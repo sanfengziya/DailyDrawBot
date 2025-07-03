@@ -211,3 +211,6 @@ venv/
 .env
 __pycache__/
 *.pyc
+
+# database
+*.db
