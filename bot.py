@@ -101,7 +101,7 @@ async def draw(ctx):
     conn.commit()
     conn.close()
 
-    await ctx.send(f"{ctx.author.mention} 你抽到了 **{earned}** 分！明天下午美东12点后可以再抽。")
+    await ctx.send(f"{ctx.author.mention} 你抽到了 **{earned}** 分！明天凌晨12点（UTC-4）后可再抽。")
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member = None):
@@ -136,7 +136,7 @@ async def ranking(ctx):
         msg += f"{i}. {user.name}: {points} 分\n"
     await ctx.send(msg)
 
-@tasks.loop(time=datetime.time(hour=12, tzinfo=pytz.timezone("US/Eastern")))
+@tasks.loop(time=datetime.time(hour=0, tzinfo=pytz.timezone("US/Eastern")))
 async def daily_reminder():
     for guild in bot.guilds:
         for channel in guild.text_channels:
