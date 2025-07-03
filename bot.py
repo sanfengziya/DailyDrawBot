@@ -9,7 +9,7 @@ import pytz
 import os
 from discord import File
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = "MTM5MDEzMjA5MzY2NDg4NjkxNQ.GIY9jP.vMxw86z4VK1Okug94Crx9Zx6WFvT00ip01RO6Y"
 PREFIX = "!"
 intents = discord.Intents.default()
 intents.message_content = True
