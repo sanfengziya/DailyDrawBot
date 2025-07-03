@@ -10,6 +10,7 @@ import os
 from discord import File
 
 TOKEN = "MTM5MDEzMjA5MzY2NDg4NjkxNQ.GIY9jP.vMxw86z4VK1Okug94Crx9Zx6WFvT00ip01RO6Y"
+YOUR_GUILD_ID = 1389456172897009775
 PREFIX = "!"
 intents = discord.Intents.default()
 intents.message_content = True
@@ -45,6 +46,11 @@ def now_est():
 async def on_ready():
     print(f"已登录为 {bot.user}")
 
+@bot.event
+async def on_guild_join(guild):
+    if guild.id != YOUR_GUILD_ID:
+        await guild.leave()
+
 @bot.command(name="draw")
 async def draw(ctx):
     user_id = ctx.author.id
@@ -72,7 +78,7 @@ async def draw(ctx):
     conn.commit()
     conn.close()
 
-    await ctx.send(f"{ctx.author.mention} 你抽到了 **{earned}** 分！明天 UTC-4 凌晨 0 点后可以再抽。")
+    await ctx.send(f"{ctx.author.mention} 你抽到了 **{earned}** 分！明天（UTC-4）时间凌晨 0 点后可再次参与。")
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member = None):

@@ -214,3 +214,6 @@ __pycache__/
 
 # database
 *.db
+
+# macOS
+.DS_Store
