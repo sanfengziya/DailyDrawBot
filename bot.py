@@ -151,8 +151,8 @@ async def addtag(ctx, price: int, role: discord.Role):
     conn.close()
     await ctx.send(f"已添加身份组 `{role.name}`，价格为 {price} 分。")
 
-@bot.command(name="taglist")
-async def tag_list(ctx):
+@bot.command(name="roleshop")
+async def roleshop(ctx):
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
     c.execute("SELECT role_id, price FROM tags")
