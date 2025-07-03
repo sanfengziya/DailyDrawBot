@@ -151,6 +151,29 @@ async def addtag(ctx, price: int, role: discord.Role):
     conn.close()
     await ctx.send(f"已添加身份组 `{role.name}`，价格为 {price} 分。")
 
+@bot.command(name="taglist")
+async def tag_list(ctx):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT role_id, price FROM tags")
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        await ctx.send("当前没有可购买的身份组。")
+        return
+
+    lines = []
+    for role_id, price in rows:
+        role = ctx.guild.get_role(role_id)
+        if role:
+            lines.append(f"{role.mention} —— {price} 分")
+        else:
+            lines.append(f"（未知角色）ID: {role_id} —— {price} 分")
+
+    msg = "**🎟️ 可购买身份组列表：**\n" + "\n".join(lines)
+    await ctx.send(msg)
+
 @bot.command(name="buy")
 async def buy(ctx, *, role_name: str):
     guild = ctx.guild
