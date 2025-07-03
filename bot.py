@@ -67,7 +67,7 @@ async def draw(ctx):
         c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?)", (user_id, 0, "1970-01-01"))
         conn.commit()
 
-    earned = random.randint(10, 100)
+    earned = random.randint(1, 100)
     c.execute("UPDATE users SET points = points + ?, last_draw = ? WHERE user_id = ?", (earned, str(today), user_id))
     conn.commit()
     conn.close()
