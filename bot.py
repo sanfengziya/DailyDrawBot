@@ -268,8 +268,8 @@ async def ranking(ctx):
     else:
         font = ImageFont.load_default()
 
-    padding = 15
-    line_height = 75
+    padding = 20
+    line_height = 85
     draw_dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     max_text_width = max(
         draw_dummy.textbbox((0, 0), t, font=font)[2] for _, t in entries
