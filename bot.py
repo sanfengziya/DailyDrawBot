@@ -332,14 +332,18 @@ async def quiz(ctx, category: str, number: int):
 
         start = asyncio.get_event_loop().time()
         answered = False
-        warned = False
+
+        async def warn_after_delay():
+            await asyncio.sleep(50)
+            if not answered:
+                await ctx.send("⏰ 仅剩下 10 秒！")
+
+        warning_task = asyncio.create_task(warn_after_delay())
+
         while True:
             remaining = 60 - (asyncio.get_event_loop().time() - start)
             if remaining <= 0:
                 break
-            if remaining <= 10 and not warned:
-                await ctx.send("⏰ 仅剩下 10 秒！")
-                warned = True
 
             def check(m):
                 return (
@@ -379,6 +383,9 @@ async def quiz(ctx, category: str, number: int):
                 break
             else:
                 await ctx.send(f"❌ {reply.author.mention} 答错了！再试试？")
+
+        if not warning_task.done():
+            warning_task.cancel()
 
         if not answered:
             letter = ["A", "B", "C", "D"][ans - 1]
