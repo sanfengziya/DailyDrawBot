@@ -22,36 +22,50 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-# 初始化数据库
-conn = sqlite3.connect("database.db")
-c = conn.cursor()
-c.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY,
-        points INTEGER DEFAULT 0,
-        last_draw TEXT
+# 数据库文件路径与脚本同级，避免在不同工作目录运行时出错
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
+
+# 初始化数据库，如果表不存在就创建
+def init_db() -> None:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            points INTEGER DEFAULT 0,
+            last_draw TEXT
+        )
+        """
     )
-''')
-c.execute('''
-    CREATE TABLE IF NOT EXISTS tags (
-        role_id INTEGER PRIMARY KEY,
-        price INTEGER NOT NULL
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tags (
+            role_id INTEGER PRIMARY KEY,
+            price INTEGER NOT NULL
+        )
+        """
     )
-''')
-c.execute('''
-    CREATE TABLE IF NOT EXISTS quiz_questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        question TEXT NOT NULL,
-        option1 TEXT NOT NULL,
-        option2 TEXT NOT NULL,
-        option3 TEXT NOT NULL,
-        option4 TEXT NOT NULL,
-        answer INTEGER NOT NULL CHECK(answer BETWEEN 1 AND 4)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS quiz_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            question TEXT NOT NULL,
+            option1 TEXT NOT NULL,
+            option2 TEXT NOT NULL,
+            option3 TEXT NOT NULL,
+            option4 TEXT NOT NULL,
+            answer INTEGER NOT NULL CHECK(answer BETWEEN 1 AND 4)
+        )
+        """
     )
-''')
-conn.commit()
-conn.close()
+    conn.commit()
+    conn.close()
+
+
+init_db()
 
 # 转换 UTC 到 UTC-4 时间
 def now_est():
@@ -74,7 +88,7 @@ async def draw(ctx):
     now = now_est()
     today = now.date()
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT points, last_draw FROM users WHERE user_id = ?", (user_id,))
     row = c.fetchone()
@@ -102,7 +116,7 @@ async def check(ctx, member: discord.Member = None):
     if member is None:
         member = ctx.author
     user_id = member.id
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
     row = c.fetchone()
@@ -119,7 +133,7 @@ async def reset_draw(ctx, member: discord.Member):
     user_id = member.id
     yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
     if c.fetchone():
@@ -140,7 +154,7 @@ async def reset_all(ctx, confirm: str = None):
         )
         return
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM users")
     conn.commit()
@@ -151,7 +165,7 @@ async def reset_all(ctx, confirm: str = None):
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
 async def backup(ctx):
-    await ctx.send(file=File("database.db"))
+    await ctx.send(file=File(DB_PATH))
 
 @bot.command(name="importdb")
 @commands.has_permissions(administrator=True)
@@ -161,13 +175,15 @@ async def importdb(ctx):
         return
 
     attachment = ctx.message.attachments[0]
-    await attachment.save("database.db")
+    await attachment.save(DB_PATH)
+    # 导入后确保所需表存在
+    init_db()
     await ctx.send("✅ 数据库已导入。")
 
 @bot.command(name="addtag")
 @commands.has_permissions(administrator=True)
 async def addtag(ctx, price: int, role: discord.Role):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO tags (role_id, price) VALUES (?, ?)", (role.id, price))
     conn.commit()
@@ -176,7 +192,7 @@ async def addtag(ctx, price: int, role: discord.Role):
 
 @bot.command(name="roleshop")
 async def roleshop(ctx):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT role_id, price FROM tags")
     rows = c.fetchall()
@@ -205,7 +221,7 @@ async def buy(ctx, *, role_name: str):
         await ctx.send("未找到该身份组。")
         return
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT price FROM tags WHERE role_id = ?", (role.id,))
     row = c.fetchone()
@@ -248,7 +264,7 @@ async def buy(ctx, *, role_name: str):
 @bot.command(name="give")
 @commands.has_permissions(administrator=True)
 async def give(ctx, member: discord.Member, amount: int):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET points = points + ?", (member.id, 0, "1970-01-01", amount))
     conn.commit()
@@ -258,7 +274,7 @@ async def give(ctx, member: discord.Member, amount: int):
 
 @bot.command(name="quizlist")
 async def quizlist(ctx):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT DISTINCT category FROM quiz_questions")
     rows = [r[0] for r in c.fetchall()]
@@ -280,7 +296,7 @@ async def importquiz(ctx):
     data = await attachment.read()
     lines = data.decode("utf-8").splitlines()
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     count = 0
     for line in lines:
@@ -308,7 +324,7 @@ async def importquiz(ctx):
 @bot.command(name="quiz")
 @commands.has_permissions(administrator=True)
 async def quiz(ctx, category: str, number: int):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
         "SELECT question, option1, option2, option3, option4, answer FROM quiz_questions WHERE category = ?",
@@ -332,14 +348,18 @@ async def quiz(ctx, category: str, number: int):
 
         start = asyncio.get_event_loop().time()
         answered = False
-        warned = False
+
+        async def warn_after_delay():
+            await asyncio.sleep(50)
+            if not answered:
+                await ctx.send("⏰ 仅剩下 10 秒！")
+
+        warning_task = asyncio.create_task(warn_after_delay())
+
         while True:
             remaining = 60 - (asyncio.get_event_loop().time() - start)
             if remaining <= 0:
                 break
-            if remaining <= 10 and not warned:
-                await ctx.send("⏰ 仅剩下 10 秒！")
-                warned = True
 
             def check(m):
                 return (
@@ -362,7 +382,7 @@ async def quiz(ctx, category: str, number: int):
             if choice == ans:
                 letter = ["A", "B", "C", "D"][ans - 1]
                 await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {letter}，奖励 10 分")
-                conn = sqlite3.connect("database.db")
+                conn = sqlite3.connect(DB_PATH)
                 c = conn.cursor()
                 c.execute(
                     """
@@ -380,6 +400,9 @@ async def quiz(ctx, category: str, number: int):
             else:
                 await ctx.send(f"❌ {reply.author.mention} 答错了！再试试？")
 
+        if not warning_task.done():
+            warning_task.cancel()
+
         if not answered:
             letter = ["A", "B", "C", "D"][ans - 1]
             await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
@@ -388,7 +411,7 @@ async def quiz(ctx, category: str, number: int):
 
 @bot.command(name="ranking")
 async def ranking(ctx):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT user_id, points FROM users ORDER BY points DESC LIMIT 10")
     rows = c.fetchall()
