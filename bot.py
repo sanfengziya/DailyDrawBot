@@ -7,6 +7,8 @@ import random
 import datetime
 import pytz
 import os
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
 from discord import File
 
 TOKEN = os.getenv("TOKEN")
@@ -248,10 +250,34 @@ async def ranking(ctx):
     rows = c.fetchall()
     conn.close()
 
-    msg = "🏆 前十排行榜：\n"
+    if not rows:
+        await ctx.send("没有排名数据。")
+        return
+
+    entries = []
     for i, (user_id, points) in enumerate(rows, start=1):
         user = await bot.fetch_user(user_id)
-        msg += f"{i}. {user.name}: {points} 分\n"
-    await ctx.send(msg)
+        avatar_bytes = await user.display_avatar.replace(size=64).read()
+        avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((64, 64))
+        entries.append((avatar, f"{i}. {user.name}: {points} 分"))
+
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    font = ImageFont.truetype(font_path, 20)
+    line_height = 70
+    width = 400
+    height = line_height * len(entries)
+    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    y = 0
+    for avatar, text in entries:
+        img.paste(avatar, (10, y + 3), avatar)
+        draw.text((80, y + 20), text, fill=(0, 0, 0), font=font)
+        y += line_height
+
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    await ctx.send(file=File(fp=buffer, filename="ranking.png"))
 
 bot.run(TOKEN)
