@@ -360,8 +360,13 @@ async def quiz(ctx, category: str, number: int):
                 conn = sqlite3.connect("database.db")
                 c = conn.cursor()
                 c.execute(
-                    "INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET points = points + ?",
-                    (reply.author.id, 0, "1970-01-01", 10),
+                    """
+                    INSERT INTO users (user_id, points, last_draw)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE
+                        SET points = points + excluded.points
+                    """,
+                    (reply.author.id, 10, "1970-01-01"),
                 )
                 conn.commit()
                 conn.close()
