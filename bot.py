@@ -259,7 +259,7 @@ async def ranking(ctx):
         user = await bot.fetch_user(user_id)
         avatar_bytes = await user.display_avatar.replace(size=64).read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((64, 64))
-        entries.append((avatar, f"{i}. {user.name}: {points} 分"))
+        entries.append((avatar, f"{i}. {user.name}: {points} points"))
 
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     
@@ -268,20 +268,25 @@ async def ranking(ctx):
     else:
         font = ImageFont.load_default()
 
-    line_height = 70
+    padding = 15
+    line_height = 75
     draw_dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    max_text_width = max(draw_dummy.textbbox((0, 0), t, font=font)[2] for _, t in entries)
-    width = max_text_width + 100
+    max_text_width = max(
+        draw_dummy.textbbox((0, 0), t, font=font)[2] for _, t in entries
+    )
+    width = max_text_width + 140
 
-    height = line_height * len(entries)
-    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+    height = line_height * len(entries) + padding * 2
+    img = Image.new("RGBA", (width, height), (245, 245, 245, 255))
     draw = ImageDraw.Draw(img)
 
-    y = 0
+    y = padding
     for avatar, text in entries:
-        img.paste(avatar, (10, y + 3), avatar)
-        draw.text((80, y + 20), text, fill=(0, 0, 0), font=font)
+        img.paste(avatar, (padding, y + 3), avatar)
+        draw.text((padding + 70, y + 20), text, fill=(0, 0, 0), font=font)
+        draw.line((padding, y, width - padding, y), fill=(220, 220, 220), width=1)
         y += line_height
+    draw.line((padding, y, width - padding, y), fill=(220, 220, 220), width=1)
 
     buffer = BytesIO()
     img.save(buffer, format="PNG")
