@@ -2,6 +2,7 @@
 
 import discord
 from discord.ext import commands
+import asyncio
 import sqlite3
 import random
 import datetime
@@ -35,6 +36,18 @@ c.execute('''
     CREATE TABLE IF NOT EXISTS tags (
         role_id INTEGER PRIMARY KEY,
         price INTEGER NOT NULL
+    )
+''')
+c.execute('''
+    CREATE TABLE IF NOT EXISTS quiz_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        question TEXT NOT NULL,
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL,
+        option4 TEXT NOT NULL,
+        answer INTEGER NOT NULL CHECK(answer BETWEEN 1 AND 4)
     )
 ''')
 conn.commit()
@@ -241,6 +254,127 @@ async def give(ctx, member: discord.Member, amount: int):
     conn.commit()
     conn.close()
     await ctx.send(f"{ctx.author.mention} 已给予 {member.mention} {amount} 分。")
+
+
+@bot.command(name="quizlist")
+async def quizlist(ctx):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT category FROM quiz_questions")
+    rows = [r[0] for r in c.fetchall()]
+    conn.close()
+    if rows:
+        await ctx.send("📋 题库类别：" + ", ".join(rows))
+    else:
+        await ctx.send("暂无题库。")
+
+
+@bot.command(name="importquiz")
+@commands.has_permissions(administrator=True)
+async def importquiz(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("请附加题库文件。")
+        return
+
+    attachment = ctx.message.attachments[0]
+    data = await attachment.read()
+    lines = data.decode("utf-8").splitlines()
+
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    count = 0
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) != 7:
+            continue
+        category, question, o1, o2, o3, o4, ans = parts
+        ans = ans.upper()
+        if ans not in ["A", "B", "C", "D"]:
+            continue
+        ans_idx = ["A", "B", "C", "D"].index(ans) + 1
+        c.execute(
+            "INSERT INTO quiz_questions (category, question, option1, option2, option3, option4, answer) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (category, question, o1, o2, o3, o4, ans_idx),
+        )
+        count += 1
+    conn.commit()
+    conn.close()
+    await ctx.send(f"✅ 已导入 {count} 道题目。")
+
+
+@bot.command(name="quiz")
+@commands.has_permissions(administrator=True)
+async def quiz(ctx, category: str, number: int):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT question, option1, option2, option3, option4, answer FROM quiz_questions WHERE category = ?",
+        (category,),
+    )
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        await ctx.send("该类别没有题目。")
+        return
+
+    random.shuffle(rows)
+    if number > len(rows):
+        number = len(rows)
+    rows = rows[:number]
+
+    for q, o1, o2, o3, o4, ans in rows:
+        await ctx.send(f"**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}")
+
+        start = asyncio.get_event_loop().time()
+        answered = False
+        while True:
+            remaining = 60 - (asyncio.get_event_loop().time() - start)
+            if remaining <= 0:
+                break
+
+            def check(m):
+                return (
+                    not m.author.bot
+                    and m.channel == ctx.channel
+                    and m.content.upper() in ["A", "B", "C", "D", "1", "2", "3", "4"]
+                )
+
+            try:
+                reply = await bot.wait_for("message", check=check, timeout=remaining)
+            except asyncio.TimeoutError:
+                break
+
+            txt = reply.content.upper()
+            if txt in ["1", "2", "3", "4"]:
+                choice = int(txt)
+            else:
+                choice = ["A", "B", "C", "D"].index(txt) + 1
+
+            if choice == ans:
+                letter = ["A", "B", "C", "D"][ans - 1]
+                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {letter}，奖励 10 分")
+                conn = sqlite3.connect("database.db")
+                c = conn.cursor()
+                c.execute(
+                    "INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET points = points + ?",
+                    (reply.author.id, 0, "1970-01-01", 10),
+                )
+                conn.commit()
+                conn.close()
+                answered = True
+                break
+            else:
+                await ctx.send(f"❌ {reply.author.mention} 答错了！再试试？")
+
+        if not answered:
+            letter = ["A", "B", "C", "D"][ans - 1]
+            await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
+
+    await ctx.send("答题结束！")
 
 @bot.command(name="ranking")
 async def ranking(ctx):
