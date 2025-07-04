@@ -9,7 +9,9 @@ import pytz
 import os
 from discord import File
 
-TOKEN = "MTM5MDEzMjA5MzY2NDg4NjkxNQ.GIY9jP.vMxw86z4VK1Okug94Crx9Zx6WFvT00ip01RO6Y"
+TOKEN = os.getenv("TOKEN")
+if TOKEN is None:
+    raise RuntimeError("TOKEN environment variable not set")
 YOUR_GUILD_ID = 1389456172897009775
 PREFIX = "!"
 intents = discord.Intents.default()
