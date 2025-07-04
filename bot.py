@@ -328,7 +328,7 @@ async def quiz(ctx, category: str, number: int):
 
     for q, o1, o2, o3, o4, ans in rows:
         await ctx.send(f"**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}")
-        await ctx.send("🎮 游戏开始！只有 60 秒作答")
+        await ctx.send("🎮 游戏开始，你只有 60 秒时间作答！")
 
         start = asyncio.get_event_loop().time()
         answered = False
@@ -338,7 +338,7 @@ async def quiz(ctx, category: str, number: int):
             if remaining <= 0:
                 break
             if remaining <= 10 and not warned:
-                await ctx.send("⏰ 剩下 10 秒！")
+                await ctx.send("⏰ 仅剩下 10 秒！")
                 warned = True
 
             def check(m):
