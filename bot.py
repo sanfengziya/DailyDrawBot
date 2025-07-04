@@ -328,13 +328,18 @@ async def quiz(ctx, category: str, number: int):
 
     for q, o1, o2, o3, o4, ans in rows:
         await ctx.send(f"**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}")
+        await ctx.send("🎮 游戏开始，你只有 60 秒的时间作答！")
 
         start = asyncio.get_event_loop().time()
         answered = False
+        warned = False
         while True:
             remaining = 60 - (asyncio.get_event_loop().time() - start)
             if remaining <= 0:
                 break
+            if remaining <= 10 and not warned:
+                await ctx.send("⏰ 仅剩下 10 秒！")
+                warned = True
 
             def check(m):
                 return (
@@ -360,8 +365,13 @@ async def quiz(ctx, category: str, number: int):
                 conn = sqlite3.connect("database.db")
                 c = conn.cursor()
                 c.execute(
-                    "INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET points = points + ?",
-                    (reply.author.id, 0, "1970-01-01", 10),
+                    """
+                    INSERT INTO users (user_id, points, last_draw)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE
+                        SET points = points + excluded.points
+                    """,
+                    (reply.author.id, 10, "1970-01-01"),
                 )
                 conn.commit()
                 conn.close()
