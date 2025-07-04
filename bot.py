@@ -11,7 +11,9 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from discord import File
 
-TOKEN = "MTM5MDEzMjA5MzY2NDg4NjkxNQ.GIY9jP.vMxw86z4VK1Okug94Crx9Zx6WFvT00ip01RO6Y"
+TOKEN = os.getenv("TOKEN")
+if TOKEN is None:
+    raise RuntimeError("TOKEN environment variable not set")
 YOUR_GUILD_ID = 1389456172897009775
 PREFIX = "!"
 intents = discord.Intents.default()
@@ -260,14 +262,17 @@ async def ranking(ctx):
         entries.append((avatar, f"{i}. {user.name}: {points} 分"))
 
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    
     if os.path.exists(font_path):
         font = ImageFont.truetype(font_path, 20)
     else:
         font = ImageFont.load_default()
+
     line_height = 70
     draw_dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     max_text_width = max(draw_dummy.textbbox((0, 0), t, font=font)[2] for _, t in entries)
     width = max_text_width + 100
+
     height = line_height * len(entries)
     img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(img)
