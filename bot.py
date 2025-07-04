@@ -262,9 +262,17 @@ async def ranking(ctx):
         entries.append((avatar, f"{i}. {user.name}: {points} 分"))
 
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    font = ImageFont.truetype(font_path, 20)
+    
+    if os.path.exists(font_path):
+        font = ImageFont.truetype(font_path, 20)
+    else:
+        font = ImageFont.load_default()
+
     line_height = 70
-    width = 400
+    draw_dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    max_text_width = max(draw_dummy.textbbox((0, 0), t, font=font)[2] for _, t in entries)
+    width = max_text_width + 100
+
     height = line_height * len(entries)
     img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(img)
