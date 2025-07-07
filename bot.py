@@ -272,6 +272,25 @@ async def give(ctx, member: discord.Member, amount: int):
     await ctx.send(f"{ctx.author.mention} 已给予 {member.mention} {amount} 分。")
 
 
+@bot.command(name="setpoint")
+@commands.has_permissions(administrator=True)
+async def setpoint(ctx, member: discord.Member, points: int):
+    """Set a member's points exactly to the specified value."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO users (user_id, points, last_draw)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET points = excluded.points
+        """,
+        (member.id, points, "1970-01-01"),
+    )
+    conn.commit()
+    conn.close()
+    await ctx.send(f"{ctx.author.mention} 已将 {member.mention} 的分数设为 {points} 分。")
+
+
 @bot.command(name="quizlist")
 async def quizlist(ctx):
     conn = sqlite3.connect(DB_PATH)
