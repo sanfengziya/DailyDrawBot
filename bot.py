@@ -3,7 +3,8 @@
 import discord
 from discord.ext import commands
 import asyncio
-import sqlite3
+import mysql.connector
+from urllib.parse import urlparse
 import random
 import datetime
 import pytz
@@ -22,46 +23,58 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-# 数据库文件路径与脚本同级，避免在不同工作目录运行时出错
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database.db")
+MYSQL_URL = os.getenv("MYSQL_URL")
+if MYSQL_URL is None:
+    raise RuntimeError("MYSQL_URL environment variable not set")
+url = urlparse(MYSQL_URL)
+DB_CONFIG = {
+    "host": url.hostname,
+    "port": url.port,
+    "user": url.username,
+    "password": url.password,
+    "database": url.path[1:],
+}
+
+def get_connection():
+    return mysql.connector.connect(**DB_CONFIG)
 
 # 初始化数据库，如果表不存在就创建
 def init_db() -> None:
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            points INTEGER DEFAULT 0,
-            last_draw TEXT
+            user_id BIGINT PRIMARY KEY,
+            points INT DEFAULT 0,
+            last_draw DATE
         )
         """
     )
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS tags (
-            role_id INTEGER PRIMARY KEY,
-            price INTEGER NOT NULL
+            role_id BIGINT PRIMARY KEY,
+            price INT NOT NULL
         )
         """
     )
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS quiz_questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(255) NOT NULL,
             question TEXT NOT NULL,
             option1 TEXT NOT NULL,
             option2 TEXT NOT NULL,
             option3 TEXT NOT NULL,
             option4 TEXT NOT NULL,
-            answer INTEGER NOT NULL CHECK(answer BETWEEN 1 AND 4)
+            answer TINYINT NOT NULL
         )
         """
     )
     conn.commit()
+    c.close()
     conn.close()
 
 
@@ -88,24 +101,27 @@ async def draw(ctx):
     now = now_est()
     today = now.date()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw FROM users WHERE user_id = ?", (user_id,))
+    c.execute("SELECT points, last_draw FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
 
     if row:
-        last_draw_str = row[1]
-        last_draw_date = datetime.datetime.strptime(last_draw_str, "%Y-%m-%d").date()
+        last_draw_date = row[1]
+        if isinstance(last_draw_date, str):
+            last_draw_date = datetime.datetime.strptime(last_draw_date, "%Y-%m-%d").date()
+        elif isinstance(last_draw_date, datetime.datetime):
+            last_draw_date = last_draw_date.date()
         if last_draw_date == today:
             await ctx.send(f"{ctx.author.mention} 你今天已经抽过奖啦，请明天再来。")
             conn.close()
             return
     else:
-        c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?)", (user_id, 0, "1970-01-01"))
+        c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s)", (user_id, 0, "1970-01-01"))
         conn.commit()
 
     earned = random.randint(1, 100)
-    c.execute("UPDATE users SET points = points + ?, last_draw = ? WHERE user_id = ?", (earned, str(today), user_id))
+    c.execute("UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s", (earned, str(today), user_id))
     conn.commit()
     conn.close()
 
@@ -116,9 +132,9 @@ async def check(ctx, member: discord.Member = None):
     if member is None:
         member = ctx.author
     user_id = member.id
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
+    c.execute("SELECT points FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
     conn.close()
 
@@ -133,11 +149,11 @@ async def reset_draw(ctx, member: discord.Member):
     user_id = member.id
     yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    c.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     if c.fetchone():
-        c.execute("UPDATE users SET last_draw = ? WHERE user_id = ?", (yesterday, user_id))
+        c.execute("UPDATE users SET last_draw = %s WHERE user_id = %s", (yesterday, user_id))
         conn.commit()
         await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
     else:
@@ -154,7 +170,7 @@ async def reset_all(ctx, confirm: str = None):
         )
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM users")
     conn.commit()
@@ -165,34 +181,32 @@ async def reset_all(ctx, confirm: str = None):
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
 async def backup(ctx):
-    await ctx.send(file=File(DB_PATH))
+    await ctx.send("备份功能仅适用于 SQLite 数据库。")
 
 @bot.command(name="importdb")
 @commands.has_permissions(administrator=True)
 async def importdb(ctx):
     if not ctx.message.attachments:
-        await ctx.send("请附加数据库文件（例如 database.db）")
+        await ctx.send("该功能仅适用于 SQLite 数据库。")
         return
-
-    attachment = ctx.message.attachments[0]
-    await attachment.save(DB_PATH)
-    # 导入后确保所需表存在
-    init_db()
-    await ctx.send("✅ 数据库已导入。")
 
 @bot.command(name="addtag")
 @commands.has_permissions(administrator=True)
 async def addtag(ctx, price: int, role: discord.Role):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO tags (role_id, price) VALUES (?, ?)", (role.id, price))
+    c.execute(
+        "INSERT INTO tags (role_id, price) VALUES (%s, %s) "
+        "ON DUPLICATE KEY UPDATE price = VALUES(price)",
+        (role.id, price),
+    )
     conn.commit()
     conn.close()
     await ctx.send(f"已添加身份组 `{role.name}`，价格为 {price} 分。")
 
 @bot.command(name="roleshop")
 async def roleshop(ctx):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT role_id, price FROM tags")
     rows = c.fetchall()
@@ -221,9 +235,9 @@ async def buy(ctx, *, role_name: str):
         await ctx.send("未找到该身份组。")
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT price FROM tags WHERE role_id = ?", (role.id,))
+    c.execute("SELECT price FROM tags WHERE role_id = %s", (role.id,))
     row = c.fetchone()
     if not row:
         await ctx.send("该身份组不可购买。")
@@ -231,7 +245,7 @@ async def buy(ctx, *, role_name: str):
         return
     price = row[0]
 
-    c.execute("SELECT points FROM users WHERE user_id = ?", (ctx.author.id,))
+    c.execute("SELECT points FROM users WHERE user_id = %s", (ctx.author.id,))
     user = c.fetchone()
     if not user or user[0] < price:
         await ctx.send("你的分数不足。")
@@ -254,7 +268,7 @@ async def buy(ctx, *, role_name: str):
         conn.close()
         return
 
-    c.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (price, ctx.author.id))
+    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (price, ctx.author.id))
     conn.commit()
     conn.close()
 
@@ -264,9 +278,13 @@ async def buy(ctx, *, role_name: str):
 @bot.command(name="give")
 @commands.has_permissions(administrator=True)
 async def give(ctx, member: discord.Member, amount: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET points = points + ?", (member.id, 0, "1970-01-01", amount))
+    c.execute(
+        "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
+        "ON DUPLICATE KEY UPDATE points = points + %s",
+        (member.id, 0, "1970-01-01", amount),
+    )
     conn.commit()
     conn.close()
     await ctx.send(f"{ctx.author.mention} 已给予 {member.mention} {amount} 分。")
@@ -276,14 +294,11 @@ async def give(ctx, member: discord.Member, amount: int):
 @commands.has_permissions(administrator=True)
 async def setpoint(ctx, member: discord.Member, points: int):
     """Set a member's points exactly to the specified value."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute(
-        """
-        INSERT INTO users (user_id, points, last_draw)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET points = excluded.points
-        """,
+        "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
+        "ON DUPLICATE KEY UPDATE points = VALUES(points)",
         (member.id, points, "1970-01-01"),
     )
     conn.commit()
@@ -293,7 +308,7 @@ async def setpoint(ctx, member: discord.Member, points: int):
 
 @bot.command(name="quizlist")
 async def quizlist(ctx):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT DISTINCT category FROM quiz_questions")
     rows = [r[0] for r in c.fetchall()]
@@ -315,7 +330,7 @@ async def importquiz(ctx):
     data = await attachment.read()
     lines = data.decode("utf-8").splitlines()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     count = 0
     for line in lines:
@@ -331,7 +346,7 @@ async def importquiz(ctx):
             continue
         ans_idx = ["A", "B", "C", "D"].index(ans) + 1
         c.execute(
-            "INSERT INTO quiz_questions (category, question, option1, option2, option3, option4, answer) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO quiz_questions (category, question, option1, option2, option3, option4, answer) VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (category, question, o1, o2, o3, o4, ans_idx),
         )
         count += 1
@@ -343,10 +358,10 @@ async def importquiz(ctx):
 @bot.command(name="quiz")
 @commands.has_permissions(administrator=True)
 async def quiz(ctx, category: str, number: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT question, option1, option2, option3, option4, answer FROM quiz_questions WHERE category = ?",
+        "SELECT question, option1, option2, option3, option4, answer FROM quiz_questions WHERE category = %s",
         (category,),
     )
     rows = c.fetchall()
@@ -401,15 +416,11 @@ async def quiz(ctx, category: str, number: int):
             if choice == ans:
                 letter = ["A", "B", "C", "D"][ans - 1]
                 await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {letter}，奖励 10 分")
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_connection()
                 c = conn.cursor()
                 c.execute(
-                    """
-                    INSERT INTO users (user_id, points, last_draw)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(user_id) DO UPDATE
-                        SET points = points + excluded.points
-                    """,
+                    "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
+                    "ON DUPLICATE KEY UPDATE points = points + VALUES(points)",
                     (reply.author.id, 10, "1970-01-01"),
                 )
                 conn.commit()
@@ -430,7 +441,7 @@ async def quiz(ctx, category: str, number: int):
 
 @bot.command(name="ranking")
 async def ranking(ctx):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT user_id, points FROM users ORDER BY points DESC LIMIT 10")
     rows = c.fetchall()
