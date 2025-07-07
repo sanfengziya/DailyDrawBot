@@ -8,12 +8,15 @@
 - `!ranking` now returns an image leaderboard with avatars
 
 Set the Discord bot token using an environment variable named `TOKEN` before
-running the bot. If you deploy on Railway, add `TOKEN` to your service's
-environment variables and Railway will pass it to the process automatically.
+running the bot. Database access now requires a MySQL connection string passed
+via the `MYSQL_URL` environment variable. If you deploy on Railway, both
+variables can be configured in your service's environment settings and will be
+provided to the bot process automatically.
 When running locally you can export the variable first, e.g.:
 
 ```bash
 export TOKEN="YOUR_DISCORD_TOKEN"
+export MYSQL_URL="mysql://user:pass@host:port/dbname"
 python bot.py
 ```
 
