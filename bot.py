@@ -355,6 +355,61 @@ async def importquiz(ctx):
     await ctx.send(f"✅ 已导入 {count} 道题目。")
 
 
+@bot.command(name="deletequiz")
+@commands.has_permissions(administrator=True)
+async def deletequiz(ctx, category: str):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, question FROM quiz_questions WHERE category = %s", (category,))
+    rows = c.fetchall()
+    if not rows:
+        conn.close()
+        await ctx.send("该类别没有题目。")
+        return
+
+    msg_lines = [f"{i + 1}. {q}" for i, (qid, q) in enumerate(rows)]
+    await ctx.send("**题目列表：**\n" + "\n".join(msg_lines))
+    await ctx.send("请输入要删除的题号，以空格分隔，或输入 `取消` 终止。")
+
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel
+
+    try:
+        reply = await bot.wait_for("message", check=check, timeout=300.0)
+    except asyncio.TimeoutError:
+        await ctx.send("操作超时，已取消。")
+        conn.close()
+        return
+
+    if reply.content.strip().lower() == "取消":
+        await ctx.send("已取消。")
+        conn.close()
+        return
+
+    try:
+        numbers = [int(n) for n in reply.content.strip().split()]
+    except ValueError:
+        await ctx.send("输入格式错误。")
+        conn.close()
+        return
+
+    ids = []
+    for num in numbers:
+        if 1 <= num <= len(rows):
+            ids.append(rows[num - 1][0])
+
+    if not ids:
+        await ctx.send("没有有效的题号可删除。")
+        conn.close()
+        return
+
+    format_strings = ",".join(["%s"] * len(ids))
+    c.execute(f"DELETE FROM quiz_questions WHERE id IN ({format_strings})", ids)
+    conn.commit()
+    conn.close()
+    await ctx.send(f"已删除 {len(ids)} 道题目。")
+
+
 @bot.command(name="quiz")
 @commands.has_permissions(administrator=True)
 async def quiz(ctx, category: str, number: int):
