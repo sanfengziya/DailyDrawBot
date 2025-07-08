@@ -437,6 +437,7 @@ async def quiz(ctx, category: str, number: int):
 
         start = asyncio.get_event_loop().time()
         answered = False
+        attempted_users = set()
 
         async def warn_after_delay():
             await asyncio.sleep(50)
@@ -455,6 +456,7 @@ async def quiz(ctx, category: str, number: int):
                     not m.author.bot
                     and m.channel == ctx.channel
                     and m.content.upper() in ["A", "B", "C", "D", "1", "2", "3", "4"]
+                    and m.author.id not in attempted_users
                 )
 
             try:
@@ -462,6 +464,7 @@ async def quiz(ctx, category: str, number: int):
             except asyncio.TimeoutError:
                 break
 
+            attempted_users.add(reply.author.id)
             txt = reply.content.upper()
             if txt in ["1", "2", "3", "4"]:
                 choice = int(txt)
@@ -483,7 +486,7 @@ async def quiz(ctx, category: str, number: int):
                 answered = True
                 break
             else:
-                await ctx.send(f"❌ {reply.author.mention} 答错了！再试试？")
+                await ctx.send(f"❌ {reply.author.mention} 答错了！你已经没有再答的机会啦")
 
         if not warning_task.done():
             warning_task.cancel()
