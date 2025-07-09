@@ -217,15 +217,29 @@ async def roleshop(ctx):
         return
 
     lines = []
-    for role_id, price in rows:
-        role = ctx.guild.get_role(role_id)
-        if role:
-            lines.append(f"{role.mention} —— {price} 分")
-        else:
-            lines.append(f"（未知角色）ID: {role_id} —— {price} 分")
+    temp_line = []
 
-    msg = "**🎟️ 可购买身份组列表：**\n" + "\n".join(lines)
-    await ctx.send(msg)
+    for i, (role_id, price) in enumerate(rows):
+        role = ctx.guild.get_role(role_id)
+        name = role.name if role else f"（未知角色）ID:{role_id}"
+        temp_line.append(f"{name}（{price}分）")
+
+        if (i + 1) % 3 == 0:
+            lines.append(" ｜ ".join(temp_line))
+            temp_line = []
+
+    if temp_line:
+        lines.append(" ｜ ".join(temp_line))
+
+    # 构建 embed
+    embed = discord.Embed(
+        title="🎟️ 可购买身份组列表",
+        description="\n".join(lines),
+        color=discord.Color.blurple()  # 你也可以换成其他颜色
+    )
+
+    await ctx.send(embed=embed)
+
 
 @bot.command(name="buy")
 async def buy(ctx, *, role_name: str):

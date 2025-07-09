@@ -214,6 +214,8 @@ __pycache__/
 
 # database
 *.db
+db.py
+importdb.py
 
 # macOS
 .DS_Store
