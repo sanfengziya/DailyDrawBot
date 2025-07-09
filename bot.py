@@ -86,6 +86,7 @@ class RolePageView(discord.ui.View):
         super().__init__(timeout=60)
         self.ctx = ctx
         self.rows = rows
+        self.per_page = 5
         self.index = 0
         self.message = None
 
@@ -94,29 +95,36 @@ class RolePageView(discord.ui.View):
         self.message = await self.ctx.send(embed=embed, view=self)
 
     def get_embed(self, index: int) -> discord.Embed:
-        role_id, price = self.rows[index]
-        role = self.ctx.guild.get_role(role_id)
-        name = role.name if role else f"（未知角色）ID:{role_id}"
-        color = role.color if role and role.color.value != 0 else discord.Color.default()
+        start = index * self.per_page
+        end = start + self.per_page
+        current_rows = self.rows[start:end]
+
         embed = discord.Embed(
-            title=f"{name}",
-            description=f"价格：{price} 分\n\n第 {index + 1} / {len(self.rows)} 个",
-            color=color,
+            title="🎟️ 可购买身份组列表",
+            description=f"第 {index + 1} / {((len(self.rows) - 1) // self.per_page) + 1} 页",
+            color=discord.Color.blue()
         )
+
+        for role_id, price in current_rows:
+            role = self.ctx.guild.get_role(role_id)
+            name = role.name if role else f"（未知角色）ID:{role_id}"
+            color = role.color if role and role.color.value != 0 else discord.Color.default()
+            embed.add_field(name=name, value=f"价格：{price} 分", inline=False)
+
         return embed
 
     @discord.ui.button(label="◀️ 上一页", style=discord.ButtonStyle.secondary)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
-        self.index = (self.index - 1) % len(self.rows)
+        self.index = (self.index - 1) % (((len(self.rows) - 1) // self.per_page) + 1)
         await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
 
     @discord.ui.button(label="▶️ 下一页", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
-        self.index = (self.index + 1) % len(self.rows)
+        self.index = (self.index + 1) % (((len(self.rows) - 1) // self.per_page) + 1)
         await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
 
 # 转换 UTC 到 UTC-4 时间
