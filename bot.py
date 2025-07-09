@@ -85,7 +85,8 @@ class RolePageView(discord.ui.View):
     def __init__(self, ctx, rows):
         super().__init__(timeout=60)
         self.ctx = ctx
-        self.rows = rows
+        # split rows into pages of 5 items each
+        self.pages = [rows[i : i + 5] for i in range(0, len(rows), 5)]
         self.index = 0
         self.message = None
 
@@ -94,29 +95,40 @@ class RolePageView(discord.ui.View):
         self.message = await self.ctx.send(embed=embed, view=self)
 
     def get_embed(self, index: int) -> discord.Embed:
-        role_id, price = self.rows[index]
-        role = self.ctx.guild.get_role(role_id)
-        name = role.name if role else f"（未知角色）ID:{role_id}"
-        color = role.color if role and role.color.value != 0 else discord.Color.default()
+        page = self.pages[index]
+        lines = []
+        for role_id, price in page:
+            role = self.ctx.guild.get_role(role_id)
+            name = role.name if role else f"(未知角色)ID:{role_id}"
+            lines.append(f"{name} - {price}分")
+
+        first_role_id, _ = page[0]
+        first_role = self.ctx.guild.get_role(first_role_id)
+        color = (
+            first_role.color
+            if first_role and first_role.color.value != 0
+            else discord.Color.default()
+        )
         embed = discord.Embed(
-            title=f"{name}",
-            description=f"价格：{price} 分\n\n第 {index + 1} / {len(self.rows)} 个",
+            title="🎟️ 可购买身份组列表",
+            description="\n".join(lines),
             color=color,
         )
+        embed.set_footer(text=f"第 {index + 1} / {len(self.pages)} 页")
         return embed
 
     @discord.ui.button(label="◀️ 上一页", style=discord.ButtonStyle.secondary)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
-        self.index = (self.index - 1) % len(self.rows)
+        self.index = (self.index - 1) % len(self.pages)
         await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
 
     @discord.ui.button(label="▶️ 下一页", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
-        self.index = (self.index + 1) % len(self.rows)
+        self.index = (self.index + 1) % len(self.pages)
         await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
 
 # 转换 UTC 到 UTC-4 时间
@@ -247,7 +259,7 @@ async def addtag(ctx, price: int, role: discord.Role):
 async def roleshop(ctx):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT role_id, price FROM tags")
+    c.execute("SELECT role_id, price FROM tags ORDER BY price")
     rows = c.fetchall()
     conn.close()
 
