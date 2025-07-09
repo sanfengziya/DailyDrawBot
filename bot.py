@@ -80,6 +80,45 @@ def init_db() -> None:
 
 init_db()
 
+# View for paginated role shop display
+class RolePageView(discord.ui.View):
+    def __init__(self, ctx, rows):
+        super().__init__(timeout=60)
+        self.ctx = ctx
+        self.rows = rows
+        self.index = 0
+        self.message = None
+
+    async def send_initial(self):
+        embed = self.get_embed(self.index)
+        self.message = await self.ctx.send(embed=embed, view=self)
+
+    def get_embed(self, index: int) -> discord.Embed:
+        role_id, price = self.rows[index]
+        role = self.ctx.guild.get_role(role_id)
+        name = role.name if role else f"（未知角色）ID:{role_id}"
+        color = role.color if role and role.color.value != 0 else discord.Color.default()
+        embed = discord.Embed(
+            title=f"{name}",
+            description=f"价格：{price} 分\n\n第 {index + 1} / {len(self.rows)} 个",
+            color=color,
+        )
+        return embed
+
+    @discord.ui.button(label="◀️ 上一页", style=discord.ButtonStyle.secondary)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
+        self.index = (self.index - 1) % len(self.rows)
+        await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
+
+    @discord.ui.button(label="▶️ 下一页", style=discord.ButtonStyle.secondary)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
+        self.index = (self.index + 1) % len(self.rows)
+        await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
+
 # 转换 UTC 到 UTC-4 时间
 def now_est():
     utc_now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
@@ -216,29 +255,8 @@ async def roleshop(ctx):
         await ctx.send("当前没有可购买的身份组。")
         return
 
-    lines = []
-    temp_line = []
-
-    for i, (role_id, price) in enumerate(rows):
-        role = ctx.guild.get_role(role_id)
-        name = role.name if role else f"（未知角色）ID:{role_id}"
-        temp_line.append(f"{name}（{price}分）")
-
-        if (i + 1) % 3 == 0:
-            lines.append(" ｜ ".join(temp_line))
-            temp_line = []
-
-    if temp_line:
-        lines.append(" ｜ ".join(temp_line))
-
-    # 构建 embed
-    embed = discord.Embed(
-        title="🎟️ 可购买身份组列表",
-        description="\n".join(lines),
-        color=discord.Color.blurple()  # 你也可以换成其他颜色
-    )
-
-    await ctx.send(embed=embed)
+    view = RolePageView(ctx, rows)
+    await view.send_initial()
 
 
 @bot.command(name="buy")
