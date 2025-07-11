@@ -89,13 +89,6 @@ def init_db() -> None:
         )
         """
     )
-    c.execute("SELECT COUNT(*) FROM wheel_rewards")
-    if c.fetchone()[0] == 0:
-        for p in [0, 5, 10, 20, 30, 50]:
-            c.execute(
-                "INSERT INTO wheel_rewards (points, description) VALUES (%s, %s)",
-                (p, f'{p} points'),
-            )
     conn.commit()
     c.close()
     conn.close()
@@ -319,24 +312,31 @@ async def addwheelreward(ctx, points: int, *, description: str):
 @bot.command(name="listwheelrewards")
 @commands.has_permissions(administrator=True)
 async def listwheelrewards(ctx):
+
+    """List all wheel rewards sorted by points."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT id, points, description FROM wheel_rewards")
+    c.execute("SELECT points, description FROM wheel_rewards ORDER BY points")
     rows = c.fetchall()
     conn.close()
     if not rows:
         await ctx.send("暂无奖励。")
         return
-    lines = [f"{r[0]}. {r[2]} ({r[1]} 分)" for r in rows]
+
+    lines = [f"{i + 1}. {desc} ({pts} 分)" for i, (pts, desc) in enumerate(rows)]
     await ctx.send("🎁 当前奖励：\n" + "\n".join(lines))
 
 @bot.command(name="deletewheelreward")
 @commands.has_permissions(administrator=True)
-async def deletewheelreward(ctx, reward_id: int):
+async def deletewheelreward(ctx, index: int):
+    """Delete a wheel reward by its list index."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM wheel_rewards WHERE id = %s", (reward_id,))
-    if c.rowcount:
+    c.execute("SELECT id FROM wheel_rewards ORDER BY points")
+    ids = [r[0] for r in c.fetchall()]
+    if 1 <= index <= len(ids):
+        reward_id = ids[index - 1]
+        c.execute("DELETE FROM wheel_rewards WHERE id = %s", (reward_id,))
         conn.commit()
         msg = "已删除该奖励。"
     else:
