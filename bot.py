@@ -22,6 +22,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+WHEEL_COST = 100
 
 MYSQL_URL = os.getenv("MYSQL_URL")
 if MYSQL_URL is None:
@@ -70,6 +71,15 @@ def init_db() -> None:
             option3 TEXT NOT NULL,
             option4 TEXT NOT NULL,
             answer TINYINT NOT NULL
+        )
+        """
+    )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wheel_rewards (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            points INT NOT NULL,
+            description VARCHAR(255) NOT NULL
         )
         """
     )
@@ -147,25 +157,64 @@ async def draw(ctx):
     row = c.fetchone()
 
     if row:
-        last_draw_date = row[1]
+        points, last_draw_date = row
         if isinstance(last_draw_date, str):
             last_draw_date = datetime.datetime.strptime(last_draw_date, "%Y-%m-%d").date()
         elif isinstance(last_draw_date, datetime.datetime):
             last_draw_date = last_draw_date.date()
-        if last_draw_date == today:
-            await ctx.send(f"{ctx.author.mention} 你今天已经抽过奖啦，请明天再来。")
-            conn.close()
-            return
     else:
         c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s)", (user_id, 0, "1970-01-01"))
         conn.commit()
+        points, last_draw_date = 0, datetime.date(1970, 1, 1)
 
-    earned = random.randint(1, 100)
-    c.execute("UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s", (earned, str(today), user_id))
+    first_draw = last_draw_date != today
+
+    if not first_draw:
+        if points < WHEEL_COST:
+            conn.close()
+            await ctx.send("你的积分不足，无法抽奖。")
+            return
+
+        await ctx.send("本次抽奖将消耗 100 积分，发送 `Y` 确认。")
+
+        def check(m: discord.Message) -> bool:
+            return m.author == ctx.author and m.channel == ctx.channel
+
+        try:
+            msg = await bot.wait_for("message", check=check, timeout=15)
+        except asyncio.TimeoutError:
+            conn.close()
+            await ctx.send("已取消抽奖。")
+            return
+
+        if msg.content.lower() not in ("y", "yes"):
+            conn.close()
+            await ctx.send("已取消抽奖。")
+            return
+
+        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
+
+    c.execute("SELECT points, description FROM wheel_rewards")
+    rewards = c.fetchall()
+    if rewards:
+        reward_points, desc = random.choice(rewards)
+    else:
+        reward_points, desc = 0, "什么也没有"
+    c.execute(
+        "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
+        (reward_points, str(today), user_id),
+    )
     conn.commit()
     conn.close()
 
-    await ctx.send(f"{ctx.author.mention} 你抽到了 **{earned}** 分！明天（UTC-4）时间凌晨 0 点后可再次参与。")
+    if reward_points:
+        await ctx.send(
+            f"{ctx.author.mention} 抽奖结果：**{desc}**，获得 {reward_points} 分！"
+        )
+    else:
+        await ctx.send(f"{ctx.author.mention} 抽奖结果：**{desc}**！")
+
+
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member = None):
@@ -229,6 +278,38 @@ async def importdb(ctx):
     if not ctx.message.attachments:
         await ctx.send("该功能仅适用于 SQLite 数据库。")
         return
+
+@bot.command(name="addwheelreward")
+@commands.has_permissions(administrator=True)
+async def addwheelreward(ctx, points: int, *, description: str):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO wheel_rewards (points, description) VALUES (%s, %s)",
+        (points, description),
+    )
+    conn.commit()
+    conn.close()
+    await ctx.send(f"已添加奖励 `{description}`，积分 {points} 分。")
+
+
+@bot.command(name="deletewheelreward")
+@commands.has_permissions(administrator=True)
+async def deletewheelreward(ctx, index: int):
+    """Delete a wheel reward by its list index."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM wheel_rewards ORDER BY points")
+    ids = [r[0] for r in c.fetchall()]
+    if 1 <= index <= len(ids):
+        reward_id = ids[index - 1]
+        c.execute("DELETE FROM wheel_rewards WHERE id = %s", (reward_id,))
+        conn.commit()
+        msg = "已删除该奖励。"
+    else:
+        msg = "未找到该奖励。"
+    conn.close()
+    await ctx.send(msg)
 
 @bot.command(name="addtag")
 @commands.has_permissions(administrator=True)
