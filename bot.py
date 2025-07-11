@@ -2,6 +2,7 @@
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 import asyncio
 import mysql.connector
 from urllib.parse import urlparse
@@ -21,7 +22,7 @@ PREFIX = "!"
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 WHEEL_COST = 100
 
 MYSQL_URL = os.getenv("MYSQL_URL")
@@ -173,6 +174,11 @@ def now_est():
 @bot.event
 async def on_ready():
     print(f"已登录为 {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        print(f"同步了 {len(synced)} 个斜杠命令")
+    except Exception as e:
+        print(f"同步斜杠命令时出错: {e}")
 
 @bot.event
 async def on_guild_join(guild):
@@ -719,8 +725,8 @@ async def quiz(ctx, category: str, number: int):
 
     await ctx.send("答题结束！")
 
-@bot.command(name="help")
-async def help_command(ctx):
+@bot.tree.command(name="help", description="显示所有可用命令的帮助信息")
+async def help_command(interaction: discord.Interaction):
     """Show help information for all commands"""
     embed = discord.Embed(
         title="🎰 Daily Draw Bot 帮助",
@@ -748,11 +754,11 @@ async def help_command(ctx):
     )
     
     # Check if user has administrator permissions
-    if ctx.author.guild_permissions.administrator:
+    if interaction.user.guild_permissions.administrator:
         embed.add_field(
             name="⚙️ 管理员命令",
-            value="""`!give <用户> <积分>` - 给予用户积分
-`!setpoint <用户> <积分>` - 设置用户积分
+            value="""`!givepoints <用户> <积分>` - 给予用户积分
+`!setpoints <用户> <积分>` - 设置用户积分
 `!resetdraw <用户>` - 重置用户抽奖状态
 `!resetall --confirm` - 清空所有用户数据
 `!addtag <价格> <身份组>` - 添加可购买身份组
@@ -764,7 +770,7 @@ async def help_command(ctx):
         )
     
     embed.set_footer(text="每日免费抽奖一次，额外抽奖需要100积分")
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.command(name="ranking")
