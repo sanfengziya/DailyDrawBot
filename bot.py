@@ -312,6 +312,7 @@ async def addwheelreward(ctx, points: int, *, description: str):
 @bot.command(name="listwheelrewards")
 @commands.has_permissions(administrator=True)
 async def listwheelrewards(ctx):
+
     """List all wheel rewards sorted by points."""
     conn = get_connection()
     c = conn.cursor()
@@ -321,6 +322,7 @@ async def listwheelrewards(ctx):
     if not rows:
         await ctx.send("暂无奖励。")
         return
+
     lines = [f"{i + 1}. {desc} ({pts} 分)" for i, (pts, desc) in enumerate(rows)]
     await ctx.send("🎁 当前奖励：\n" + "\n".join(lines))
 
