@@ -1,34 +1,178 @@
-# DailyDrawBot
-🎲 A Discord bot for daily lucky draws and point tracking.
+# 🎰 Daily Draw Bot
 
-## Features
-- Daily draw system with points
-- Role shop and gifting
-- Timed quiz system with `!quiz`, `!importquiz` and `!quizlist`
-- Delete quiz questions with `!deletequiz`
-- `!ranking` now returns an image leaderboard with avatars
+一个功能丰富的Discord抽奖机器人，支持每日抽奖、积分系统、身份组商店和答题游戏！
 
-Set the Discord bot token using an environment variable named `TOKEN` before
-running the bot. Database access now requires a MySQL connection string passed
-via the `MYSQL_URL` environment variable. If you deploy on Railway, both
-variables can be configured in your service's environment settings and will be
-provided to the bot process automatically.
-When running locally you can export the variable first, e.g.:
+## ✨ 主要功能
 
+### 🎲 抽奖系统
+- **每日免费抽奖**：每个用户每天可以免费抽奖一次
+- **额外抽奖**：消耗100积分进行额外抽奖
+- **概率奖励系统**：从10分到777分的多种奖励等级
+- **积分追踪**：自动记录用户积分和抽奖历史
+
+### 🏪 身份组商店
+- **自定义身份组**：管理员可以添加可购买的身份组
+- **积分购买**：用户使用积分购买身份组
+- **分页浏览**：美观的分页界面展示所有可购买身份组
+
+### 🎮 答题系统
+- **多类别题库**：支持按类别组织的题目
+- **限时答题**：60秒答题时间，第一个答对者获得10积分
+- **题库管理**：支持导入和删除题目
+- **批量导入**：支持从文本文件批量导入题目
+
+### 📊 排行榜系统
+- **积分排行榜**：显示前10名用户的积分排名
+- **头像展示**：排行榜包含用户头像
+- **实时更新**：积分变化实时反映在排行榜中
+
+## 🚀 快速开始
+
+### 环境要求
+- Python 3.7+
+- MySQL数据库
+- Discord Bot Token
+
+### 安装步骤
+
+1. **克隆项目**
 ```bash
-export TOKEN="YOUR_DISCORD_TOKEN"
-export MYSQL_URL="mysql://user:pass@host:port/dbname"
+git clone <repository-url>
+cd Daily-Draw
+```
+
+2. **安装依赖**
+```bash
+pip install -r requirements.txt
+```
+
+3. **配置环境变量**
+```bash
+export TOKEN="YOUR_DISCORD_BOT_TOKEN"
+export MYSQL_URL="mysql://username:password@host:port/database"
+```
+
+4. **运行机器人**
+```bash
 python bot.py
 ```
 
-### Quiz question format
-Provide a text file where each line represents a question. Fields are separated by a vertical bar `|` in the following order:
+### Railway部署
+在Railway上部署时，在服务环境设置中配置以下变量：
+- `TOKEN`：Discord机器人令牌
+- `MYSQL_URL`：MySQL连接字符串
+
+## 📖 命令说明
+
+### 👤 用户命令
+| 命令 | 描述 | 示例 |
+|------|------|------|
+| `!draw` | 每日抽奖（免费） | `!draw` |
+| `!check [用户]` | 查看积分和抽奖状态 | `!check @用户` |
+| `!ranking` | 查看积分排行榜 | `!ranking` |
+| `!roleshop` | 查看身份组商店 | `!roleshop` |
+| `!buy <身份组名>` | 购买身份组 | `!buy VIP` |
+
+### 🎮 答题命令
+| 命令 | 描述 | 示例 |
+|------|------|------|
+| `!quizlist` | 查看题库类别 | `!quizlist` |
+| `!quiz <类别> <题目数>` | 开始答题游戏 | `!quiz 数学 5` |
+
+### ⚙️ 管理员命令
+| 命令 | 描述 | 示例 |
+|------|------|------|
+| `!givepoints <用户> <积分>` | 给予用户积分 | `!givepoints @用户 100` |
+| `!setpoints <用户> <积分>` | 设置用户积分 | `!setpoints @用户 500` |
+| `!resetdraw <用户>` | 重置用户抽奖状态 | `!resetdraw @用户` |
+| `!resetall --confirm` | 清空所有用户数据 | `!resetall --confirm` |
+| `!addtag <价格> <身份组>` | 添加可购买身份组 | `!addtag 1000 @VIP` |
+| `!rewardinfo` | 查看抽奖概率系统 | `!rewardinfo` |
+| `!testdraw [次数]` | 测试抽奖系统 | `!testdraw 100` |
+| `!importquiz` | 导入题库文件 | `!importquiz` |
+| `!deletequiz <类别>` | 删除题库题目 | `!deletequiz 数学` |
+
+## 📝 题库格式
+
+题库文件应为文本格式，每行代表一道题目。字段用竖线 `|` 分隔，格式如下：
 
 ```
-category|question|optionA|optionB|optionC|optionD|answer
+类别|问题|选项A|选项B|选项C|选项D|答案
 ```
 
-The `answer` field should be the letter `A`, `B`, `C` or `D` indicating the correct option.
+**示例：**
+```
+数学|1+1等于多少？|1|2|3|4|B
+历史|中国的首都是？|上海|北京|广州|深圳|B
+```
 
-Use `!quiz <category> <number>` to start a timed quiz. Questions appear one at a time with 60 seconds to answer. The first user to answer correctly earns 10 points.
-Use `!deletequiz <category>` to list all questions in a category and remove selected ones by their number.
+**说明：**
+- `类别`：题目分类（如：数学、历史、科学等）
+- `问题`：题目内容
+- `选项A/B/C/D`：四个选项
+- `答案`：正确答案（A、B、C或D）
+
+## 🎰 抽奖奖励系统
+
+机器人采用概率权重系统，奖励等级如下：
+
+| 积分 | 概率 | 描述 | 表情 |
+|------|------|------|------|
+| 10分 | 15% | 小小心意 | 🍬 |
+| 20分 | 18% | 普通奖励 | 🎁 |
+| 30分 | 20% | 不错哦 | 🎯 |
+| 50分 | 15% | 运气不错 | 🎪 |
+| 75分 | 10% | 有点开心 | 🎨 |
+| 100分 | 7% | 少见奖励 | 💎 |
+| 150分 | 5% | 较稀有 | 🌟 |
+| 200分 | 4% | 稀有奖励 | 💫 |
+| 300分 | 3% | 传说级运气 | 👑 |
+| 500分 | 2% | 极低概率大奖 | 🔥 |
+| 1000分 | 1% | 超级大奖 | 💎 |
+| 777分 | 0.1% | 幸运之神奖 | ✨ |
+
+## 🔧 数据库结构
+
+机器人使用MySQL数据库，包含以下表：
+
+### users表
+- `user_id`：用户ID（主键）
+- `points`：积分
+- `last_draw`：最后抽奖日期
+- `last_wheel`：最后转盘日期
+
+### tags表
+- `role_id`：身份组ID（主键）
+- `price`：价格
+
+### quiz_questions表
+- `id`：题目ID（自增主键）
+- `category`：类别
+- `question`：问题
+- `option1-4`：选项A-D
+- `answer`：正确答案（1-4）
+
+### wheel_rewards表
+- `id`：奖励ID（自增主键）
+- `points`：积分
+- `description`：描述
+
+## 🤝 贡献
+
+欢迎提交Issue和Pull Request来改进这个项目！
+
+## 📄 许可证
+
+本项目采用MIT许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🆘 支持
+
+如果遇到问题，请：
+1. 检查环境变量是否正确设置
+2. 确认数据库连接正常
+3. 查看机器人权限设置
+4. 提交Issue描述问题
+
+---
+
+**享受你的每日抽奖时光！** 🎉

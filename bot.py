@@ -93,6 +93,34 @@ def init_db() -> None:
     c.close()
     conn.close()
 
+# 优化的抽奖奖励系统
+REWARD_SYSTEM = [
+    {"points": 10, "probability": 15, "message": "小小心意", "emoji": "🍬"},
+    {"points": 20, "probability": 18, "message": "普通奖励", "emoji": "🎁"},
+    {"points": 30, "probability": 20, "message": "不错哦", "emoji": "🎯"},
+    {"points": 50, "probability": 15, "message": "运气不错", "emoji": "🎪"},
+    {"points": 75, "probability": 10, "message": "有点开心", "emoji": "🎨"},
+    {"points": 100, "probability": 7, "message": "少见奖励", "emoji": "💎"},
+    {"points": 150, "probability": 5, "message": "较稀有", "emoji": "🌟"},
+    {"points": 200, "probability": 4, "message": "稀有奖励", "emoji": "💫"},
+    {"points": 300, "probability": 3, "message": "传说级运气", "emoji": "👑"},
+    {"points": 500, "probability": 2, "message": "极低概率大奖", "emoji": "🔥"},
+    {"points": 1000, "probability": 1, "message": "超级大奖", "emoji": "💎"},
+    {"points": 777, "probability": 0.1, "message": "幸运之神奖", "emoji": "✨"},
+]
+
+def get_weighted_reward():
+    """Get a random reward based on weighted probabilities"""
+    # Create a list where each reward appears according to its probability
+    reward_pool = []
+    for reward in REWARD_SYSTEM:
+        # Convert percentage to number of entries (multiply by 10 for precision)
+        count = int(reward["probability"] * 10)
+        for _ in range(count):
+            reward_pool.append(reward)
+    
+    # Randomly select from the pool
+    return random.choice(reward_pool)
 
 init_db()
 
@@ -175,13 +203,26 @@ async def draw(ctx):
 
     first_draw = last_draw_date != today
 
-    if not first_draw:
+    if first_draw:
+        # First draw of the day - free!
+        await ctx.send(f"🎉 {ctx.author.mention} 开始今天的抽奖吧！")
+    else:
         if points < WHEEL_COST:
             conn.close()
-            await ctx.send("你的积分不足，无法抽奖。")
+            embed = discord.Embed(
+                title="❌ 积分不足",
+                description=f"你需要 {WHEEL_COST} 积分才能再次抽奖\n当前积分: {points}",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
             return
 
-        await ctx.send("本次抽奖将消耗 100 积分，发送 `Y` 确认。")
+        embed = discord.Embed(
+            title="🎰 额外抽奖",
+            description=f"本次抽奖将消耗 **{WHEEL_COST}** 积分\n当前积分: **{points}**\n\n发送 `Y` 确认抽奖",
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
 
         def check(m: discord.Message) -> bool:
             return m.author == ctx.author and m.channel == ctx.channel
@@ -190,87 +231,41 @@ async def draw(ctx):
             msg = await bot.wait_for("message", check=check, timeout=15)
         except asyncio.TimeoutError:
             conn.close()
-            await ctx.send("已取消抽奖。")
+            await ctx.send("⏰ 已取消抽奖。")
             return
 
         if msg.content.lower() not in ("y", "yes"):
             conn.close()
-            await ctx.send("已取消抽奖。")
+            await ctx.send("❌ 已取消抽奖。")
             return
 
         c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
 
-    c.execute("SELECT points, description FROM wheel_rewards")
-    rewards = c.fetchall()
-    if rewards:
-        reward_points, desc = random.choice(rewards)
-    else:
-        reward_points, desc = 0, "什么也没有"
+    reward = get_weighted_reward()
     c.execute(
         "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
-        (reward_points, str(today), user_id),
+        (reward["points"], str(today), user_id),
     )
     conn.commit()
     conn.close()
 
-    if reward_points:
-        await ctx.send(
-            f"{ctx.author.mention} 抽奖结果：**{desc}**，获得 {reward_points} 分！"
-        )
-    else:
-        await ctx.send(f"{ctx.author.mention} 抽奖结果：**{desc}**！")
-
-
-
-
-@bot.command(name="wheel")
-async def wheel(ctx):
-    """Spin the lucky wheel if you have enough points."""
-    user_id = ctx.author.id
-    now = now_est()
-    today = now.date()
-
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT points, last_wheel FROM users WHERE user_id = %s", (user_id,))
-    row = c.fetchone()
-
-    if row:
-        points = row[0]
-        if points < WHEEL_COST:
-            await ctx.send("你的积分不足，无法转盘。")
-            conn.close()
-            return
-    else:
-        c.execute(
-            "INSERT INTO users (user_id, points, last_draw, last_wheel) VALUES (%s, %s, %s, %s)",
-            (user_id, 0, "1970-01-01", "1970-01-01"),
-        )
-        conn.commit()
-        await ctx.send("你的积分不足，无法转盘。")
-        conn.close()
-        return
-
-    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
-
-    c.execute("SELECT points, description FROM wheel_rewards")
-    rewards = c.fetchall()
-    if rewards:
-        reward_points, desc = random.choice(rewards)
-    else:
-        reward_points, desc = 0, "什么也没有"
-    c.execute(
-        "UPDATE users SET points = points + %s, last_wheel = %s WHERE user_id = %s",
-        (reward_points, str(today), user_id),
+    # Create a beautiful embed for the reward
+    embed = discord.Embed(
+        title=f"{reward['emoji']} 抽奖结果",
+        description=f"**{reward['message']}**\n获得 **{reward['points']}** 分！",
+        color=discord.Color.gold() if reward['points'] >= 300 else discord.Color.blue() if reward['points'] >= 100 else discord.Color.green()
     )
-    conn.commit()
-    conn.close()
-    if reward_points:
-        await ctx.send(
-            f"{ctx.author.mention} 幸运转盘结果：**{desc}**，获得 {reward_points} 分！"
-        )
-    else:
-        await ctx.send(f"{ctx.author.mention} 幸运转盘结果：**{desc}**！")
+    
+    # Add special effects for high-value rewards
+    if reward['points'] >= 777:
+        embed.description += "\n\n🎉 **恭喜你抽中了幸运之神奖！** 🎉"
+        embed.color = discord.Color.purple()
+    elif reward['points'] >= 500:
+        embed.description += "\n\n🔥 **太棒了！你抽中了超级大奖！** 🔥"
+    elif reward['points'] >= 200:
+        embed.description += "\n\n⭐ **哇！你抽中了稀有奖励！** ⭐"
+    
+    await ctx.send(embed=embed)
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member = None):
@@ -279,14 +274,40 @@ async def check(ctx, member: discord.Member = None):
     user_id = member.id
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
     conn.close()
 
     if row:
-        await ctx.send(f"{member.mention} 当前有 **{row[0]}** 分。")
+        points, last_draw = row
+        embed = discord.Embed(
+            title=f"💰 {member.display_name} 的积分信息",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="当前积分", value=f"**{points}** 分", inline=True)
+        
+        if last_draw and last_draw != "1970-01-01":
+            if isinstance(last_draw, str):
+                last_draw_date = datetime.datetime.strptime(last_draw, "%Y-%m-%d").date()
+            else:
+                last_draw_date = last_draw.date() if hasattr(last_draw, 'date') else last_draw
+            
+            today = now_est().date()
+            if last_draw_date == today:
+                embed.add_field(name="今日抽奖", value="✅ 已完成", inline=True)
+            else:
+                embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
+        else:
+            embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
+        
+        await ctx.send(embed=embed)
     else:
-        await ctx.send(f"{member.mention} 还没有参与过抽奖~")
+        embed = discord.Embed(
+            title="❌ 用户信息",
+            description=f"{member.mention} 还没有参与过抽奖~",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
 
 @bot.command(name="resetdraw")
 @commands.has_permissions(administrator=True)
@@ -413,9 +434,9 @@ async def buy(ctx, *, role_name: str):
     await ctx.author.add_roles(role)
     await ctx.send(f"✅ 你已购买并获得 `{role.name}` 身份组。")
 
-@bot.command(name="give")
+@bot.command(name="givepoints")
 @commands.has_permissions(administrator=True)
-async def give(ctx, member: discord.Member, amount: int):
+async def givepoints(ctx, member: discord.Member, amount: int):
     conn = get_connection()
     c = conn.cursor()
     c.execute(
@@ -428,9 +449,9 @@ async def give(ctx, member: discord.Member, amount: int):
     await ctx.send(f"{ctx.author.mention} 已给予 {member.mention} {amount} 分。")
 
 
-@bot.command(name="setpoint")
+@bot.command(name="setpoints")
 @commands.has_permissions(administrator=True)
-async def setpoint(ctx, member: discord.Member, points: int):
+async def setpoints(ctx, member: discord.Member, points: int):
     """Set a member's points exactly to the specified value."""
     conn = get_connection()
     c = conn.cursor()
@@ -442,6 +463,69 @@ async def setpoint(ctx, member: discord.Member, points: int):
     conn.commit()
     conn.close()
     await ctx.send(f"{ctx.author.mention} 已将 {member.mention} 的分数设为 {points} 分。")
+
+
+@bot.command(name="rewardinfo")
+@commands.has_permissions(administrator=True)
+async def rewardinfo(ctx):
+    """Display current reward system information"""
+    embed = discord.Embed(
+        title="🎰 抽奖奖励系统",
+        description="当前抽奖概率分布：",
+        color=discord.Color.blue()
+    )
+    
+    total_prob = sum(reward["probability"] for reward in REWARD_SYSTEM)
+    
+    for reward in REWARD_SYSTEM:
+        embed.add_field(
+            name=f"{reward['emoji']} {reward['points']}分 - {reward['message']}",
+            value=f"概率: {reward['probability']}%",
+            inline=True
+        )
+    
+    embed.add_field(
+        name="📊 统计信息",
+        value=f"总概率: {total_prob}%\n奖励种类: {len(REWARD_SYSTEM)}种\n平均奖励: {sum(r['points'] * r['probability'] / 100 for r in REWARD_SYSTEM):.1f}分",
+        inline=False
+    )
+    
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="testdraw")
+@commands.has_permissions(administrator=True)
+async def testdraw(ctx, times: int = 100):
+    """Test the reward system with multiple draws"""
+    if times > 1000:
+        await ctx.send("测试次数不能超过1000次！")
+        return
+    
+    results = {}
+    total_points = 0
+    
+    for _ in range(times):
+        reward = get_weighted_reward()
+        points = reward["points"]
+        results[points] = results.get(points, 0) + 1
+        total_points += points
+    
+    embed = discord.Embed(
+        title=f"🎲 抽奖测试结果 ({times}次)",
+        description=f"总获得积分: {total_points}\n平均每次: {total_points/times:.1f}分",
+        color=discord.Color.green()
+    )
+    
+    for points in sorted(results.keys()):
+        count = results[points]
+        percentage = (count / times) * 100
+        embed.add_field(
+            name=f"{points}分",
+            value=f"出现{count}次 ({percentage:.1f}%)",
+            inline=True
+        )
+    
+    await ctx.send(embed=embed)
 
 
 @bot.command(name="quizlist")
@@ -634,6 +718,54 @@ async def quiz(ctx, category: str, number: int):
             await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
 
     await ctx.send("答题结束！")
+
+@bot.command(name="help")
+async def help_command(ctx):
+    """Show help information for all commands"""
+    embed = discord.Embed(
+        title="🎰 Daily Draw Bot 帮助",
+        description="欢迎使用每日抽奖机器人！",
+        color=discord.Color.blue()
+    )
+    
+    # User commands (always visible)
+    embed.add_field(
+        name="🎲 用户命令",
+        value="""`!draw` - 每日抽奖（免费）
+`!check [用户]` - 查看积分和抽奖状态
+`!ranking` - 查看积分排行榜
+`!roleshop` - 查看身份组商店
+`!buy <身份组名>` - 购买身份组""",
+        inline=False
+    )
+    
+    # Quiz commands (always visible)
+    embed.add_field(
+        name="🎮 答题系统",
+        value="""`!quizlist` - 查看题库类别
+`!quiz <类别> <题目数>` - 开始答题游戏""",
+        inline=False
+    )
+    
+    # Check if user has administrator permissions
+    if ctx.author.guild_permissions.administrator:
+        embed.add_field(
+            name="⚙️ 管理员命令",
+            value="""`!give <用户> <积分>` - 给予用户积分
+`!setpoint <用户> <积分>` - 设置用户积分
+`!resetdraw <用户>` - 重置用户抽奖状态
+`!resetall --confirm` - 清空所有用户数据
+`!addtag <价格> <身份组>` - 添加可购买身份组
+`!rewardinfo` - 查看抽奖概率系统
+`!testdraw [次数]` - 测试抽奖系统
+`!importquiz` - 导入题库文件
+`!deletequiz <类别>` - 删除题库题目""",
+            inline=False
+        )
+    
+    embed.set_footer(text="每日免费抽奖一次，额外抽奖需要100积分")
+    await ctx.send(embed=embed)
+
 
 @bot.command(name="ranking")
 async def ranking(ctx):
