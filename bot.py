@@ -225,16 +225,21 @@ async def draw(ctx):
             last_paid_draw_date = last_paid_draw_date.date()
         else:
             last_paid_draw_date = datetime.date(1970, 1, 1)
+        
+        # Debug: Print the values to console
+        print(f"DEBUG: User {user_id} - paid_draws_today: {paid_draws_today}, last_paid_draw_date: {last_paid_draw_date}, today: {today}")
     else:
         c.execute("INSERT INTO users (user_id, points, last_draw, paid_draws_today, last_paid_draw_date) VALUES (%s, %s, %s, %s, %s)", 
                  (user_id, 0, "1970-01-01", 0, "1970-01-01"))
         conn.commit()
         points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
+        print(f"DEBUG: New user {user_id} created with paid_draws_today: {paid_draws_today}")
 
     first_draw = last_draw_date != today
     
     # Reset paid draws counter if it's a new day
     if last_paid_draw_date != today:
+        print(f"DEBUG: Resetting paid_draws_today from {paid_draws_today} to 0 (new day)")
         paid_draws_today = 0
 
     if first_draw:
@@ -297,9 +302,11 @@ async def draw(ctx):
         )
     else:
         # Paid draw - update points, last_draw, paid_draws_today, and last_paid_draw_date
+        new_paid_draws = paid_draws_today + 1
+        print(f"DEBUG: Updating paid_draws_today from {paid_draws_today} to {new_paid_draws}")
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
-            (reward["points"], str(today), paid_draws_today + 1, str(today), user_id),
+            (reward["points"], str(today), new_paid_draws, str(today), user_id),
         )
     conn.commit()
     conn.close()
@@ -421,6 +428,33 @@ async def reset_all(ctx, confirm: str = None):
     conn.close()
 
     await ctx.send(f"{ctx.author.mention} ✅ 所有用户数据已被清除。")
+
+@bot.command(name="fixdb")
+@commands.has_permissions(administrator=True)
+async def fix_database(ctx):
+    """Force update database schema for paid draws tracking"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Check and add missing columns
+    c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
+    if not c.fetchone():
+        c.execute("ALTER TABLE users ADD COLUMN paid_draws_today INT DEFAULT 0")
+        print("Added paid_draws_today column")
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'last_paid_draw_date'")
+    if not c.fetchone():
+        c.execute("ALTER TABLE users ADD COLUMN last_paid_draw_date DATE DEFAULT '1970-01-01'")
+        print("Added last_paid_draw_date column")
+    
+    # Update existing users to have proper default values
+    c.execute("UPDATE users SET paid_draws_today = 0 WHERE paid_draws_today IS NULL")
+    c.execute("UPDATE users SET last_paid_draw_date = '1970-01-01' WHERE last_paid_draw_date IS NULL")
+    
+    conn.commit()
+    conn.close()
+    
+    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。")
 
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
@@ -843,6 +877,7 @@ async def help_command(interaction: discord.Interaction):
 `!setpoints <用户> <积分>` - 设置用户积分
 `!resetdraw <用户>` - 重置用户抽奖状态
 `!resetall --confirm` - 清空所有用户数据
+`!fixdb` - 修复数据库结构
 `!addtag <价格> <身份组>` - 添加可购买身份组
 `!rewardinfo` - 查看抽奖概率系统
 `!testdraw [次数]` - 测试抽奖系统
