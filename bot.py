@@ -380,11 +380,15 @@ async def check(ctx, member: discord.Member = None):
             last_paid_draw_date_obj = datetime.date(1970, 1, 1)
         
         today = now_est().date()
+        # Only reset if it's actually a new day AND we need to show the reset value
+        # For display purposes, we'll show the actual database value
+        display_paid_draws = paid_draws_today
         if last_paid_draw_date_obj != today:
-            paid_draws_today = 0
+            # This is just for display calculation, don't modify the actual value
+            display_paid_draws = 0
         
-        remaining_draws = MAX_PAID_DRAWS_PER_DAY - paid_draws_today
-        embed.add_field(name="付费抽奖", value=f"**{paid_draws_today}/{MAX_PAID_DRAWS_PER_DAY}** 次\n剩余: **{remaining_draws}** 次", inline=True)
+        remaining_draws = MAX_PAID_DRAWS_PER_DAY - display_paid_draws
+        embed.add_field(name="付费抽奖", value=f"**{display_paid_draws}/{MAX_PAID_DRAWS_PER_DAY}** 次\n剩余: **{remaining_draws}** 次", inline=True)
         
         await ctx.send(embed=embed)
     else:
@@ -577,6 +581,50 @@ async def check_database(ctx):
     
     conn.close()
     await ctx.send(embed=embed)
+
+@bot.command(name="detailedebug")
+@commands.has_permissions(administrator=True)
+async def detailed_debug(ctx, member: discord.Member):
+    """Detailed debug for paid draws logic"""
+    user_id = member.id
+    today = now_est().date()
+    
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row:
+        points, last_draw, paid_draws_today, last_paid_draw_date = row
+        
+        # Parse dates
+        if isinstance(last_paid_draw_date, str):
+            last_paid_draw_date_obj = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
+        elif isinstance(last_paid_draw_date, datetime.datetime):
+            last_paid_draw_date_obj = last_paid_draw_date.date()
+        else:
+            last_paid_draw_date_obj = datetime.date(1970, 1, 1)
+        
+        # Calculate display value
+        display_paid_draws = paid_draws_today
+        if last_paid_draw_date_obj != today:
+            display_paid_draws = 0
+        
+        embed = discord.Embed(
+            title=f"🔍 {member.display_name} 详细调试信息",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="数据库中的付费抽奖次数", value=str(paid_draws_today), inline=True)
+        embed.add_field(name="最后付费抽奖日期", value=str(last_paid_draw_date), inline=True)
+        embed.add_field(name="今天日期", value=str(today), inline=True)
+        embed.add_field(name="是否新的一天", value=str(last_paid_draw_date_obj != today), inline=True)
+        embed.add_field(name="显示用的付费抽奖次数", value=str(display_paid_draws), inline=True)
+        embed.add_field(name="剩余付费抽奖次数", value=str(MAX_PAID_DRAWS_PER_DAY - display_paid_draws), inline=True)
+        
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
 
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
@@ -1002,6 +1050,7 @@ async def help_command(interaction: discord.Interaction):
 `!fixdb` - 修复数据库结构
 `!checkdb` - 检查数据库结构
 `!debuguser <用户>` - 调试用户付费抽奖信息
+`!detailedebug <用户>` - 详细调试付费抽奖逻辑
 `!testupdate <用户>` - 测试数据库更新功能
 `!addtag <价格> <身份组>` - 添加可购买身份组
 `!rewardinfo` - 查看抽奖概率系统
