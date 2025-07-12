@@ -96,19 +96,19 @@ def init_db() -> None:
 
 # 优化的抽奖奖励系统
 REWARD_SYSTEM = [
-    {"points": 10, "probability": 16.0, "message": "小小心意", "emoji": "🍬"},
-    {"points": 20, "probability": 12.0, "message": "普通奖励", "emoji": "🎁"},
-    {"points": 75, "probability": 18.0, "message": "不错哦", "emoji": "🎯"},
-    {"points": 100, "probability": 15.0, "message": "运气不错", "emoji": "🎪"},
-    {"points": 125, "probability": 7.5, "message": "有点开心", "emoji": "🎨"},
-    {"points": 175, "probability": 5.5, "message": "较稀有", "emoji": "🌟"},
-    {"points": 200, "probability": 4.5, "message": "稀有奖励", "emoji": "💫"},
-    {"points": 250, "probability": 4.0, "message": "传说级运气", "emoji": "👑"},
-    {"points": 300, "probability": 3.0, "message": "极低概率大奖", "emoji": "🔥"},
+    {"points": 10, "probability": 22.0, "message": "小小心意", "emoji": "🍬"},
+    {"points": 20, "probability": 17.0, "message": "普通奖励", "emoji": "🎁"},
+    {"points": 75, "probability": 13.0, "message": "不错哦", "emoji": "🎯"},
+    {"points": 100, "probability": 12.0, "message": "运气不错", "emoji": "🎪"},
+    {"points": 125, "probability": 5.0, "message": "有点开心", "emoji": "🎨"},
+    {"points": 175, "probability": 4.5, "message": "较稀有", "emoji": "🌟"},
+    {"points": 200, "probability": 4.0, "message": "稀有奖励", "emoji": "💫"},
+    {"points": 250, "probability": 3.5, "message": "传说级运气", "emoji": "👑"},
+    {"points": 300, "probability": 2.5, "message": "极低概率大奖", "emoji": "🔥"},
     {"points": 500, "probability": 2.0, "message": "超级大奖", "emoji": "💎"},
     {"points": 666, "probability": 1.5, "message": "恶魔奖励", "emoji": "😈"},
     {"points": 777, "probability": 0.9, "message": "幸运之神奖", "emoji": "✨"},
-    {"points": 1000, "probability": 0.9, "message": "终极大奖", "emoji": "🏆"},
+    {"points": 1000, "probability": 0.1, "message": "终极大奖", "emoji": "🏆"},
 ]
 
 def get_weighted_reward():
