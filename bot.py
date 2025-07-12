@@ -304,6 +304,7 @@ async def draw(ctx):
         # Paid draw - update points, last_draw, paid_draws_today, and last_paid_draw_date
         new_paid_draws = paid_draws_today + 1
         print(f"DEBUG: Updating paid_draws_today from {paid_draws_today} to {new_paid_draws}")
+        print(f"DEBUG: Updating last_paid_draw_date from {last_paid_draw_date} to {today}")
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
             (reward["points"], str(today), new_paid_draws, str(today), user_id),
@@ -441,20 +442,61 @@ async def fix_database(ctx):
     if not c.fetchone():
         c.execute("ALTER TABLE users ADD COLUMN paid_draws_today INT DEFAULT 0")
         print("Added paid_draws_today column")
+        await ctx.send("✅ 已添加 paid_draws_today 字段")
+    else:
+        await ctx.send("✅ paid_draws_today 字段已存在")
     
     c.execute("SHOW COLUMNS FROM users LIKE 'last_paid_draw_date'")
     if not c.fetchone():
         c.execute("ALTER TABLE users ADD COLUMN last_paid_draw_date DATE DEFAULT '1970-01-01'")
         print("Added last_paid_draw_date column")
+        await ctx.send("✅ 已添加 last_paid_draw_date 字段")
+    else:
+        await ctx.send("✅ last_paid_draw_date 字段已存在")
     
     # Update existing users to have proper default values
     c.execute("UPDATE users SET paid_draws_today = 0 WHERE paid_draws_today IS NULL")
     c.execute("UPDATE users SET last_paid_draw_date = '1970-01-01' WHERE last_paid_draw_date IS NULL")
     
+    # Force update all users to today's date for testing
+    today = now_est().date()
+    c.execute("UPDATE users SET last_paid_draw_date = %s WHERE last_paid_draw_date = '1970-01-01'", (str(today),))
+    
     conn.commit()
     conn.close()
     
-    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。")
+    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。")
+
+@bot.command(name="debuguser")
+@commands.has_permissions(administrator=True)
+async def debug_user(ctx, member: discord.Member):
+    """Debug user's paid draw information"""
+    user_id = member.id
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row:
+        points, last_draw, paid_draws_today, last_paid_draw_date = row
+        today = now_est().date()
+        
+        embed = discord.Embed(
+            title=f"🔍 {member.display_name} 的调试信息",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="用户ID", value=str(user_id), inline=True)
+        embed.add_field(name="积分", value=str(points), inline=True)
+        embed.add_field(name="最后抽奖日期", value=str(last_draw), inline=True)
+        embed.add_field(name="付费抽奖次数", value=str(paid_draws_today), inline=True)
+        embed.add_field(name="最后付费抽奖日期", value=str(last_paid_draw_date), inline=True)
+        embed.add_field(name="今天日期", value=str(today), inline=True)
+        embed.add_field(name="是否新的一天", value=str(last_paid_draw_date != today), inline=True)
+        
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
 
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
@@ -498,8 +540,8 @@ async def roleshop(ctx):
     await view.send_initial()
 
 
-@bot.command(name="buy")
-async def buy(ctx, *, role_name: str):
+@bot.command(name="buytag")
+async def buytag(ctx, *, role_name: str):
     guild = ctx.guild
     role = discord.utils.get(guild.roles, name=role_name)
     if not role:
@@ -857,7 +899,7 @@ async def help_command(interaction: discord.Interaction):
 `!check [用户]` - 查看积分和抽奖状态
 `!ranking` - 查看积分排行榜
 `!roleshop` - 查看身份组商店
-`!buy <身份组名>` - 购买身份组""",
+`!buytag <身份组名>` - 购买身份组""",
         inline=False
     )
     
@@ -878,6 +920,7 @@ async def help_command(interaction: discord.Interaction):
 `!resetdraw <用户>` - 重置用户抽奖状态
 `!resetall --confirm` - 清空所有用户数据
 `!fixdb` - 修复数据库结构
+`!debuguser <用户>` - 调试用户付费抽奖信息
 `!addtag <价格> <身份组>` - 添加可购买身份组
 `!rewardinfo` - 查看抽奖概率系统
 `!testdraw [次数]` - 测试抽奖系统
