@@ -603,12 +603,23 @@ async def detailed_debug(ctx, member: discord.Member):
             last_paid_draw_date_obj = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
         elif isinstance(last_paid_draw_date, datetime.datetime):
             last_paid_draw_date_obj = last_paid_draw_date.date()
+        elif isinstance(last_paid_draw_date, datetime.date):
+            last_paid_draw_date_obj = last_paid_draw_date
         else:
             last_paid_draw_date_obj = datetime.date(1970, 1, 1)
         
+        # Ensure today is date type
+        if isinstance(today, datetime.datetime):
+            today_date = today.date()
+        elif isinstance(today, datetime.date):
+            today_date = today
+        else:
+            today_date = datetime.datetime.strptime(str(today), "%Y-%m-%d").date()
+        
         # Calculate display value
         display_paid_draws = paid_draws_today
-        if last_paid_draw_date_obj != today:
+        is_new_day = last_paid_draw_date_obj != today_date
+        if is_new_day:
             display_paid_draws = 0
         
         embed = discord.Embed(
@@ -617,8 +628,8 @@ async def detailed_debug(ctx, member: discord.Member):
         )
         embed.add_field(name="数据库中的付费抽奖次数", value=str(paid_draws_today), inline=True)
         embed.add_field(name="最后付费抽奖日期", value=str(last_paid_draw_date), inline=True)
-        embed.add_field(name="今天日期", value=str(today), inline=True)
-        embed.add_field(name="是否新的一天", value=str(last_paid_draw_date_obj != today), inline=True)
+        embed.add_field(name="今天日期", value=str(today_date), inline=True)
+        embed.add_field(name="是否新的一天", value=str(is_new_day), inline=True)
         embed.add_field(name="显示用的付费抽奖次数", value=str(display_paid_draws), inline=True)
         embed.add_field(name="剩余付费抽奖次数", value=str(MAX_PAID_DRAWS_PER_DAY - display_paid_draws), inline=True)
         
