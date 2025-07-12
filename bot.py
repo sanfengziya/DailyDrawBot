@@ -24,6 +24,7 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 WHEEL_COST = 100
+MAX_PAID_DRAWS_PER_DAY = 10
 
 MYSQL_URL = os.getenv("MYSQL_URL")
 if MYSQL_URL is None:
@@ -50,7 +51,9 @@ def init_db() -> None:
             user_id BIGINT PRIMARY KEY,
             points INT DEFAULT 0,
             last_draw DATE,
-            last_wheel DATE DEFAULT '1970-01-01'
+            last_wheel DATE DEFAULT '1970-01-01',
+            paid_draws_today INT DEFAULT 0,
+            last_paid_draw_date DATE DEFAULT '1970-01-01'
         )
         """
     )
@@ -58,6 +61,18 @@ def init_db() -> None:
     if not c.fetchone():
         c.execute(
             "ALTER TABLE users ADD COLUMN last_wheel DATE DEFAULT '1970-01-01'"
+        )
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
+    if not c.fetchone():
+        c.execute(
+            "ALTER TABLE users ADD COLUMN paid_draws_today INT DEFAULT 0"
+        )
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'last_paid_draw_date'")
+    if not c.fetchone():
+        c.execute(
+            "ALTER TABLE users ADD COLUMN last_paid_draw_date DATE DEFAULT '1970-01-01'"
         )
     c.execute(
         """
@@ -194,26 +209,49 @@ async def draw(ctx):
 
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
 
     if row:
-        points, last_draw_date = row
+        points, last_draw_date, paid_draws_today, last_paid_draw_date = row
         if isinstance(last_draw_date, str):
             last_draw_date = datetime.datetime.strptime(last_draw_date, "%Y-%m-%d").date()
         elif isinstance(last_draw_date, datetime.datetime):
             last_draw_date = last_draw_date.date()
+        
+        if isinstance(last_paid_draw_date, str):
+            last_paid_draw_date = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
+        elif isinstance(last_paid_draw_date, datetime.datetime):
+            last_paid_draw_date = last_paid_draw_date.date()
+        else:
+            last_paid_draw_date = datetime.date(1970, 1, 1)
     else:
-        c.execute("INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s)", (user_id, 0, "1970-01-01"))
+        c.execute("INSERT INTO users (user_id, points, last_draw, paid_draws_today, last_paid_draw_date) VALUES (%s, %s, %s, %s, %s)", 
+                 (user_id, 0, "1970-01-01", 0, "1970-01-01"))
         conn.commit()
-        points, last_draw_date = 0, datetime.date(1970, 1, 1)
+        points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
 
     first_draw = last_draw_date != today
+    
+    # Reset paid draws counter if it's a new day
+    if last_paid_draw_date != today:
+        paid_draws_today = 0
 
     if first_draw:
         # First draw of the day - free!
         await ctx.send(f"🎉 {ctx.author.mention} 开始今天的抽奖吧！")
     else:
+        # Check if user has reached daily paid draw limit
+        if paid_draws_today >= MAX_PAID_DRAWS_PER_DAY:
+            conn.close()
+            embed = discord.Embed(
+                title="❌ 今日付费抽奖次数已达上限",
+                description=f"你今日已付费抽奖 **{paid_draws_today}** 次\n每日最多可付费抽奖 **{MAX_PAID_DRAWS_PER_DAY}** 次\n\n明天再来吧！",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+        
         if points < WHEEL_COST:
             conn.close()
             embed = discord.Embed(
@@ -224,9 +262,10 @@ async def draw(ctx):
             await ctx.send(embed=embed)
             return
 
+        remaining_draws = MAX_PAID_DRAWS_PER_DAY - paid_draws_today
         embed = discord.Embed(
             title="🎰 额外抽奖",
-            description=f"本次抽奖将消耗 **{WHEEL_COST}** 积分\n当前积分: **{points}**\n\n发送 `Y` 确认抽奖",
+            description=f"本次抽奖将消耗 **{WHEEL_COST}** 积分\n当前积分: **{points}**\n今日已付费抽奖: **{paid_draws_today}** 次\n剩余付费抽奖次数: **{remaining_draws}** 次\n\n发送 `Y` 确认抽奖",
             color=discord.Color.orange()
         )
         await ctx.send(embed=embed)
@@ -249,10 +288,19 @@ async def draw(ctx):
         c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
 
     reward = get_weighted_reward()
-    c.execute(
-        "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
-        (reward["points"], str(today), user_id),
-    )
+    
+    if first_draw:
+        # Free draw - only update points and last_draw
+        c.execute(
+            "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
+            (reward["points"], str(today), user_id),
+        )
+    else:
+        # Paid draw - update points, last_draw, paid_draws_today, and last_paid_draw_date
+        c.execute(
+            "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
+            (reward["points"], str(today), paid_draws_today + 1, str(today), user_id),
+        )
     conn.commit()
     conn.close()
 
@@ -289,12 +337,12 @@ async def check(ctx, member: discord.Member = None):
     user_id = member.id
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
     conn.close()
 
     if row:
-        points, last_draw = row
+        points, last_draw, paid_draws_today, last_paid_draw_date = row
         embed = discord.Embed(
             title=f"💰 {member.display_name} 的积分信息",
             color=discord.Color.blue()
@@ -314,6 +362,21 @@ async def check(ctx, member: discord.Member = None):
                 embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
         else:
             embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
+        
+        # Check if paid draws should be reset for today
+        if isinstance(last_paid_draw_date, str):
+            last_paid_draw_date_obj = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
+        elif isinstance(last_paid_draw_date, datetime.datetime):
+            last_paid_draw_date_obj = last_paid_draw_date.date()
+        else:
+            last_paid_draw_date_obj = datetime.date(1970, 1, 1)
+        
+        today = now_est().date()
+        if last_paid_draw_date_obj != today:
+            paid_draws_today = 0
+        
+        remaining_draws = MAX_PAID_DRAWS_PER_DAY - paid_draws_today
+        embed.add_field(name="付费抽奖", value=f"**{paid_draws_today}/{MAX_PAID_DRAWS_PER_DAY}** 次\n剩余: **{remaining_draws}** 次", inline=True)
         
         await ctx.send(embed=embed)
     else:
@@ -743,10 +806,20 @@ async def help_command(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
     
+    # Draw rules
+    embed.add_field(
+        name="📋 抽奖规则",
+        value="""🎉 **免费抽奖**：每天1次，完全免费
+🎰 **付费抽奖**：每天最多10次，每次消耗100积分
+⏰ **重置时间**：每天0点自动重置抽奖次数
+💰 **奖励范围**：10-1000积分，平均回报率103.8%""",
+        inline=False
+    )
+    
     # User commands (always visible)
     embed.add_field(
         name="🎲 用户命令",
-        value="""`!draw` - 每日抽奖（免费）
+        value="""`!draw` - 每日抽奖（免费1次，付费最多10次/天）
 `!check [用户]` - 查看积分和抽奖状态
 `!ranking` - 查看积分排行榜
 `!roleshop` - 查看身份组商店
@@ -778,7 +851,7 @@ async def help_command(interaction: discord.Interaction):
             inline=False
         )
     
-    embed.set_footer(text="每日免费抽奖一次，额外抽奖需要100积分")
+    embed.set_footer(text="每日免费抽奖1次，付费抽奖最多10次/天，每次消耗100积分")
     await interaction.response.send_message(embed=embed)
 
 
