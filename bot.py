@@ -96,18 +96,19 @@ def init_db() -> None:
 
 # 优化的抽奖奖励系统
 REWARD_SYSTEM = [
-    {"points": 10, "probability": 15, "message": "小小心意", "emoji": "🍬"},
-    {"points": 20, "probability": 18, "message": "普通奖励", "emoji": "🎁"},
-    {"points": 30, "probability": 20, "message": "不错哦", "emoji": "🎯"},
-    {"points": 50, "probability": 15, "message": "运气不错", "emoji": "🎪"},
-    {"points": 75, "probability": 10, "message": "有点开心", "emoji": "🎨"},
-    {"points": 100, "probability": 7, "message": "少见奖励", "emoji": "💎"},
-    {"points": 150, "probability": 5, "message": "较稀有", "emoji": "🌟"},
-    {"points": 200, "probability": 4, "message": "稀有奖励", "emoji": "💫"},
-    {"points": 300, "probability": 3, "message": "传说级运气", "emoji": "👑"},
-    {"points": 500, "probability": 2, "message": "极低概率大奖", "emoji": "🔥"},
-    {"points": 1000, "probability": 1, "message": "超级大奖", "emoji": "💎"},
-    {"points": 777, "probability": 0.1, "message": "幸运之神奖", "emoji": "✨"},
+    {"points": 10, "probability": 16.0, "message": "小小心意", "emoji": "🍬"},
+    {"points": 20, "probability": 12.0, "message": "普通奖励", "emoji": "🎁"},
+    {"points": 75, "probability": 18.0, "message": "不错哦", "emoji": "🎯"},
+    {"points": 100, "probability": 15.0, "message": "运气不错", "emoji": "🎪"},
+    {"points": 125, "probability": 7.5, "message": "有点开心", "emoji": "🎨"},
+    {"points": 175, "probability": 5.5, "message": "较稀有", "emoji": "🌟"},
+    {"points": 200, "probability": 4.5, "message": "稀有奖励", "emoji": "💫"},
+    {"points": 250, "probability": 4.0, "message": "传说级运气", "emoji": "👑"},
+    {"points": 300, "probability": 3.0, "message": "极低概率大奖", "emoji": "🔥"},
+    {"points": 500, "probability": 2.0, "message": "超级大奖", "emoji": "💎"},
+    {"points": 666, "probability": 1.5, "message": "恶魔奖励", "emoji": "😈"},
+    {"points": 777, "probability": 0.9, "message": "幸运之神奖", "emoji": "✨"},
+    {"points": 1000, "probability": 0.9, "message": "终极大奖", "emoji": "🏆"},
 ]
 
 def get_weighted_reward():
@@ -263,13 +264,21 @@ async def draw(ctx):
     )
     
     # Add special effects for high-value rewards
-    if reward['points'] >= 777:
+    if reward['points'] >= 1000:
+        embed.description += "\n\n🏆 **恭喜你抽中了终极大奖！** 🏆"
+        embed.color = discord.Color.purple()
+    elif reward['points'] >= 777:
         embed.description += "\n\n🎉 **恭喜你抽中了幸运之神奖！** 🎉"
         embed.color = discord.Color.purple()
+    elif reward['points'] >= 666:
+        embed.description += "\n\n😈 **哇！你抽中了恶魔奖励！** 😈"
+        embed.color = discord.Color.dark_red()
     elif reward['points'] >= 500:
         embed.description += "\n\n🔥 **太棒了！你抽中了超级大奖！** 🔥"
-    elif reward['points'] >= 200:
+        embed.color = discord.Color.orange()
+    elif reward['points'] >= 250:
         embed.description += "\n\n⭐ **哇！你抽中了稀有奖励！** ⭐"
+        embed.color = discord.Color.gold()
     
     await ctx.send(embed=embed)
 
