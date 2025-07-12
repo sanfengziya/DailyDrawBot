@@ -498,6 +498,86 @@ async def debug_user(ctx, member: discord.Member):
     else:
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
 
+@bot.command(name="testupdate")
+@commands.has_permissions(administrator=True)
+async def test_update(ctx, member: discord.Member):
+    """Test database update for paid draws"""
+    user_id = member.id
+    today = now_est().date()
+    
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # First, get current values
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    row = c.fetchone()
+    
+    if row:
+        points, last_draw, paid_draws_today, last_paid_draw_date = row
+        await ctx.send(f"🔍 更新前的数据：\n积分: {points}\n付费抽奖次数: {paid_draws_today}\n最后付费抽奖日期: {last_paid_draw_date}")
+        
+        # Test the update
+        new_paid_draws = paid_draws_today + 1
+        c.execute(
+            "UPDATE users SET points = points + 0, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
+            (str(today), new_paid_draws, str(today), user_id),
+        )
+        conn.commit()
+        
+        # Check if update was successful
+        c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+        row_after = c.fetchone()
+        
+        if row_after:
+            points_after, last_draw_after, paid_draws_after, last_paid_draw_date_after = row_after
+            await ctx.send(f"✅ 更新后的数据：\n积分: {points_after}\n付费抽奖次数: {paid_draws_after}\n最后付费抽奖日期: {last_paid_draw_date_after}")
+        else:
+            await ctx.send("❌ 更新后无法读取数据")
+    else:
+        await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
+    
+    conn.close()
+
+@bot.command(name="checkdb")
+@commands.has_permissions(administrator=True)
+async def check_database(ctx):
+    """Check database structure for paid draws tracking"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Check table structure
+    c.execute("DESCRIBE users")
+    columns = c.fetchall()
+    
+    embed = discord.Embed(
+        title="🔍 数据库结构检查",
+        color=discord.Color.blue()
+    )
+    
+    for column in columns:
+        field_name, field_type, null, key, default, extra = column
+        embed.add_field(
+            name=field_name,
+            value=f"类型: {field_type}\n默认值: {default}\n允许NULL: {null}",
+            inline=True
+        )
+    
+    # Check if paid draws columns exist
+    c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
+    paid_draws_exists = c.fetchone() is not None
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'last_paid_draw_date'")
+    last_paid_date_exists = c.fetchone() is not None
+    
+    embed.add_field(
+        name="字段检查",
+        value=f"paid_draws_today: {'✅' if paid_draws_exists else '❌'}\nlast_paid_draw_date: {'✅' if last_paid_date_exists else '❌'}",
+        inline=False
+    )
+    
+    conn.close()
+    await ctx.send(embed=embed)
+
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
 async def backup(ctx):
@@ -920,7 +1000,9 @@ async def help_command(interaction: discord.Interaction):
 `!resetdraw <用户>` - 重置用户抽奖状态
 `!resetall --confirm` - 清空所有用户数据
 `!fixdb` - 修复数据库结构
+`!checkdb` - 检查数据库结构
 `!debuguser <用户>` - 调试用户付费抽奖信息
+`!testupdate <用户>` - 测试数据库更新功能
 `!addtag <价格> <身份组>` - 添加可购买身份组
 `!rewardinfo` - 查看抽奖概率系统
 `!testdraw [次数]` - 测试抽奖系统
