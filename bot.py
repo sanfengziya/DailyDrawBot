@@ -214,32 +214,16 @@ async def draw(ctx):
 
     if row:
         points, last_draw_date, paid_draws_today, last_paid_draw_date = row
-        if isinstance(last_draw_date, str):
-            last_draw_date = datetime.datetime.strptime(last_draw_date, "%Y-%m-%d").date()
-        elif isinstance(last_draw_date, datetime.datetime):
-            last_draw_date = last_draw_date.date()
-        
-        if isinstance(last_paid_draw_date, str):
-            last_paid_draw_date = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
-        elif isinstance(last_paid_draw_date, datetime.datetime):
-            last_paid_draw_date = last_paid_draw_date.date()
-        else:
-            last_paid_draw_date = datetime.date(1970, 1, 1)
-        
-        # Debug: Print the values to console
-        print(f"DEBUG: User {user_id} - paid_draws_today: {paid_draws_today}, last_paid_draw_date: {last_paid_draw_date}, today: {today}")
     else:
         c.execute("INSERT INTO users (user_id, points, last_draw, paid_draws_today, last_paid_draw_date) VALUES (%s, %s, %s, %s, %s)", 
                  (user_id, 0, "1970-01-01", 0, "1970-01-01"))
         conn.commit()
         points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
-        print(f"DEBUG: New user {user_id} created with paid_draws_today: {paid_draws_today}")
 
     first_draw = last_draw_date != today
     
     # Reset paid draws counter if it's a new day
     if last_paid_draw_date != today:
-        print(f"DEBUG: Resetting paid_draws_today from {paid_draws_today} to 0 (new day)")
         paid_draws_today = 0
 
     if first_draw:
@@ -303,8 +287,6 @@ async def draw(ctx):
     else:
         # Paid draw - update points, last_draw, paid_draws_today, and last_paid_draw_date
         new_paid_draws = paid_draws_today + 1
-        print(f"DEBUG: Updating paid_draws_today from {paid_draws_today} to {new_paid_draws}")
-        print(f"DEBUG: Updating last_paid_draw_date from {last_paid_draw_date} to {today}")
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
             (reward["points"], str(today), new_paid_draws, str(today), user_id),
@@ -350,7 +332,8 @@ async def check(ctx, member: discord.Member = None):
     conn.close()
 
     if row:
-        points, last_draw, paid_draws_today, last_paid_draw_date = row
+        points, last_draw, paid_draws_today, last_paid_draw_date = row 
+
         embed = discord.Embed(
             title=f"💰 {member.display_name} 的积分信息",
             color=discord.Color.blue()
@@ -371,19 +354,11 @@ async def check(ctx, member: discord.Member = None):
         else:
             embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
         
-        # Check if paid draws should be reset for today
-        if isinstance(last_paid_draw_date, str):
-            last_paid_draw_date_obj = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
-        elif isinstance(last_paid_draw_date, datetime.datetime):
-            last_paid_draw_date_obj = last_paid_draw_date.date()
-        else:
-            last_paid_draw_date_obj = datetime.date(1970, 1, 1)
-        
         today = now_est().date()
         # Only reset if it's actually a new day AND we need to show the reset value
         # For display purposes, we'll show the actual database value
         display_paid_draws = paid_draws_today
-        if last_paid_draw_date_obj != today:
+        if last_paid_draw_date != today:
             # This is just for display calculation, don't modify the actual value
             display_paid_draws = 0
         
