@@ -27,7 +27,8 @@ async def help_command(interaction: discord.Interaction):
 `!check [用户]` - 查看积分和抽奖状态
 `!ranking` - 查看积分排行榜
 `!roleshop` - 查看身份组商店
-`!buytag <身份组名>` - 购买身份组""",
+`!buytag <身份组名>` - 购买身份组
+`!giftpoints <用户> <积分>` - 赠送积分给其他用户""",
         inline=False
     )
     

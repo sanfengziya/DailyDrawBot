@@ -26,15 +26,15 @@ async def draw(ctx):
 
     first_draw = last_draw_date != today
     
-    # Reset paid draws counter if it's a new day
+    # 如果是新的一天，重置付费抽奖计数器
     if last_paid_draw_date != today:
         paid_draws_today = 0
 
     if first_draw:
-        # First draw of the day - free!
+        # 当天第一次抽奖 - 免费！
         await ctx.send(f"🎉 {ctx.author.mention} 开始今天的抽奖吧！")
     else:
-        # Check if user has reached daily paid draw limit
+        # 检查用户是否已达到每日付费抽奖上限
         if paid_draws_today >= MAX_PAID_DRAWS_PER_DAY:
             conn.close()
             embed = discord.Embed(
@@ -73,7 +73,7 @@ async def draw(ctx):
             await ctx.send("⏰ 已取消抽奖。")
             return
 
-        if msg.content.lower() not in ("y", "yes"):
+        if msg.content.upper() != "Y":
             conn.close()
             await ctx.send("❌ 已取消抽奖。")
             return
@@ -83,13 +83,13 @@ async def draw(ctx):
     reward = get_weighted_reward()
     
     if first_draw:
-        # Free draw - only update points and last_draw
+        # 免费抽奖 - 只更新积分和最后抽奖日期
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
             (reward["points"], str(today), user_id),
         )
     else:
-        # Paid draw - update points, last_draw, paid_draws_today, and last_paid_draw_date
+        # 付费抽奖 - 更新积分、最后抽奖日期、今日付费抽奖次数和最后付费抽奖日期
         new_paid_draws = paid_draws_today + 1
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
@@ -98,14 +98,14 @@ async def draw(ctx):
     conn.commit()
     conn.close()
 
-    # Create a beautiful embed for the reward
+    # 为奖励创建精美的嵌入消息
     embed = discord.Embed(
         title=f"{reward['emoji']} 抽奖结果",
         description=f"**{reward['message']}**\n获得 **{reward['points']}** 分！",
         color=discord.Color.gold() if reward['points'] >= 300 else discord.Color.blue() if reward['points'] >= 100 else discord.Color.green()
     )
     
-    # Add special effects for high-value rewards
+    # 为高价值奖励添加特殊效果
     if reward['points'] >= 1000:
         embed.description += "\n\n🏆 **恭喜你抽中了终极大奖！** 🏆"
         embed.color = discord.Color.purple()
@@ -158,11 +158,11 @@ async def check(ctx, member=None):
             embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
         
         today = now_est().date()
-        # Only reset if it's actually a new day AND we need to show the reset value
-        # For display purposes, we'll show the actual database value
+        # 只有在确实是新的一天且需要显示重置值时才重置
+        # 出于显示目的，我们将显示实际的数据库值
         display_paid_draws = paid_draws_today
         if last_paid_draw_date != today:
-            # This is just for display calculation, don't modify the actual value
+            # 这只是用于显示计算，不修改实际值
             display_paid_draws = 0
         
         remaining_draws = MAX_PAID_DRAWS_PER_DAY - display_paid_draws
@@ -209,11 +209,11 @@ async def reset_all(ctx, confirm=None):
     await ctx.send(f"{ctx.author.mention} ✅ 所有用户数据已被清除。")
 
 async def fix_database(ctx):
-    """Force update database schema for paid draws tracking"""
+    """强制更新数据库架构以支持付费抽奖跟踪"""
     conn = get_connection()
     c = conn.cursor()
     
-    # Check and add missing columns
+    # 检查并添加缺失的列
     c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
     if not c.fetchone():
         c.execute("ALTER TABLE users ADD COLUMN paid_draws_today INT DEFAULT 0")
@@ -230,11 +230,11 @@ async def fix_database(ctx):
     else:
         await ctx.send("✅ last_paid_draw_date 字段已存在")
     
-    # Update existing users to have proper default values
+    # 更新现有用户以具有适当的默认值
     c.execute("UPDATE users SET paid_draws_today = 0 WHERE paid_draws_today IS NULL")
     c.execute("UPDATE users SET last_paid_draw_date = '1970-01-01' WHERE last_paid_draw_date IS NULL")
     
-    # Force update all users to today's date for testing
+    # 强制将所有用户更新为今天的日期以进行测试
     today = now_est().date()
     c.execute("UPDATE users SET last_paid_draw_date = %s WHERE last_paid_draw_date = '1970-01-01'", (str(today),))
     

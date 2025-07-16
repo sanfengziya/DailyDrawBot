@@ -10,14 +10,14 @@ def now_est():
     return utc_now.astimezone(est)
 
 def get_weighted_reward():
-    """Get a random reward based on weighted probabilities"""
-    # Create a list where each reward appears according to its probability
+    """根据加权概率获取随机奖励"""
+    # 创建一个列表，其中每个奖励根据其概率出现
     reward_pool = []
     for reward in REWARD_SYSTEM:
-        # Convert percentage to number of entries (multiply by 10 for precision)
+        # 将百分比转换为条目数量（乘以10以提高精度）
         count = int(reward["probability"] * 10)
         for _ in range(count):
             reward_pool.append(reward)
     
-    # Randomly select from the pool
+    # 从池中随机选择
     return random.choice(reward_pool) 

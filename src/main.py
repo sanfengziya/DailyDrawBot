@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Daily Draw Bot - Main Entry Point
+# 每日抽奖机器人 - 主入口点
 
 import discord
 from discord.ext import commands
@@ -97,6 +97,10 @@ async def roleshop(ctx):
 @bot.command(name="buytag")
 async def buytag(ctx, *, role_name: str):
     await role_commands.buytag(ctx, role_name)
+
+@bot.command(name="giftpoints")
+async def giftpoints(ctx, member: discord.Member, amount: int):
+    await role_commands.giftpoints(ctx, member, amount)
 
 @bot.command(name="givepoints")
 @commands.has_permissions(administrator=True)

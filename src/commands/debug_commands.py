@@ -4,7 +4,7 @@ from src.db.database import get_connection
 from src.utils.helpers import now_est
 
 async def debug_user(ctx, member):
-    """Debug user's paid draw information"""
+    """调试用户的付费抽奖信息"""
     user_id = member.id
     conn = get_connection()
     c = conn.cursor()
@@ -33,14 +33,14 @@ async def debug_user(ctx, member):
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
 
 async def test_update(ctx, member):
-    """Test database update for paid draws"""
+    """测试付费抽奖的数据库更新"""
     user_id = member.id
     today = now_est().date()
     
     conn = get_connection()
     c = conn.cursor()
     
-    # First, get current values
+    # 首先，获取当前值
     c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
     row = c.fetchone()
     
@@ -48,7 +48,7 @@ async def test_update(ctx, member):
         points, last_draw, paid_draws_today, last_paid_draw_date = row
         await ctx.send(f"🔍 更新前的数据：\n积分: {points}\n付费抽奖次数: {paid_draws_today}\n最后付费抽奖日期: {last_paid_draw_date}")
         
-        # Test the update
+        # 测试更新
         new_paid_draws = paid_draws_today + 1
         c.execute(
             "UPDATE users SET points = points + 0, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
@@ -56,7 +56,7 @@ async def test_update(ctx, member):
         )
         conn.commit()
         
-        # Check if update was successful
+        # 检查更新是否成功
         c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
         row_after = c.fetchone()
         
@@ -71,11 +71,11 @@ async def test_update(ctx, member):
     conn.close()
 
 async def check_database(ctx):
-    """Check database structure for paid draws tracking"""
+    """检查付费抽奖跟踪的数据库结构"""
     conn = get_connection()
     c = conn.cursor()
     
-    # Check table structure
+    # 检查表结构
     c.execute("DESCRIBE users")
     columns = c.fetchall()
     
@@ -92,7 +92,7 @@ async def check_database(ctx):
             inline=True
         )
     
-    # Check if paid draws columns exist
+    # 检查付费抽奖列是否存在
     c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
     paid_draws_exists = c.fetchone() is not None
     
@@ -109,7 +109,7 @@ async def check_database(ctx):
     await ctx.send(embed=embed)
 
 async def detailed_debug(ctx, member):
-    """Detailed debug for paid draws logic"""
+    """付费抽奖逻辑的详细调试"""
     user_id = member.id
     today = now_est().date()
     
@@ -122,7 +122,7 @@ async def detailed_debug(ctx, member):
     if row:
         points, last_draw, paid_draws_today, last_paid_draw_date = row
         
-        # Parse dates
+        # 解析日期
         if isinstance(last_paid_draw_date, str):
             last_paid_draw_date_obj = datetime.datetime.strptime(last_paid_draw_date, "%Y-%m-%d").date()
         elif isinstance(last_paid_draw_date, datetime.datetime):
@@ -132,7 +132,7 @@ async def detailed_debug(ctx, member):
         else:
             last_paid_draw_date_obj = datetime.date(1970, 1, 1)
         
-        # Ensure today is date type
+        # 确保today是日期类型
         if isinstance(today, datetime.datetime):
             today_date = today.date()
         elif isinstance(today, datetime.date):
@@ -140,7 +140,7 @@ async def detailed_debug(ctx, member):
         else:
             today_date = datetime.datetime.strptime(str(today), "%Y-%m-%d").date()
         
-        # Calculate display value
+        # 计算显示值
         display_paid_draws = paid_draws_today
         is_new_day = last_paid_draw_date_obj != today_date
         if is_new_day:
@@ -162,7 +162,7 @@ async def detailed_debug(ctx, member):
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
 
 async def rewardinfo(ctx):
-    """Display current reward system information"""
+    """显示当前奖励系统信息"""
     from src.config.config import REWARD_SYSTEM
     
     embed = discord.Embed(
@@ -189,7 +189,7 @@ async def rewardinfo(ctx):
     await ctx.send(embed=embed)
 
 async def testdraw(ctx, times=100):
-    """Test the reward system with multiple draws"""
+    """测试多次抽奖的奖励系统"""
     from src.utils.helpers import get_weighted_reward
     
     if times > 1000:

@@ -1,6 +1,6 @@
 import discord
 
-# View for paginated role shop display
+# 用于分页角色商店显示的视图
 class RolePageView(discord.ui.View):
     def __init__(self, ctx, rows):
         super().__init__(timeout=60)
