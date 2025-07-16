@@ -36,9 +36,9 @@ DB_CONFIG = {
 REWARD_SYSTEM = [
     {"points": 10, "probability": 22.0, "message": "小小心意", "emoji": "🍬"},
     {"points": 20, "probability": 17.0, "message": "普通奖励", "emoji": "🎁"},
-    {"points": 75, "probability": 13.0, "message": "不错哦", "emoji": "🎯"},
-    {"points": 100, "probability": 12.0, "message": "运气不错", "emoji": "🎪"},
-    {"points": 125, "probability": 5.0, "message": "有点开心", "emoji": "🎨"},
+    {"points": 75, "probability": 15.0, "message": "不错哦", "emoji": "🎯"},
+    {"points": 100, "probability": 20.0, "message": "运气不错", "emoji": "🎪"},
+    {"points": 125, "probability": 7.0, "message": "有点开心", "emoji": "🎨"},
     {"points": 175, "probability": 4.5, "message": "较稀有", "emoji": "🌟"},
     {"points": 200, "probability": 4.0, "message": "稀有奖励", "emoji": "💫"},
     {"points": 250, "probability": 3.5, "message": "传说级运气", "emoji": "👑"},
