@@ -1,17 +1,23 @@
 import os
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# 加载.env文件
+load_dotenv()
 
 # Bot配置
 TOKEN = os.getenv("TOKEN")
 if TOKEN is None:
     raise RuntimeError("TOKEN environment variable not set")
     
-YOUR_GUILD_ID = 1389456172897009775
-PREFIX = "!"
+YOUR_GUILD_ID = int(os.getenv("YOUR_GUILD_ID", "0"))
+if YOUR_GUILD_ID == 0:
+    raise RuntimeError("YOUR_GUILD_ID environment variable not set")
+PREFIX = os.getenv("PREFIX", "!")
 
 # 抽奖配置
-WHEEL_COST = 100
-MAX_PAID_DRAWS_PER_DAY = 10
+WHEEL_COST = int(os.getenv("WHEEL_COST", "100"))
+MAX_PAID_DRAWS_PER_DAY = int(os.getenv("MAX_PAID_DRAWS_PER_DAY", "10"))
 
 # 数据库配置
 MYSQL_URL = os.getenv("MYSQL_URL")
