@@ -7,7 +7,7 @@ import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
 from src.db.database import init_db
-from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands
+from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, language_commands
 
 # 设置机器人
 intents = discord.Intents.default()
@@ -141,6 +141,9 @@ async def ranking(ctx):
 @bot.tree.command(name="help", description="显示所有可用命令的帮助信息")
 async def help_command(interaction: discord.Interaction):
     await help_commands.help_command(interaction)
+
+# 注册语言命令
+language_commands.setup(bot)
 
 # 初始化数据库
 init_db()

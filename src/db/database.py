@@ -69,6 +69,17 @@ def init_db() -> None:
         )
         """
     )
+    
+    # 创建服务器设置表，用于存储语言偏好
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS guild_settings (
+            guild_id BIGINT PRIMARY KEY,
+            language VARCHAR(10) DEFAULT 'en'
+        )
+        """
+    )
+    
     conn.commit()
     c.close()
     conn.close() 
