@@ -18,7 +18,7 @@ async def ranking(ctx):
 
     entries = []
     for i, (user_id, points) in enumerate(rows, start=1):
-        user = await ctx.bot.fetch_user(user_id)
+        user = await ctx.bot.fetch_user(int(user_id))
         avatar_bytes = await user.display_avatar.replace(size=64).read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((64, 64))
         entries.append((avatar, f"{i}. {user.name}: {points} points"))
@@ -55,4 +55,4 @@ async def ranking(ctx):
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
-    await ctx.send(file=File(fp=buffer, filename="ranking.png")) 
+    await ctx.send(file=File(fp=buffer, filename="ranking.png"))

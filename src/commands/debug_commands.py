@@ -8,7 +8,7 @@ async def debug_user(ctx, member):
     user_id = member.id
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
     row = c.fetchone()
     conn.close()
     
@@ -41,7 +41,7 @@ async def test_update(ctx, member):
     c = conn.cursor()
     
     # 首先，获取当前值
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
     row = c.fetchone()
     
     if row:
@@ -52,12 +52,12 @@ async def test_update(ctx, member):
         new_paid_draws = paid_draws_today + 1
         c.execute(
             "UPDATE users SET points = points + 0, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
-            (str(today), new_paid_draws, str(today), user_id),
+            (str(today), new_paid_draws, str(today), str(user_id)),
         )
         conn.commit()
         
         # 检查更新是否成功
-        c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+        c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
         row_after = c.fetchone()
         
         if row_after:
@@ -115,7 +115,7 @@ async def detailed_debug(ctx, member):
     
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
     row = c.fetchone()
     conn.close()
     
@@ -220,4 +220,4 @@ async def testdraw(ctx, times=100):
             inline=True
         )
     
-    await ctx.send(embed=embed) 
+    await ctx.send(embed=embed)

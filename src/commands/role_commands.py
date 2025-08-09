@@ -46,7 +46,7 @@ async def buytag(ctx, role_name):
         return
     price = row[0]
 
-    c.execute("SELECT points FROM users WHERE user_id = %s", (ctx.author.id,))
+    c.execute("SELECT points FROM users WHERE user_id = %s", (str(ctx.author.id),))
     user = c.fetchone()
     if not user or user[0] < price:
         await ctx.send("你的分数不足。")
@@ -69,7 +69,7 @@ async def buytag(ctx, role_name):
         conn.close()
         return
 
-    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (price, ctx.author.id))
+    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (price, str(ctx.author.id)))
     conn.commit()
     conn.close()
 
@@ -92,7 +92,7 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
     c = conn.cursor()
     
     # 检查赠送者是否有足够积分
-    c.execute("SELECT points FROM users WHERE user_id = %s", (ctx.author.id,))
+    c.execute("SELECT points FROM users WHERE user_id = %s", (str(ctx.author.id),))
     sender_row = c.fetchone()
     
     if not sender_row:
@@ -130,13 +130,13 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
         return
     
     # 执行积分转移
-    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (amount, ctx.author.id))
+    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (amount, str(ctx.author.id)))
     
     # 为接收者添加积分（如果不存在则创建记录）
     c.execute(
         "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
         "ON DUPLICATE KEY UPDATE points = points + %s",
-        (member.id, amount, "1970-01-01", amount)
+        (str(member.id), amount, "1970-01-01", amount)
     )
     
     conn.commit()
@@ -156,7 +156,7 @@ async def givepoints(ctx, member: discord.Member, amount: int):
     c.execute(
         "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
         "ON DUPLICATE KEY UPDATE points = points + %s",
-        (member.id, 0, "1970-01-01", amount),
+        (str(member.id), 0, "1970-01-01", amount),
     )
     conn.commit()
     conn.close()
@@ -169,8 +169,8 @@ async def setpoints(ctx, member: discord.Member, points: int):
     c.execute(
         "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
         "ON DUPLICATE KEY UPDATE points = VALUES(points)",
-        (member.id, points, "1970-01-01"),
+        (str(member.id), points, "1970-01-01"),
     )
     conn.commit()
     conn.close()
-    await ctx.send(f"{ctx.author.mention} 已将 {member.mention} 的分数设为 {points} 分。") 
+    await ctx.send(f"{ctx.author.mention} 已将 {member.mention} 的分数设为 {points} 分。")

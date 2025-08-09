@@ -13,14 +13,14 @@ async def draw(ctx):
 
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
     row = c.fetchone()
 
     if row:
         points, last_draw_date, paid_draws_today, last_paid_draw_date = row
     else:
         c.execute("INSERT INTO users (user_id, points, last_draw, paid_draws_today, last_paid_draw_date) VALUES (%s, %s, %s, %s, %s)", 
-                 (user_id, 0, "1970-01-01", 0, "1970-01-01"))
+                 (str(user_id), 0, "1970-01-01", 0, "1970-01-01"))
         conn.commit()
         points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
 
@@ -78,7 +78,7 @@ async def draw(ctx):
             await ctx.send("❌ 已取消抽奖。")
             return
 
-        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
+        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, str(user_id)))
 
     reward = get_weighted_reward()
     
@@ -86,14 +86,14 @@ async def draw(ctx):
         # 免费抽奖 - 只更新积分和最后抽奖日期
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
-            (reward["points"], str(today), user_id),
+            (reward["points"], str(today), str(user_id)),
         )
     else:
         # 付费抽奖 - 更新积分、最后抽奖日期、今日付费抽奖次数和最后付费抽奖日期
         new_paid_draws = paid_draws_today + 1
         c.execute(
             "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
-            (reward["points"], str(today), new_paid_draws, str(today), user_id),
+            (reward["points"], str(today), new_paid_draws, str(today), str(user_id)),
         )
     conn.commit()
     conn.close()
@@ -130,7 +130,7 @@ async def check(ctx, member=None):
     user_id = member.id
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (str(user_id),))
     row = c.fetchone()
     conn.close()
 
@@ -183,9 +183,9 @@ async def reset_draw(ctx, member):
 
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+    c.execute("SELECT * FROM users WHERE user_id = %s", (str(user_id),))
     if c.fetchone():
-        c.execute("UPDATE users SET last_draw = %s WHERE user_id = %s", (yesterday, user_id))
+        c.execute("UPDATE users SET last_draw = %s WHERE user_id = %s", (yesterday, str(user_id)))
         conn.commit()
         await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
     else:
@@ -241,4 +241,4 @@ async def fix_database(ctx):
     conn.commit()
     conn.close()
     
-    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。") 
+    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。")

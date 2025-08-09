@@ -166,7 +166,7 @@ async def quiz(ctx, category, number):
                 c.execute(
                     "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
                     "ON DUPLICATE KEY UPDATE points = points + VALUES(points)",
-                    (reply.author.id, 10, "1970-01-01"),
+                    (str(reply.author.id), 10, "1970-01-01"),
                 )
                 conn.commit()
                 conn.close()
@@ -182,4 +182,4 @@ async def quiz(ctx, category, number):
             letter = ["A", "B", "C", "D"][ans - 1]
             await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
 
-    await ctx.send("答题结束！") 
+    await ctx.send("答题结束！")
