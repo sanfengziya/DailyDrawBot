@@ -17,7 +17,7 @@ PREFIX = os.getenv("PREFIX", "!")
 
 # 抽奖配置
 WHEEL_COST = int(os.getenv("WHEEL_COST", "100"))
-MAX_PAID_DRAWS_PER_DAY = int(os.getenv("MAX_PAID_DRAWS_PER_DAY", "10"))
+MAX_PAID_DRAWS_PER_DAY = int(os.getenv("MAX_PAID_DRAWS_PER_DAY", "20"))
 
 # 数据库配置
 MYSQL_URL = os.getenv("MYSQL_URL")

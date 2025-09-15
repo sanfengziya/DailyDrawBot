@@ -1,5 +1,14 @@
 import discord
 
+def create_embed(title: str, description: str, color: discord.Color = discord.Color.blue()) -> discord.Embed:
+    """创建一个标准的嵌入消息"""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color
+    )
+    return embed
+
 # 用于分页角色商店显示的视图
 class RolePageView(discord.ui.View):
     def __init__(self, ctx, rows):
@@ -38,4 +47,4 @@ class RolePageView(discord.ui.View):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("你无法控制这个分页！", ephemeral=True)
         self.index = (self.index + 1) % len(self.rows)
-        await interaction.response.edit_message(embed=self.get_embed(self.index), view=self) 
+        await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)

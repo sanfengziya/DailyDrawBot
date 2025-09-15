@@ -7,7 +7,7 @@ import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
 from src.db.database import init_db
-from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, language_commands
+from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, language_commands, egg_commands, pet_commands
 
 # 设置机器人
 intents = discord.Intents.default()
@@ -18,6 +18,23 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 @bot.event
 async def on_ready():
     print(f"已登录为 {bot.user}")
+    
+    # 加载Cog命令
+    try:
+        await bot.add_cog(egg_commands.EggCommands(bot))
+        await bot.add_cog(pet_commands.PetCommands(bot))
+        print("已加载宠物蛋系统命令")
+    except Exception as e:
+        print(f"加载Cog时出错: {e}")
+    
+    # 注册斜杠命令
+    try:
+        egg_commands.setup(bot)
+        pet_commands.setup(bot)
+        print("已注册宠物蛋系统斜杠命令")
+    except Exception as e:
+        print(f"注册斜杠命令时出错: {e}")
+    
     try:
         synced = await bot.tree.sync()
         print(f"同步了 {len(synced)} 个斜杠命令")
@@ -153,4 +170,4 @@ def main():
     bot.run(TOKEN)
 
 if __name__ == "__main__":
-    main() 
+    main()

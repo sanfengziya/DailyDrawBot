@@ -219,3 +219,12 @@ importdb.py
 
 # macOS
 .DS_Store
+
+# test file
+test_probability_system.py
+
+# rules
+project_rules.md
+
+# readme
+PET_SYSTEM_README.md
