@@ -190,7 +190,7 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
     if not pets:
         embed = create_embed(
             "🐾 我的宠物",
-            "你还没有任何宠物呢！快去抽蛋孵化吧！",
+            f"{interaction.user.mention} 你还没有任何宠物呢！快去抽蛋孵化吧！",
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -212,7 +212,7 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
     total_pages = (total_pets + per_page - 1) // per_page
     
     embed = create_embed(
-        f"🐾 我的宠物 (第 {page}/{total_pages} 页)",
+        f"🐾 {interaction.user.mention} 的宠物 (第 {page}/{total_pages} 页)",
         description,
         discord.Color.blue()
     )
@@ -237,13 +237,26 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     if not result:
         embed = create_embed(
             "❌ 错误",
-            "找不到这只宠物或者它不属于你！",
+            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
         return
+
+    pet_name, rarity, stars, max_stars = result
     
-    pet_name, rarity, stars, max_stars, created_at = result
+    if stars >= max_stars:
+        embed = create_embed(
+            "⭐ 已满星",
+            f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
+            discord.Color.yellow()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
     
     rarity_colors = {
         'C': '🤍',
@@ -263,7 +276,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         upgrade_info = "\n**已达到最大星级！**"
     
     embed = create_embed(
-        f"{rarity_colors[rarity]} {pet_name}",
+        f"{rarity_colors[rarity]} {interaction.user.mention} 的 {pet_name}",
         f"**宠物ID：** {pet_id}\n"
         f"**稀有度：** {rarity}\n"
         f"**星级：** {star_display} ({stars}/{max_stars})\n"
@@ -289,7 +302,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     if not result:
         embed = create_embed(
             "❌ 错误",
-            "找不到这只宠物或者它不属于你！",
+            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
@@ -302,7 +315,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     if stars >= max_stars:
         embed = create_embed(
             "⭐ 已满星",
-            f"{pet_name} 已经达到最大星级了！",
+            f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
             discord.Color.yellow()
         )
         await interaction.response.send_message(embed=embed)
@@ -327,7 +340,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     if not resource_result:
         embed = create_embed(
             "❌ 错误",
-            "无法获取你的资源信息！",
+            f"{interaction.user.mention} 无法获取你的资源信息！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
@@ -340,7 +353,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     if points < required_points:
         embed = create_embed(
             "💰 积分不足",
-            f"升星需要 {required_points} 积分，你只有 {points} 积分！",
+            f"{interaction.user.mention} 升星需要 {required_points} 积分，你只有 {points} 积分！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
@@ -351,7 +364,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     if fragments < required_fragments:
         embed = create_embed(
             "🧩 碎片不足",
-            f"升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！",
+            f"{interaction.user.mention} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
@@ -383,7 +396,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     
     embed = create_embed(
         "🌟 升星成功！",
-        f"**{pet_name}** 成功升星！\n"
+        f"{interaction.user.mention} 你的 **{pet_name}** 成功升星！\n"
         f"星级：{star_display} ({new_stars}/{max_stars})\n"
         f"消耗：{required_fragments} 个 {rarity} 碎片 + {required_points} 积分",
         discord.Color.green()
@@ -406,7 +419,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
     if not result:
         embed = create_embed(
             "❌ 错误",
-            "找不到这只宠物或者它不属于你！",
+            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
@@ -427,7 +440,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
     # 创建确认界面
     embed = create_embed(
         "⚠️ 确认分解",
-        f"你确定要分解 **{pet_name}** 吗？\n\n"
+        f"{interaction.user.mention} 你确定要分解 **{pet_name}** 吗？\n\n"
         f"**分解收益：**\n"
         f"🧩 {total_fragments} 个 {rarity} 碎片\n"
         f"💰 {total_points} 积分\n\n"
@@ -463,7 +476,7 @@ async def handle_pet_fragments(interaction: discord.Interaction):
     if not fragments:
         embed = create_embed(
             "🧩 我的碎片",
-            "你还没有任何碎片呢！分解宠物可以获得碎片！",
+            f"{interaction.user.mention} 你还没有任何碎片呢！分解宠物可以获得碎片！",
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -481,7 +494,7 @@ async def handle_pet_fragments(interaction: discord.Interaction):
         description += f"{rarity_colors[rarity]} **{rarity} 碎片：** {amount} 个\n"
     
     embed = create_embed(
-        "🧩 我的碎片",
+        f"🧩 {interaction.user.mention} 的碎片",
         description,
         discord.Color.purple()
     )
@@ -513,7 +526,7 @@ class DismantleConfirmView(discord.ui.View):
         if c.rowcount == 0:
             embed = create_embed(
                 "❌ 错误",
-                "宠物不存在或已被分解！",
+                f"{interaction.user.mention} 宠物不存在或已被分解！",
                 discord.Color.red()
             )
             await interaction.response.edit_message(embed=embed, view=None)
@@ -539,7 +552,7 @@ class DismantleConfirmView(discord.ui.View):
         
         embed = create_embed(
             "💥 分解成功",
-            f"**{self.pet_name}** 已被分解！\n\n"
+            f"{interaction.user.mention} 你的 **{self.pet_name}** 已被分解！\n\n"
             f"**获得：**\n"
             f"🧩 {self.fragments} 个 {self.rarity} 碎片\n"
             f"💰 {self.points} 积分",
@@ -555,7 +568,7 @@ class DismantleConfirmView(discord.ui.View):
         
         embed = create_embed(
             "✅ 已取消",
-            "分解操作已取消。",
+            f"{interaction.user.mention} 分解操作已取消。",
             discord.Color.blue()
         )
         await interaction.response.edit_message(embed=embed, view=None)
