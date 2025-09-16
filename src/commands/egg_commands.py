@@ -306,12 +306,12 @@ async def handle_egg_claim(interaction: discord.Interaction):
     
     embed = create_embed(
         "🎉 宠物领取成功！",
-        f"恭喜你获得了以下宠物：\n\n{result_text}\n"
+        f"恭喜 {interaction.user.mention} 获得了以下宠物：\n\n{result_text}\n"
         f"总共领取了 **{len(claimed_pets)}** 只宠物！",
         discord.Color.gold()
     )
     
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 async def egg_list(interaction: discord.Interaction):
     """查看蛋和孵化状态"""

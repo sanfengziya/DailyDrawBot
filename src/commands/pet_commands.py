@@ -34,12 +34,91 @@ class PetCommands(commands.Cog):
         c.close()
         conn.close()
 
+# 宠物选择视图
+class PetSelectView(discord.ui.View):
+    def __init__(self, user_id: int, action: str):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.action = action
+        
+    async def setup_select(self):
+        """设置宠物选择下拉菜单"""
+        conn = get_connection()
+        c = conn.cursor()
+        
+        c.execute("""
+            SELECT pet_id, pet_name, rarity, stars
+            FROM pets
+            WHERE user_id = %s
+            ORDER BY rarity DESC, stars DESC, pet_name
+            LIMIT 25
+        """, (self.user_id,))
+        
+        pets = c.fetchall()
+        c.close()
+        conn.close()
+        
+        if not pets:
+            return False
+            
+        # 稀有度颜色映射
+        rarity_emojis = {
+            "普通": "⚪",
+            "稀有": "🔵", 
+            "史诗": "🟣",
+            "传说": "🟡",
+            "神话": "🔴"
+        }
+        
+        options = []
+        for pet_id, pet_name, rarity, stars in pets:
+            emoji = rarity_emojis.get(rarity, "⚪")
+            star_display = "⭐" * stars if stars > 0 else ""
+            label = f"{pet_name} {star_display}".strip()
+            description = f"{rarity} | ID: {pet_id}"
+            
+            options.append(discord.SelectOption(
+                label=label[:100],  # Discord限制
+                description=description[:100],
+                value=str(pet_id),
+                emoji=emoji
+            ))
+        
+        select = PetSelect(self.action, options)
+        self.add_item(select)
+        return True
+
+class PetSelect(discord.ui.Select):
+    def __init__(self, action: str, options):
+        self.action = action
+        super().__init__(
+            placeholder=f"选择要{self.get_action_name()}的宠物...",
+            options=options
+        )
+    
+    def get_action_name(self):
+        action_names = {
+            "info": "查看详情",
+            "upgrade": "升星", 
+            "dismantle": "分解"
+        }
+        return action_names.get(self.action, "操作")
+    
+    async def callback(self, interaction: discord.Interaction):
+        pet_id = int(self.values[0])
+        
+        if self.action == "info":
+            await handle_pet_info(interaction, pet_id)
+        elif self.action == "upgrade":
+            await handle_pet_upgrade(interaction, pet_id)
+        elif self.action == "dismantle":
+            await handle_pet_dismantle(interaction, pet_id)
+
 # 主宠物命令
 @app_commands.command(name="pet", description="🐾 宠物系统 - 查看、升星、分解")
 @app_commands.guild_only()
 @app_commands.describe(
     action="选择操作类型",
-    pet_id="宠物ID（查看详情、升星、分解时需要）",
     page="页码（查看列表时使用，默认第1页）"
 )
 @app_commands.choices(action=[
@@ -49,40 +128,36 @@ class PetCommands(commands.Cog):
     app_commands.Choice(name="💥 分解宠物", value="dismantle"),
     app_commands.Choice(name="🧩 查看碎片库存", value="fragments")
 ])
-async def pet(interaction: discord.Interaction, action: str, pet_id: int = None, page: int = 1):
+async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""
     if action == "list":
         await handle_pet_list(interaction, page)
-    elif action == "info":
-        if pet_id is None:
+    elif action in ["info", "upgrade", "dismantle"]:
+        # 显示宠物选择界面
+        view = PetSelectView(interaction.user.id, action)
+        has_pets = await view.setup_select()
+        
+        if not has_pets:
             embed = create_embed(
-                "❌ 参数错误",
-                "查看宠物详情需要提供宠物ID！",
+                "❌ 没有宠物",
+                "你还没有任何宠物！使用 `/egg claim` 来领取宠物吧！",
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await handle_pet_info(interaction, pet_id)
-    elif action == "upgrade":
-        if pet_id is None:
-            embed = create_embed(
-                "❌ 参数错误",
-                "升星宠物需要提供宠物ID！",
-                discord.Color.red()
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        await handle_pet_upgrade(interaction, pet_id)
-    elif action == "dismantle":
-        if pet_id is None:
-            embed = create_embed(
-                "❌ 参数错误",
-                "分解宠物需要提供宠物ID！",
-                discord.Color.red()
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        await handle_pet_dismantle(interaction, pet_id)
+            
+        action_names = {
+            "info": "查看宠物详情",
+            "upgrade": "升星宠物", 
+            "dismantle": "分解宠物"
+        }
+        
+        embed = create_embed(
+            f"🐾 {action_names[action]}",
+            "请从下方选择要操作的宠物：",
+            discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     elif action == "fragments":
         await handle_pet_fragments(interaction)
 
