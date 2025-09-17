@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
+import datetime
 from src.db.database import get_connection
 from src.utils.ui import create_embed
 
@@ -18,6 +19,14 @@ class PetCommands(commands.Cog):
         4: {'fragments': 50, 'points': 1500},  # 4★ → 5★
         5: {'fragments': 100, 'points': 2000}, # 5★ → 6★
     }
+    
+    # 宠物积分获取配置
+    PET_POINTS_PER_HOUR = {
+        'C': 3,    # 普通宠物
+        'R': 5,    # 稀有宠物
+        'SR': 8,   # 史诗宠物
+        'SSR': 12  # 传说宠物
+    }
 
     def add_fragments(self, player_id, rarity, amount):
         """添加碎片到玩家库存"""
@@ -33,6 +42,91 @@ class PetCommands(commands.Cog):
         conn.commit()
         c.close()
         conn.close()
+    
+    def calculate_pet_points(self, rarity, stars, hours):
+        """计算宠物积分获取量"""
+        base_points = self.PET_POINTS_PER_HOUR.get(rarity, 0)
+        multiplier = stars + 1
+        return int(base_points * multiplier * hours)
+    
+    def update_pet_points(self, user_id):
+        """更新装备宠物的时间戳（用于积分计算）"""
+        conn = get_connection()
+        c = conn.cursor()
+        
+        # 检查用户是否有装备的宠物
+        c.execute("""
+            SELECT equipped_pet_id
+            FROM users
+            WHERE user_id = %s AND equipped_pet_id IS NOT NULL
+        """, (user_id,))
+        
+        result = c.fetchone()
+        if not result:
+            c.close()
+            conn.close()
+            return
+        
+        # 更新最后更新时间为当前时间
+        now = datetime.datetime.now()
+        c.execute("""
+            UPDATE users 
+            SET last_pet_points_update = %s 
+            WHERE user_id = %s
+        """, (now, user_id))
+        
+        conn.commit()
+        c.close()
+        conn.close()
+
+    def calculate_pending_points(self, user_id):
+        """基于时间差计算待领取的宠物积分（最多累积24小时）"""
+        conn = get_connection()
+        c = conn.cursor()
+        
+        # 获取用户装备的宠物信息和上次更新时间
+        c.execute("""
+            SELECT u.equipped_pet_id, u.last_pet_points_update, p.rarity, p.stars
+            FROM users u
+            LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
+            WHERE u.user_id = %s AND u.equipped_pet_id IS NOT NULL
+        """, (user_id,))
+        
+        result = c.fetchone()
+        if not result:
+            c.close()
+            conn.close()
+            return 0
+        
+        equipped_pet_id, last_update, rarity, stars = result
+        
+        # 计算时间差（小时）
+        now = datetime.datetime.now()
+        if last_update:
+            time_diff = now - last_update
+            hours = time_diff.total_seconds() / 3600
+        else:
+            # 如果没有记录，说明刚装备，返回0
+            c.close()
+            conn.close()
+            return 0
+        
+        # 限制最多累积24小时的积分
+        max_hours = 24
+        actual_hours = min(hours, max_hours)
+        
+        # 如果时间差小于0.1小时（6分钟），返回0
+        if actual_hours < 0.1:
+            c.close()
+            conn.close()
+            return 0
+        
+        # 计算获得的积分
+        pending_points = self.calculate_pet_points(rarity, stars, actual_hours)
+        
+        c.close()
+        conn.close()
+        return int(pending_points)
 
 # 宠物选择视图
 class PetSelectView(discord.ui.View):
@@ -100,7 +194,8 @@ class PetSelect(discord.ui.Select):
         action_names = {
             "info": "查看详情",
             "upgrade": "升星", 
-            "dismantle": "分解"
+            "dismantle": "分解",
+            "equip": "装备"
         }
         return action_names.get(self.action, "操作")
     
@@ -113,6 +208,8 @@ class PetSelect(discord.ui.Select):
             await handle_pet_upgrade(interaction, pet_id)
         elif self.action == "dismantle":
             await handle_pet_dismantle(interaction, pet_id)
+        elif self.action == "equip":
+            await handle_pet_equip(interaction, pet_id)
 
 # 主宠物命令
 @app_commands.command(name="pet", description="🐾 宠物系统 - 查看、升星、分解")
@@ -126,13 +223,17 @@ class PetSelect(discord.ui.Select):
     app_commands.Choice(name="🔍 查看宠物详情", value="info"),
     app_commands.Choice(name="⭐ 升星宠物", value="upgrade"),
     app_commands.Choice(name="💥 分解宠物", value="dismantle"),
-    app_commands.Choice(name="🧩 查看碎片库存", value="fragments")
+    app_commands.Choice(name="🧩 查看碎片库存", value="fragments"),
+    app_commands.Choice(name="🎒 装备宠物", value="equip"),
+    app_commands.Choice(name="📤 卸下宠物", value="unequip"),
+    app_commands.Choice(name="👀 查看装备状态", value="status"),
+    app_commands.Choice(name="💰 领取宠物积分", value="claim")
 ])
 async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""
     if action == "list":
         await handle_pet_list(interaction, page)
-    elif action in ["info", "upgrade", "dismantle"]:
+    elif action in ["info", "upgrade", "dismantle", "equip"]:
         # 显示宠物选择界面
         view = PetSelectView(interaction.user.id, action)
         has_pets = await view.setup_select()
@@ -149,7 +250,8 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
         action_names = {
             "info": "查看宠物详情",
             "upgrade": "升星宠物", 
-            "dismantle": "分解宠物"
+            "dismantle": "分解宠物",
+            "equip": "装备宠物"
         }
         
         embed = create_embed(
@@ -160,6 +262,12 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     elif action == "fragments":
         await handle_pet_fragments(interaction)
+    elif action == "unequip":
+        await handle_pet_unequip(interaction)
+    elif action == "status":
+        await handle_pet_status(interaction)
+    elif action == "claim":
+        await handle_pet_claim_points(interaction)
 
 async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
     """查看我的宠物"""
@@ -572,6 +680,325 @@ class DismantleConfirmView(discord.ui.View):
             discord.Color.blue()
         )
         await interaction.response.edit_message(embed=embed, view=None)
+
+async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
+    """装备宠物"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # 检查宠物是否存在且属于用户
+    c.execute("""
+        SELECT pet_name, rarity, stars
+        FROM pets
+        WHERE pet_id = %s AND user_id = %s
+    """, (pet_id, interaction.user.id))
+    
+    result = c.fetchone()
+    if not result:
+        embed = create_embed(
+            "❌ 错误",
+            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    pet_name, rarity, stars = result
+    
+    # 检查是否已经装备了这只宠物
+    c.execute("SELECT equipped_pet_id FROM users WHERE user_id = %s", (interaction.user.id,))
+    current_equipped = c.fetchone()
+    
+    if current_equipped and current_equipped[0] == pet_id:
+        embed = create_embed(
+            "⚠️ 已装备",
+            f"{interaction.user.mention} 你已经装备了 **{pet_name}**！",
+            discord.Color.yellow()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    # 检查是否有待领取的积分
+    pet_commands = PetCommands(None)
+    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    if pending_points > 0:
+        embed = create_embed(
+            "⚠️ 请先领取积分",
+            f"{interaction.user.mention} 你有 **{pending_points}** 点待领取的宠物积分！\n\n"
+            f"请先使用 `/pet claim` 领取积分，然后再更换宠物。",
+            discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    # 如果有其他宠物装备，先更新积分累积
+    if current_equipped and current_equipped[0]:
+        pet_commands = PetCommands(None)
+        pet_commands.update_pet_points(interaction.user.id)
+    
+    # 装备新宠物
+    now = datetime.datetime.now()
+    c.execute("""
+        UPDATE users 
+        SET equipped_pet_id = %s, last_pet_points_update = %s 
+        WHERE user_id = %s
+    """, (pet_id, now, interaction.user.id))
+    
+    conn.commit()
+    c.close()
+    conn.close()
+    
+    # 计算每小时积分和待领取积分
+    pet_commands = PetCommands(None)
+    hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
+    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    
+    star_display = '⭐' * stars if stars > 0 else '⚪'
+    rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+    rarity_color = rarity_colors.get(rarity, '🤍')
+    
+    embed = create_embed(
+        "🎒 装备成功！",
+        f"{interaction.user.mention} 成功装备了 **{pet_name}**！\n\n"
+        f"{rarity_color} **稀有度：** {rarity}\n"
+        f"{star_display} **星级：** {stars}\n"
+        f"💰 **每小时积分：** {hourly_points}\n\n"
+        f"你的宠物现在会自动为你获取积分！",
+        discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+
+async def handle_pet_unequip(interaction: discord.Interaction):
+    """卸下宠物"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # 检查是否有装备的宠物
+    c.execute("""
+        SELECT u.equipped_pet_id, p.pet_name, p.rarity, p.stars
+        FROM users u
+        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
+        WHERE u.user_id = %s AND u.equipped_pet_id IS NOT NULL
+    """, (interaction.user.id,))
+    
+    result = c.fetchone()
+    if not result:
+        embed = create_embed(
+            "❌ 没有装备宠物",
+            f"{interaction.user.mention} 你当前没有装备任何宠物！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    equipped_pet_id, pet_name, rarity, stars = result
+    
+    # 检查是否有待领取的积分
+    pet_commands = PetCommands(None)
+    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    if pending_points > 0:
+        embed = create_embed(
+            "⚠️ 请先领取积分",
+            f"{interaction.user.mention} 你有 **{pending_points}** 点待领取的宠物积分！\n\n"
+            f"请先使用 `/pet claim` 领取积分，然后再卸下宠物。",
+            discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    # 更新积分累积
+    pet_commands = PetCommands(None)
+    pet_commands.update_pet_points(interaction.user.id)
+    
+    # 卸下宠物
+    c.execute("""
+        UPDATE users 
+        SET equipped_pet_id = NULL, last_pet_points_update = NULL 
+        WHERE user_id = %s
+    """, (interaction.user.id,))
+    
+    conn.commit()
+    c.close()
+    conn.close()
+    
+    embed = create_embed(
+        "📤 卸下成功！",
+        f"{interaction.user.mention} 成功卸下了 **{pet_name}**！\n\n"
+        f"你可以装备其他宠物来继续获取积分。",
+        discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
+
+async def handle_pet_status(interaction: discord.Interaction):
+    """查看装备状态"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # 获取用户装备信息
+    c.execute("""
+        SELECT u.equipped_pet_id, u.points, p.pet_name, p.rarity, p.stars
+        FROM users u
+        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
+        WHERE u.user_id = %s
+    """, (interaction.user.id,))
+    
+    result = c.fetchone()
+    if not result:
+        embed = create_embed(
+            "❌ 用户不存在",
+            f"{interaction.user.mention} 无法获取你的信息！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    equipped_pet_id, current_points, pet_name, rarity, stars = result
+    
+    if not equipped_pet_id:
+        embed = create_embed(
+            "👀 装备状态",
+            f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
+            f"💰 **当前积分：** {current_points}\n\n"
+            f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+            discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    # 计算每小时积分和待领取积分
+    pet_commands = PetCommands(None)
+    hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
+    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    
+    star_display = '⭐' * stars if stars > 0 else '⚪'
+    rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+    rarity_color = rarity_colors.get(rarity, '🤍')
+    
+    embed = create_embed(
+        "👀 装备状态",
+        f"{interaction.user.mention} 的宠物装备状态：\n\n"
+        f"🐾 **装备宠物：** {pet_name}\n"
+        f"{rarity_color} **稀有度：** {rarity}\n"
+        f"{star_display} **星级：** {stars}\n"
+        f"💰 **每小时积分：** {hourly_points}\n"
+        f"⏰ **待领取积分：** {pending_points}\n"
+        f"💎 **当前总积分：** {current_points}\n\n"
+        f"💡 使用 `/pet claim` 来领取你的宠物积分！",
+        discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
+    c.close()
+    conn.close()
+
+async def handle_pet_claim_points(interaction: discord.Interaction):
+    """领取宠物积分"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # 查询用户的装备宠物信息
+    c.execute("""
+        SELECT u.equipped_pet_id, u.points, p.pet_name, p.rarity, p.stars
+        FROM users u
+        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
+        WHERE u.user_id = %s
+    """, (interaction.user.id,))
+    
+    result = c.fetchone()
+    
+    if not result:
+        embed = create_embed(
+            "❌ 用户不存在",
+            "请先使用任何命令来初始化你的账户！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        c.close()
+        conn.close()
+        return
+    
+    equipped_pet_id, current_points, pet_name, rarity, stars = result
+    
+    # 使用新方法计算待领取积分
+    pet_commands = PetCommands(None)
+    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    
+    if not equipped_pet_id:
+        embed = create_embed(
+            "❌ 没有装备宠物",
+            f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
+            f"💰 **当前积分：** {current_points}\n\n"
+            f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+            discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    if pending_points <= 0:
+        star_display = '⭐' * stars if stars > 0 else '⚪'
+        rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+        rarity_color = rarity_colors.get(rarity, '🤍')
+        
+        embed = create_embed(
+            "💰 没有可领取的积分",
+            f"{interaction.user.mention} 当前没有可领取的积分！\n\n"
+            f"🐾 **装备宠物：** {pet_name}\n"
+            f"{rarity_color} **稀有度：** {rarity}\n"
+            f"{star_display} **星级：** {stars}\n"
+            f"💎 **当前积分：** {current_points}\n\n"
+            f"💡 宠物会随着时间自动累积积分，请稍后再来领取！",
+            discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed)
+        c.close()
+        conn.close()
+        return
+    
+    # 领取积分
+    new_total_points = current_points + pending_points
+    now = datetime.datetime.now()
+    
+    c.execute("""
+        UPDATE users 
+        SET points = %s, last_pet_points_update = %s
+        WHERE user_id = %s
+    """, (new_total_points, now, interaction.user.id))
+    
+    conn.commit()
+    
+    star_display = '⭐' * stars if stars > 0 else '⚪'
+    rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+    rarity_color = rarity_colors.get(rarity, '🤍')
+    
+    embed = create_embed(
+        "💰 积分领取成功！",
+        f"{interaction.user.mention} 成功领取了宠物积分！\n\n"
+        f"🐾 **装备宠物：** {pet_name}\n"
+        f"{rarity_color} **稀有度：** {rarity}\n"
+        f"{star_display} **星级：** {stars}\n"
+        f"✨ **领取积分：** +{pending_points}\n"
+        f"💎 **当前总积分：** {new_total_points}\n\n"
+        f"🎉 继续让你的宠物为你赚取更多积分吧！",
+        discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+    c.close()
+    conn.close()
 
 def setup(bot):
     """注册斜杠命令"""

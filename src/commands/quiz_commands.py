@@ -182,4 +182,4 @@ async def quiz(ctx, category, number):
             letter = ["A", "B", "C", "D"][ans - 1]
             await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
 
-    await ctx.send("答题结束！") 
+    await ctx.send("答题结束！")

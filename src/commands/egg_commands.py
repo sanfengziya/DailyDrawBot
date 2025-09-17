@@ -596,9 +596,7 @@ class EggSelect(discord.ui.Select):
         embed = create_embed(
             "🐣 开始孵化！",
             f"**{interaction.user.mention}** 的 **{rarity_name}蛋** 开始孵化了！\n\n"
-            f"⏰ 孵化时间：{hatch_hours} 小时\n"
-            f"🕐 开始时间：{start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"🕐 完成时间：{end_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            f"⏰ 孵化时间：{hatch_hours} 小时\n\n"
             f"请耐心等待，到时间后使用 `/egg claim` 来领取你的宠物！",
             discord.Color.green()
         )

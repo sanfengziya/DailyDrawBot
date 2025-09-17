@@ -241,4 +241,4 @@ async def fix_database(ctx):
     conn.commit()
     conn.close()
     
-    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。") 
+    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。")

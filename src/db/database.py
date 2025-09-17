@@ -15,17 +15,15 @@ def init_db() -> None:
             user_id BIGINT PRIMARY KEY,
             points INT DEFAULT 0,
             last_draw DATE,
-            last_wheel DATE DEFAULT '1970-01-01',
             paid_draws_today INT DEFAULT 0,
-            last_paid_draw_date DATE DEFAULT '1970-01-01'
+            last_paid_draw_date DATE DEFAULT '1970-01-01',
+            equipped_pet_id INT DEFAULT NULL COMMENT '当前装备的宠物ID',
+            last_pet_points_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上次宠物积分更新时间',
+            pending_pet_points INT DEFAULT 0 COMMENT '待领取的宠物积分'
         )
         """
     )
-    c.execute("SHOW COLUMNS FROM users LIKE 'last_wheel'")
-    if not c.fetchone():
-        c.execute(
-            "ALTER TABLE users ADD COLUMN last_wheel DATE DEFAULT '1970-01-01'"
-        )
+
     
     c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
     if not c.fetchone():
@@ -37,6 +35,25 @@ def init_db() -> None:
     if not c.fetchone():
         c.execute(
             "ALTER TABLE users ADD COLUMN last_paid_draw_date DATE DEFAULT '1970-01-01'"
+        )
+    
+    # 检查并添加装备宠物字段
+    c.execute("SHOW COLUMNS FROM users LIKE 'equipped_pet_id'")
+    if not c.fetchone():
+        c.execute(
+            "ALTER TABLE users ADD COLUMN equipped_pet_id INT DEFAULT NULL COMMENT '当前装备的宠物ID'"
+        )
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'last_pet_points_update'")
+    if not c.fetchone():
+        c.execute(
+            "ALTER TABLE users ADD COLUMN last_pet_points_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上次宠物积分更新时间'"
+        )
+    
+    c.execute("SHOW COLUMNS FROM users LIKE 'pending_pet_points'")
+    if not c.fetchone():
+        c.execute(
+            "ALTER TABLE users ADD COLUMN pending_pet_points INT DEFAULT 0 COMMENT '待领取的宠物积分'"
         )
     c.execute(
         """
