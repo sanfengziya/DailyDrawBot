@@ -10,11 +10,14 @@ async def ranking(ctx):
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
         
-        # 查询排名前10的用户
-        ranking_response = supabase.table('users').select('discord_user_id, points').order('points', desc=True).limit(10).execute()
+        # 获取当前服务器ID
+        guild_id = str(ctx.guild.id)
+        
+        # 查询当前服务器排名前10的用户
+        ranking_response = supabase.table('users').select('discord_user_id, points').eq('guild_id', guild_id).order('points', desc=True).limit(10).execute()
         
         if not ranking_response.data:
-            await ctx.send("没有排名数据。")
+            await ctx.send("当前服务器还没有排名数据。")
             return
             
         rows = [(user['discord_user_id'], user['points']) for user in ranking_response.data]
