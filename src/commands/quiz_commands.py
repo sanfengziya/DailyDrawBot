@@ -2,17 +2,23 @@ import discord
 import asyncio
 import random
 from src.db.database import get_connection
+from src.utils.helpers import get_user_internal_id
 
 async def quizlist(ctx):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT DISTINCT category FROM quiz_questions")
-    rows = [r[0] for r in c.fetchall()]
-    conn.close()
-    if rows:
-        await ctx.send("📋 题库类别：" + ", ".join(rows))
-    else:
-        await ctx.send("暂无题库。")
+    supabase = get_connection()
+    
+    try:
+        result = supabase.table("quiz_questions").select("category").execute()
+        categories = list(set([row["category"] for row in result.data]))
+        
+        if categories:
+            await ctx.send("📋 题库类别：" + ", ".join(categories))
+        else:
+            await ctx.send("暂无题库。")
+            
+    except Exception as e:
+        print(f"获取题库类别失败: {e}")
+        await ctx.send("获取题库类别失败，请稍后重试。")
 
 async def importquiz(ctx):
     if not ctx.message.attachments:
@@ -23,9 +29,10 @@ async def importquiz(ctx):
     data = await attachment.read()
     lines = data.decode("utf-8").splitlines()
 
-    conn = get_connection()
-    c = conn.cursor()
+    supabase = get_connection()
     count = 0
+    questions_to_insert = []
+    
     for line in lines:
         line = line.strip()
         if not line or line.startswith("#"):
@@ -38,79 +45,94 @@ async def importquiz(ctx):
         if ans not in ["A", "B", "C", "D"]:
             continue
         ans_idx = ["A", "B", "C", "D"].index(ans) + 1
-        c.execute(
-            "INSERT INTO quiz_questions (category, question, option1, option2, option3, option4, answer) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (category, question, o1, o2, o3, o4, ans_idx),
-        )
+        
+        questions_to_insert.append({
+            "category": category,
+            "question": question,
+            "option1": o1,
+            "option2": o2,
+            "option3": o3,
+            "option4": o4,
+            "answer": ans_idx
+        })
         count += 1
-    conn.commit()
-    conn.close()
-    await ctx.send(f"✅ 已导入 {count} 道题目。")
+    
+    try:
+        if questions_to_insert:
+            supabase.table("quiz_questions").insert(questions_to_insert).execute()
+        await ctx.send(f"✅ 已导入 {count} 道题目。")
+        
+    except Exception as e:
+        print(f"导入题目失败: {e}")
+        await ctx.send("导入题目失败，请稍后重试。")
 
 async def deletequiz(ctx, category):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, question FROM quiz_questions WHERE category = %s", (category,))
-    rows = c.fetchall()
-    if not rows:
-        conn.close()
-        await ctx.send("该类别没有题目。")
-        return
-
-    msg_lines = [f"{i + 1}. {q}" for i, (qid, q) in enumerate(rows)]
-    await ctx.send("**题目列表：**\n" + "\n".join(msg_lines))
-    await ctx.send("请输入要删除的题号，以空格分隔，或输入 `取消` 终止。")
-
-    def check(m):
-        return m.author == ctx.author and m.channel == ctx.channel
-
+    supabase = get_connection()
+    
     try:
-        reply = await ctx.bot.wait_for("message", check=check, timeout=300.0)
-    except asyncio.TimeoutError:
-        await ctx.send("操作超时，已取消。")
-        conn.close()
-        return
+        result = supabase.table("quiz_questions").select("id, question").eq("category", category).execute()
+        rows = [(row["id"], row["question"]) for row in result.data]
+        
+        if not rows:
+            await ctx.send("该类别没有题目。")
+            return
 
-    if reply.content.strip().lower() == "取消":
-        await ctx.send("已取消。")
-        conn.close()
-        return
+        msg_lines = [f"{i + 1}. {q}" for i, (qid, q) in enumerate(rows)]
+        await ctx.send("**题目列表：**\n" + "\n".join(msg_lines))
+        await ctx.send("请输入要删除的题号，以空格分隔，或输入 `取消` 终止。")
 
-    try:
-        numbers = [int(n) for n in reply.content.strip().split()]
-    except ValueError:
-        await ctx.send("输入格式错误。")
-        conn.close()
-        return
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel
 
-    ids = []
-    for num in numbers:
-        if 1 <= num <= len(rows):
-            ids.append(rows[num - 1][0])
+        try:
+            reply = await ctx.bot.wait_for("message", check=check, timeout=300.0)
+        except asyncio.TimeoutError:
+            await ctx.send("操作超时，已取消。")
+            return
 
-    if not ids:
-        await ctx.send("没有有效的题号可删除。")
-        conn.close()
-        return
+        if reply.content.strip().lower() == "取消":
+            await ctx.send("已取消。")
+            return
 
-    format_strings = ",".join(["%s"] * len(ids))
-    c.execute(f"DELETE FROM quiz_questions WHERE id IN ({format_strings})", ids)
-    conn.commit()
-    conn.close()
-    await ctx.send(f"已删除 {len(ids)} 道题目。")
+        try:
+            numbers = [int(n) for n in reply.content.strip().split()]
+        except ValueError:
+            await ctx.send("输入格式错误。")
+            return
+
+        ids = []
+        for num in numbers:
+            if 1 <= num <= len(rows):
+                ids.append(rows[num - 1][0])
+
+        if not ids:
+            await ctx.send("没有有效的题号可删除。")
+            return
+
+        # 删除选中的题目
+        for question_id in ids:
+            supabase.table("quiz_questions").delete().eq("id", question_id).execute()
+            
+        await ctx.send(f"已删除 {len(ids)} 道题目。")
+        
+    except Exception as e:
+        print(f"删除题目失败: {e}")
+        await ctx.send("删除题目失败，请稍后重试。")
 
 async def quiz(ctx, category, number):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT question, option1, option2, option3, option4, answer FROM quiz_questions WHERE category = %s",
-        (category,),
-    )
-    rows = c.fetchall()
-    conn.close()
+    supabase = get_connection()
+    
+    try:
+        result = supabase.table("quiz_questions").select("question, option1, option2, option3, option4, answer").eq("category", category).execute()
+        rows = [(row["question"], row["option1"], row["option2"], row["option3"], row["option4"], row["answer"]) for row in result.data]
 
-    if not rows:
-        await ctx.send("该类别没有题目。")
+        if not rows:
+            await ctx.send("该类别没有题目。")
+            return
+            
+    except Exception as e:
+        print(f"获取题目失败: {e}")
+        await ctx.send("获取题目失败，请稍后重试。")
         return
 
     random.shuffle(rows)
@@ -161,15 +183,33 @@ async def quiz(ctx, category, number):
             if choice == ans:
                 letter = ["A", "B", "C", "D"][ans - 1]
                 await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {letter}，奖励 10 分")
-                conn = get_connection()
-                c = conn.cursor()
-                c.execute(
-                    "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
-                    "ON DUPLICATE KEY UPDATE points = points + VALUES(points)",
-                    (str(reply.author.id), 10, "1970-01-01"),
-                )
-                conn.commit()
-                conn.close()
+                
+                try:
+                    # 获取用户内部ID
+                    user_internal_id = get_user_internal_id(ctx.guild.id, reply.author.id)
+                    if not user_internal_id:
+                        print(f"获取用户内部ID失败: {reply.author.id}")
+                        continue
+                        
+                    # 获取用户当前积分
+                    user_result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
+                    
+                    if user_result.data:
+                        # 用户存在，更新积分
+                        current_points = user_result.data[0]["points"]
+                        supabase.table("users").update({
+                            "points": current_points + 10
+                        }).eq("id", user_internal_id).execute()
+                    else:
+                        # 用户不存在，创建新记录
+                        supabase.table("users").insert({
+                            "points": 10,
+                            "last_draw_date": "1970-01-01"
+                        }).execute()
+                        
+                except Exception as e:
+                    print(f"奖励积分失败: {e}")
+                    
                 answered = True
                 break
             else:

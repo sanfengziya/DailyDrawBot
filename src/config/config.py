@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 # 加载.env文件
@@ -19,17 +18,16 @@ PREFIX = os.getenv("PREFIX", "!")
 WHEEL_COST = int(os.getenv("WHEEL_COST", "100"))
 MAX_PAID_DRAWS_PER_DAY = int(os.getenv("MAX_PAID_DRAWS_PER_DAY", "20"))
 
-# 数据库配置
-MYSQL_URL = os.getenv("MYSQL_URL")
-if MYSQL_URL is None:
-    raise RuntimeError("MYSQL_URL environment variable not set")
-url = urlparse(MYSQL_URL)
+# Supabase数据库配置
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://vorirblervetghvqmych.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if SUPABASE_KEY is None:
+    raise RuntimeError("SUPABASE_KEY environment variable not set")
+
+# 数据库配置（保持向后兼容）
 DB_CONFIG = {
-    "host": url.hostname,
-    "port": url.port,
-    "user": url.username,
-    "password": url.password,
-    "database": url.path[1:],
+    "url": SUPABASE_URL,
+    "key": SUPABASE_KEY,
 }
 
 # 优化的抽奖奖励系统
@@ -47,4 +45,4 @@ REWARD_SYSTEM = [
     {"points": 666, "probability": 1.5, "message": "恶魔奖励", "emoji": "😈"},
     {"points": 777, "probability": 0.9, "message": "幸运之神奖", "emoji": "✨"},
     {"points": 1000, "probability": 0.1, "message": "终极大奖", "emoji": "🏆"},
-] 
+]

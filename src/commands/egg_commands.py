@@ -34,48 +34,71 @@ class EggCommands(commands.Cog):
     @staticmethod
     def get_pet_names():
         """从数据库获取宠物名称"""
-        conn = get_connection()
-        c = conn.cursor()
+        supabase = get_connection()
         
-        c.execute("""
-            SELECT pet_name, rarity 
-            FROM pet_templates
-        """)
-        templates = c.fetchall()
-        
-        c.close()
-        conn.close()
-        
-        # 组织数据为字典格式
-        pet_names = {}
-        for pet_name, rarity in templates:
-            if rarity not in pet_names:
-                pet_names[rarity] = []
-            pet_names[rarity].append(pet_name)
-        
-        return pet_names
+        try:
+            result = supabase.table("pet_templates").select("name, rarity").execute()
+            
+            # 组织数据为字典格式
+            pet_names = {}
+            for template in result.data:
+                pet_name = template["name"]
+                rarity = template["rarity"]
+                if rarity not in pet_names:
+                    pet_names[rarity] = []
+                pet_names[rarity].append(pet_name)
+            
+            return pet_names
+            
+        except Exception as e:
+            print(f"获取宠物名称失败: {e}")
+            return {}
     
     @staticmethod
     def get_draw_probabilities():
         """从数据库获取抽蛋概率配置"""
-        conn = get_connection()
-        c = conn.cursor()
-        c.execute("SELECT rarity, probability FROM egg_draw_probabilities ORDER BY FIELD(rarity, 'SSR', 'SR', 'R', 'C')")
-        probabilities = c.fetchall()
-        c.close()
-        conn.close()
-        return probabilities
+        supabase = get_connection()
+        
+        try:
+            result = supabase.table("egg_draw_probabilities").select("rarity, probability").execute()
+            
+            # 按指定顺序排序
+            order = ['SSR', 'SR', 'R', 'C']
+            probabilities = []
+            for rarity in order:
+                for item in result.data:
+                    if item["rarity"] == rarity:
+                        probabilities.append((item["rarity"], item["probability"]))
+                        break
+            
+            return probabilities
+            
+        except Exception as e:
+            print(f"获取抽蛋概率失败: {e}")
+            return []
     
     @staticmethod
     def get_hatch_probabilities(egg_rarity):
         """从数据库获取指定蛋稀有度的孵化概率配置"""
-        conn = get_connection()
-        c = conn.cursor()
-        c.execute("SELECT pet_rarity, probability FROM egg_hatch_probabilities WHERE egg_rarity = %s ORDER BY FIELD(pet_rarity, 'SSR', 'SR', 'R', 'C')", (egg_rarity,))
-        probabilities = c.fetchall()
-        c.close()
-        conn.close()
-        return probabilities
+        supabase = get_connection()
+        
+        try:
+            result = supabase.table("egg_hatch_probabilities").select("pet_rarity, probability").eq("egg_rarity", egg_rarity).execute()
+            
+            # 按指定顺序排序
+            order = ['SSR', 'SR', 'R', 'C']
+            probabilities = []
+            for rarity in order:
+                for item in result.data:
+                    if item["pet_rarity"] == rarity:
+                        probabilities.append((item["pet_rarity"], item["probability"]))
+                        break
+            
+            return probabilities
+            
+        except Exception as e:
+            print(f"获取孵化概率失败: {e}")
+            return []
 
 # 斜杠命令定义
 @app_commands.command(name="egg", description="🥚 蛋系统 - 抽蛋、孵化、查看")
@@ -101,25 +124,39 @@ async def egg(interaction: discord.Interaction, action: str):
 async def handle_egg_draw(interaction: discord.Interaction):
     """处理抽蛋功能"""
     # 检查用户积分
-    conn = get_connection()
-    c = conn.cursor()
+    supabase = get_connection()
+    discord_user_id = interaction.user.id
+    guild_id = interaction.guild.id
     
-    c.execute("SELECT points FROM users WHERE user_id = %s", (str(interaction.user.id),))
-    result = c.fetchone()
-    
-    if not result:
-        # 创建新用户
-        c.execute("INSERT INTO users (user_id, points) VALUES (%s, 0)", (str(interaction.user.id),))
-        conn.commit()
-        points = 0
-    else:
-        points = result[0]
-    
-    # 获取实际的抽蛋概率
-    draw_probabilities = EggCommands.get_draw_probabilities()
-    
-    c.close()
-    conn.close()
+    try:
+        result = supabase.table("users").select("points").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
+        
+        if not result.data:
+            # 创建新用户
+            supabase.table("users").insert({
+                "guild_id": guild_id,
+                "discord_user_id": discord_user_id,
+                "points": 0,
+                "last_draw_date": "1970-01-01",
+                "paid_draws_today": 0,
+                "last_paid_draw_date": "1970-01-01"
+            }).execute()
+            points = 0
+        else:
+            points = result.data[0]["points"]
+        
+        # 获取实际的抽蛋概率
+        draw_probabilities = EggCommands.get_draw_probabilities()
+        
+    except Exception as e:
+        print(f"抽蛋功能错误: {e}")
+        embed = discord.Embed(
+            title="❌ 系统错误",
+            description="抽蛋功能暂时不可用，请稍后再试。",
+            color=0xff0000
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
     
     # 构建概率显示文本
     rarity_names = {'SSR': '💛 传说蛋', 'SR': '💜 史诗蛋', 'R': '💙 稀有蛋', 'C': '🤍 普通蛋'}
@@ -145,37 +182,64 @@ async def handle_egg_list(interaction: discord.Interaction):
 
 async def handle_egg_hatch(interaction: discord.Interaction):
     """处理孵化蛋功能"""
-    conn = get_connection()
-    c = conn.cursor()
+    supabase = get_connection()
+    discord_user_id = interaction.user.id
+    guild_id = interaction.guild.id
     
-    # 首先检查是否已经有蛋在孵化中
-    c.execute("""
-        SELECT egg_id, egg_code, start_time, end_time FROM player_eggs 
-        WHERE user_id = %s AND status = '孵化中'
-    """, (str(interaction.user.id),))
-    incubating_egg = c.fetchone()
+    try:
+        # 首先获取用户的 user_id
+        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
+        
+        if not user_response.data:
+            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+            return
+            
+        user_id = user_response.data[0]["id"]
+        
+        # 首先检查是否已经有蛋在孵化中
+        result = supabase.table("user_eggs").select("id, rarity, hatch_started_at, hatch_completed_at").eq("user_id", user_id).eq("status", "hatching").execute()
+        
+        incubating_egg = result.data[0] if result.data else None
+        
+    except Exception as e:
+        print(f"孵化蛋功能错误: {e}")
+        embed = discord.Embed(
+            title="❌ 系统错误",
+            description="孵化蛋功能暂时不可用，请稍后再试。",
+            color=0xff0000
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
     
     if incubating_egg:
-        egg_id, egg_code, start_time, end_time = incubating_egg
+        egg_id = incubating_egg["id"]
+        rarity = incubating_egg["rarity"]
+        start_time = incubating_egg["hatch_started_at"]
+        end_time = incubating_egg["hatch_completed_at"]
+        
         rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
         rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
         
-        rarity_name = rarity_names[egg_code]
-        emoji = rarity_emojis[egg_code]
+        rarity_name = rarity_names[rarity]
+        emoji = rarity_emojis[rarity]
         
-        current_time = datetime.datetime.now()
-        if current_time >= end_time:
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        if end_time and current_time >= datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00')):
             status_text = "✅ 已完成，可以领取！"
             action_text = "使用 `/egg claim` 来领取你的宠物！"
         else:
-            remaining = end_time - current_time
-            hours = int(remaining.total_seconds() // 3600)
-            minutes = int((remaining.total_seconds() % 3600) // 60)
-            if hours > 0:
-                time_text = f"{hours}小时{minutes}分钟"
+            if end_time:
+                end_dt = datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                remaining = end_dt - current_time
+                hours = int(remaining.total_seconds() // 3600)
+                minutes = int((remaining.total_seconds() % 3600) // 60)
+                if hours > 0:
+                    time_text = f"{hours}小时{minutes}分钟"
+                else:
+                    time_text = f"{minutes}分钟"
+                status_text = f"⏰ 还需要 {time_text}"
             else:
-                time_text = f"{minutes}分钟"
-            status_text = f"⏰ 还需要 {time_text}"
+                status_text = "⏰ 正在孵化中"
             action_text = "请耐心等待孵化完成！"
         
         embed = create_embed(
@@ -187,23 +251,26 @@ async def handle_egg_hatch(interaction: discord.Interaction):
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        c.close()
-        conn.close()
         return
     
-    # 查询用户的待孵化蛋
-    c.execute("""
-        SELECT egg_id, egg_code, created_at FROM player_eggs 
-        WHERE user_id = %s AND status = '待孵化'
-        ORDER BY created_at DESC
-        LIMIT 25
-    """, (str(interaction.user.id),))
-    eggs = c.fetchall()
-    
-    if not eggs:
-        await interaction.response.send_message("你没有可以孵化的蛋！先去抽一些蛋吧！", ephemeral=True)
-        c.close()
-        conn.close()
+    try:
+        # 查询用户的待孵化蛋
+        result = supabase.table("user_eggs").select("id, rarity, created_at").eq("user_id", user_id).eq("status", "pending").order("created_at", desc=True).limit(25).execute()
+        
+        eggs = result.data
+        
+        if not eggs:
+            await interaction.response.send_message("你没有可以孵化的蛋！先去抽一些蛋吧！", ephemeral=True)
+            return
+            
+    except Exception as e:
+        print(f"查询待孵化蛋错误: {e}")
+        embed = discord.Embed(
+            title="❌ 系统错误",
+            description="查询蛋列表失败，请稍后再试。",
+            color=0xff0000
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
     
     # 创建选择界面
@@ -215,88 +282,129 @@ async def handle_egg_hatch(interaction: discord.Interaction):
     
     view = EggHatchView(eggs)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    
-    c.close()
-    conn.close()
 
 async def handle_egg_claim(interaction: discord.Interaction):
     """处理领取宠物功能"""
-    conn = get_connection()
-    c = conn.cursor()
+    supabase = get_connection()
+    discord_user_id = interaction.user.id
+    guild_id = interaction.guild.id
     
-    # 查询已完成孵化的蛋
-    current_time = datetime.datetime.now()
-    c.execute("""
-        SELECT egg_id, egg_code, end_time FROM player_eggs 
-        WHERE user_id = %s AND status = '孵化中' AND end_time <= %s
-        ORDER BY end_time ASC
-        LIMIT 10
-    """, (str(interaction.user.id), current_time))
-    ready_eggs = c.fetchall()
-    
-    if not ready_eggs:
-        await interaction.response.send_message("没有可以领取的宠物！请先孵化一些蛋，或者等待孵化完成。", ephemeral=True)
-        c.close()
-        conn.close()
+    try:
+        # 首先获取用户的 user_id
+        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
+        
+        if not user_response.data:
+            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+            return
+            
+        user_id = user_response.data[0]["id"]
+        
+        # 查询已完成孵化的蛋
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        result = supabase.table("user_eggs").select("id, rarity, hatch_completed_at").eq("user_id", user_id).eq("status", "hatching").execute()
+        
+        ready_eggs = result.data
+        
+        if not ready_eggs:
+            await interaction.response.send_message("没有可以领取的宠物！请先孵化一些蛋，或者等待孵化完成。", ephemeral=True)
+            return
+            
+    except Exception as e:
+        print(f"查询已完成孵化的蛋错误: {e}")
+        embed = discord.Embed(
+            title="❌ 系统错误",
+            description="查询孵化完成的蛋失败，请稍后再试。",
+            color=0xff0000
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
     
     # 批量领取所有完成的蛋
     claimed_pets = []
     
-    # 获取宠物名称数据
-    pet_names = EggCommands.get_pet_names()
-    
-    for egg_id, egg_code, end_time in ready_eggs:
-        # 根据蛋的稀有度和孵化概率决定宠物稀有度
-        hatch_probabilities = EggCommands.get_hatch_probabilities(egg_code)
+    try:
+        # 获取宠物名称数据
+        pet_names = EggCommands.get_pet_names()
         
-        # 使用概率决定宠物稀有度
-        rand = random.random() * 100
-        cumulative_prob = 0
-        pet_rarity = egg_code  # 默认值，如果没有配置概率就使用蛋的稀有度
-        
-        for rarity, probability in hatch_probabilities:
-            cumulative_prob += float(probability)
-            if rand < cumulative_prob:
-                pet_rarity = rarity
-                break
-        
-        # 生成宠物
-        pet_names_for_rarity = pet_names.get(pet_rarity, [])
-        if not pet_names_for_rarity:
-            # 如果没有该稀有度的宠物，回退到蛋的稀有度
-            pet_rarity = egg_code
+        for egg in ready_eggs:
+            egg_id = egg["id"]
+            rarity = egg["rarity"]
+            end_time = egg["hatch_completed_at"]
+            
+            # 检查是否真的已经完成孵化
+            if end_time:
+                end_dt = datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                if current_time < end_dt:
+                    continue  # 跳过未完成的蛋
+            
+            # 根据蛋的稀有度和孵化概率决定宠物稀有度
+            hatch_probabilities = EggCommands.get_hatch_probabilities(rarity)
+            
+            # 使用概率决定宠物稀有度
+            rand = random.random() * 100
+            cumulative_prob = 0
+            pet_rarity = rarity  # 默认值，如果没有配置概率就使用蛋的稀有度
+            
+            for rarity_option, probability in hatch_probabilities:
+                cumulative_prob += float(probability)
+                if rand < cumulative_prob:
+                    pet_rarity = rarity_option
+                    break
+            
+            # 生成宠物
             pet_names_for_rarity = pet_names.get(pet_rarity, [])
-        
-        pet_name = random.choice(pet_names_for_rarity)
-        initial_stars = random.randint(*EggCommands.INITIAL_STARS[pet_rarity])
-        
-        # 添加到宠物库存
-        c.execute("""
-            INSERT INTO pets (user_id, pet_name, rarity, stars, max_stars, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (str(interaction.user.id), pet_name, pet_rarity, initial_stars, EggCommands.MAX_STARS[pet_rarity], datetime.datetime.now()))
-        
-        # 更新蛋状态
-        c.execute("""
-            UPDATE player_eggs SET status = '已领取' WHERE egg_id = %s
-        """, (egg_id,))
-        
-        rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
-        rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
-        
-        claimed_pets.append({
-            'name': pet_name,
-            'rarity': pet_rarity,
-            'rarity_name': rarity_names[pet_rarity],
-            'emoji': rarity_emojis[pet_rarity],
-            'stars': initial_stars,
-            'egg_rarity': egg_code  # 记录原始蛋的稀有度
-        })
-    
-    conn.commit()
-    c.close()
-    conn.close()
+            if not pet_names_for_rarity:
+                # 如果没有该稀有度的宠物，回退到蛋的稀有度
+                pet_rarity = rarity
+                pet_names_for_rarity = pet_names.get(pet_rarity, [])
+            
+            pet_name = random.choice(pet_names_for_rarity)
+            initial_stars = random.randint(*EggCommands.INITIAL_STARS[pet_rarity])
+            
+            # 从数据库获取max_stars
+            rarity_config_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', pet_rarity).execute()
+            max_stars = rarity_config_response.data[0]['max_stars'] if rarity_config_response.data else EggCommands.MAX_STARS[pet_rarity]
+            
+            # 从pet_templates表获取pet_template_id
+            pet_template_response = supabase.table('pet_templates').select('id').eq('name', pet_name).eq('rarity', pet_rarity).execute()
+            if pet_template_response.data:
+                pet_template_id = pet_template_response.data[0]['id']
+            else:
+                # 如果找不到对应的模板，跳过这个宠物
+                continue
+            
+            # 添加到宠物库存
+            supabase.table("user_pets").insert({
+                "user_id": user_id,
+                "pet_template_id": pet_template_id,
+                "stars": initial_stars,
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+            }).execute()
+            
+            # 更新蛋状态为已领取
+            supabase.table("user_eggs").update({"status": "claimed"}).eq("id", egg_id).execute()
+            
+            rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
+            rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+            
+            claimed_pets.append({
+                'name': pet_name,
+                'rarity': pet_rarity,
+                'rarity_name': rarity_names[pet_rarity],
+                'emoji': rarity_emojis[pet_rarity],
+                'stars': initial_stars,
+                'egg_rarity': rarity  # 记录原始蛋的稀有度
+            })
+            
+    except Exception as e:
+        print(f"领取宠物错误: {e}")
+        embed = discord.Embed(
+            title="❌ 系统错误",
+            description="领取宠物失败，请稍后再试。",
+            color=0xff0000
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
     
     # 创建结果展示
     result_text = ""
@@ -315,35 +423,36 @@ async def handle_egg_claim(interaction: discord.Interaction):
 
 async def egg_list(interaction: discord.Interaction):
     """查看蛋和孵化状态"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 查询用户的蛋
-    c.execute("""
-        SELECT egg_id, egg_code, created_at FROM player_eggs 
-        WHERE user_id = %s AND status = '待孵化'
-        ORDER BY created_at DESC
-    """, (str(interaction.user.id),))
-    eggs = c.fetchall()
-    
-    # 查询孵化中的蛋
-    c.execute("""
-        SELECT egg_id, egg_code, start_time, end_time FROM player_eggs
-        WHERE user_id = %s AND status = '孵化中'
-        ORDER BY end_time ASC
-    """, (str(interaction.user.id),))
-    incubating = c.fetchall()
-    
-    # 查询可领取的蛋
-    current_time = datetime.datetime.now()
-    c.execute("""
-        SELECT COUNT(*) FROM player_eggs 
-        WHERE user_id = %s AND status = '孵化中' AND end_time <= %s
-    """, (str(interaction.user.id), current_time))
-    ready_count = c.fetchone()[0]
-    
-    c.close()
-    conn.close()
+    try:
+        supabase = get_connection()
+        discord_user_id = interaction.user.id
+        guild_id = interaction.guild.id
+        
+        # 首先获取用户的 user_id
+        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
+        
+        if not user_response.data:
+            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+            return
+            
+        user_id = user_response.data[0]["id"]
+        
+        # 查询用户的蛋
+        eggs_response = supabase.table('user_eggs').select('id, rarity, created_at').eq('user_id', user_id).eq('status', 'pending').order('created_at', desc=True).execute()
+        eggs = [(row['id'], row['rarity'], row['created_at']) for row in eggs_response.data]
+        
+        # 查询孵化中的蛋
+        incubating_response = supabase.table('user_eggs').select('id, rarity, hatch_started_at, hatch_completed_at').eq('user_id', user_id).eq('status', 'hatching').order('hatch_completed_at').execute()
+        incubating = [(row['id'], row['rarity'], row['hatch_started_at'], row['hatch_completed_at']) for row in incubating_response.data]
+        
+        # 查询可领取的蛋
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        ready_response = supabase.table('user_eggs').select('*', count='exact').eq('user_id', user_id).eq('status', 'hatching').execute()
+        ready_count = len([egg for egg in ready_response.data if egg.get('hatch_completed_at') and datetime.datetime.fromisoformat(egg['hatch_completed_at'].replace('Z', '+00:00')) <= current_time])
+        
+    except Exception as e:
+        await interaction.response.send_message(f"查询蛋列表时出错：{str(e)}", ephemeral=True)
+        return
     
     if not eggs and not incubating:
         embed = create_embed(
@@ -363,10 +472,16 @@ async def egg_list(interaction: discord.Interaction):
     
     if incubating:
         description += "**🔥 孵化中：**\n"
-        for egg_id, egg_code, start_time, end_time in incubating:
-            rarity_emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[egg_code]
-            rarity_name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[egg_code]
-            now = datetime.datetime.now()
+        for egg_id, rarity, start_time, end_time in incubating:
+            rarity_emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[rarity]
+            rarity_name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[rarity]
+            now = datetime.datetime.now(datetime.timezone.utc)
+            
+            # 确保end_time也是UTC时区
+            if isinstance(end_time, str):
+                if end_time.endswith('Z'):
+                    end_time = end_time[:-1] + '+00:00'
+                end_time = datetime.datetime.fromisoformat(end_time)
             
             if now >= end_time:
                 status = "✅ 可领取"
@@ -429,45 +544,50 @@ class EggDrawView(discord.ui.View):
 
     async def perform_draw(self, interaction, count, cost):
         """执行抽蛋"""
-        conn = get_connection()
-        c = conn.cursor()
-        
-        # 检查积分
-        c.execute("SELECT points FROM users WHERE user_id = %s", (str(interaction.user.id),))
-        result = c.fetchone()
-        
-        if not result or result[0] < cost:
-            await interaction.response.send_message(
-                f"积分不足！需要 {cost} 积分，你只有 {result[0] if result else 0} 积分。",
-                ephemeral=True
-            )
-            c.close()
-            conn.close()
+        try:
+            supabase = get_connection()
+            discord_user_id = interaction.user.id
+            guild_id = interaction.guild.id
+            
+            # 检查积分
+            user_response = supabase.table('users').select('id, points').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
+            
+            if not user_response.data or user_response.data[0]['points'] < cost:
+                current_points = user_response.data[0]['points'] if user_response.data else 0
+                await interaction.response.send_message(
+                    f"积分不足！需要 {cost} 积分，你只有 {current_points} 积分。",
+                    ephemeral=True
+                )
+                return
+            
+            user_id = user_response.data[0]['id']
+            
+            # 先发送初始响应，避免交互超时
+            await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
+            
+            # 扣除积分
+            supabase.table('users').update({'points': user_response.data[0]['points'] - cost}).eq('id', user_id).execute()
+            
+            # 纯概率抽蛋
+            results = self.draw_eggs(count)
+            
+            # 添加蛋到玩家库存
+            eggs_to_insert = []
+            for rarity in results:
+                # 直接使用稀有度作为蛋代码，与egg_types表匹配
+                eggs_to_insert.append({
+                    'user_id': user_id,
+                    'rarity': rarity,
+                    'status': 'pending',
+                    'created_at': datetime.datetime.now().isoformat(timespec='seconds')
+                })
+            
+            if eggs_to_insert:
+                supabase.table('user_eggs').insert(eggs_to_insert).execute()
+            
+        except Exception as e:
+            await interaction.edit_original_response(content=f"抽蛋时出错：{str(e)}")
             return
-        
-        # 先发送初始响应，避免交互超时
-        await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
-        
-        # 扣除积分
-        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (cost, str(interaction.user.id)))
-        
-        # 纯概率抽蛋
-        results = self.draw_eggs(count)
-        
-        # 添加蛋到玩家库存
-        for rarity in results:
-            # 直接使用稀有度作为蛋代码，与egg_types表匹配
-            egg_code = rarity  # C, R, SR, SSR
-            c.execute("""
-                INSERT INTO player_eggs (user_id, egg_code, status, created_at)
-                VALUES (%s, %s, '待孵化', %s)
-            """, (str(interaction.user.id), egg_code, datetime.datetime.now()))
-        
-        # 不再需要抽蛋统计（已删除保底机制）
-        
-        conn.commit()
-        c.close()
-        conn.close()
         
         # 显示结果
         result_text = ""
@@ -526,15 +646,21 @@ class EggHatchView(discord.ui.View):
         # 创建选择菜单
         options = []
         for egg in eggs[:25]:  # Discord限制最多25个选项
-            egg_id, egg_code, created_at = egg
+            egg_id = egg['id']
+            rarity = egg['rarity']
+            created_at = egg['created_at']
             rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
             rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
             
-            rarity_name = rarity_names.get(egg_code, '未知')
-            emoji = rarity_emojis.get(egg_code, '❓')
+            rarity_name = rarity_names.get(rarity, '未知')
+            emoji = rarity_emojis.get(rarity, '❓')
             
             # 格式化创建时间
-            time_str = created_at.strftime("%m-%d %H:%M")
+            if isinstance(created_at, str):
+                created_at_dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            else:
+                created_at_dt = created_at
+            time_str = created_at_dt.strftime("%m-%d %H:%M")
             
             options.append(discord.SelectOption(
                 label=f"{emoji} {rarity_name}蛋",
@@ -559,7 +685,7 @@ class EggSelect(discord.ui.Select):
         # 找到选中的蛋
         selected_egg = None
         for egg in self.eggs:
-            if egg[0] == selected_egg_id:
+            if egg['id'] == selected_egg_id:
                 selected_egg = egg
                 break
         
@@ -567,31 +693,32 @@ class EggSelect(discord.ui.Select):
             await interaction.response.send_message("蛋不存在！", ephemeral=True)
             return
         
-        egg_id, egg_code, created_at = selected_egg
+        egg_id = selected_egg['id']
+        rarity = selected_egg['rarity']
         
         # 计算孵化时间（根据稀有度）
         hatch_times = {'C': 1, 'R': 2, 'SR': 4, 'SSR': 8}  # 小时
-        hatch_hours = hatch_times.get(egg_code, 1)
+        hatch_hours = hatch_times.get(rarity, 1)
         
         # 开始孵化
-        conn = get_connection()
-        c = conn.cursor()
-        
-        start_time = datetime.datetime.now()
-        end_time = start_time + datetime.timedelta(hours=hatch_hours)
-        
-        c.execute("""
-            UPDATE player_eggs 
-            SET status = '孵化中', start_time = %s, end_time = %s
-            WHERE egg_id = %s AND user_id = %s
-        """, (start_time, end_time, egg_id, str(interaction.user.id)))
-        
-        conn.commit()
-        c.close()
-        conn.close()
+        try:
+            supabase = get_connection()
+            
+            start_time = datetime.datetime.now(datetime.timezone.utc)
+            end_time = start_time + datetime.timedelta(hours=hatch_hours)
+            
+            supabase.table('user_eggs').update({
+                'status': 'hatching',
+                'hatch_started_at': start_time.isoformat(timespec='seconds'),
+                'hatch_completed_at': end_time.isoformat(timespec='seconds')
+            }).eq('id', egg_id).execute()
+            
+        except Exception as e:
+            await interaction.response.send_message(f"开始孵化时出错：{str(e)}", ephemeral=True)
+            return
         
         rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
-        rarity_name = rarity_names.get(egg_code, '未知')
+        rarity_name = rarity_names.get(rarity, '未知')
         
         embed = create_embed(
             "🐣 开始孵化！",

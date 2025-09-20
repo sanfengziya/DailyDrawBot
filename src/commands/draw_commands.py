@@ -7,22 +7,39 @@ from src.utils.helpers import now_est, get_weighted_reward
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
 
 async def draw(ctx):
-    user_id = str(ctx.author.id)
-    now = now_est()
-    today = now.date()
-
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
-    row = c.fetchone()
-
-    if row:
-        points, last_draw_date, paid_draws_today, last_paid_draw_date = row
-    else:
-        c.execute("INSERT INTO users (user_id, points, last_draw, paid_draws_today, last_paid_draw_date) VALUES (%s, %s, %s, %s, %s)", 
-                 (user_id, 0, "1970-01-01", 0, "1970-01-01"))
-        conn.commit()
-        points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
+    discord_user_id = ctx.author.id
+    guild_id = ctx.guild.id
+    today = now_est().date()
+    
+    try:
+        supabase = get_connection()
+        
+        # 查询用户信息
+        user_response = supabase.table('users').select('id, points, last_draw_date, paid_draws_today, last_paid_draw_date').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
+        
+        if user_response.data:
+            user_data = user_response.data[0]
+            user_id = user_data['id']
+            points = user_data['points'] or 0
+            last_draw_date = datetime.datetime.strptime(user_data['last_draw_date'], '%Y-%m-%d').date() if user_data['last_draw_date'] else datetime.date(1970, 1, 1)
+            paid_draws_today = user_data['paid_draws_today'] or 0
+            last_paid_draw_date = datetime.datetime.strptime(user_data['last_paid_draw_date'], '%Y-%m-%d').date() if user_data['last_paid_draw_date'] else datetime.date(1970, 1, 1)
+        else:
+            # 创建新用户
+            create_response = supabase.table('users').insert({
+                'guild_id': ctx.guild.id,
+                'discord_user_id': ctx.author.id,
+                'points': 0,
+                'last_draw_date': '1970-01-01',
+                'paid_draws_today': 0,
+                'last_paid_draw_date': '1970-01-01'
+            }).execute()
+            user_id = create_response.data[0]['id']
+            points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
+            
+    except Exception as e:
+        await ctx.send(f"查询用户数据时出错：{str(e)}")
+        return
 
     first_draw = last_draw_date != today
     
@@ -36,7 +53,6 @@ async def draw(ctx):
     else:
         # 检查用户是否已达到每日付费抽奖上限
         if paid_draws_today >= MAX_PAID_DRAWS_PER_DAY:
-            conn.close()
             embed = discord.Embed(
                 title="❌ 今日付费抽奖次数已达上限",
                 description=f"你今日已付费抽奖 **{paid_draws_today}** 次\n每日最多可付费抽奖 **{MAX_PAID_DRAWS_PER_DAY}** 次\n\n明天再来吧！",
@@ -46,7 +62,6 @@ async def draw(ctx):
             return
         
         if points < WHEEL_COST:
-            conn.close()
             embed = discord.Embed(
                 title="❌ 积分不足",
                 description=f"你需要 {WHEEL_COST} 积分才能再次抽奖\n当前积分: {points}",
@@ -69,34 +84,48 @@ async def draw(ctx):
         try:
             msg = await ctx.bot.wait_for("message", check=check, timeout=15)
         except asyncio.TimeoutError:
-            conn.close()
             await ctx.send("⏰ 已取消抽奖。")
             return
 
         if msg.content.upper() != "Y":
-            conn.close()
             await ctx.send("❌ 已取消抽奖。")
             return
 
-        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (WHEEL_COST, user_id))
+        # 扣除积分
+        try:
+            supabase.table('users').update({
+                'points': points - WHEEL_COST
+            }).eq('id', user_id).execute()
+        except Exception as e:
+            await ctx.send(f"扣除积分时出错：{str(e)}")
+            return
 
     reward = get_weighted_reward()
     
     if first_draw:
         # 免费抽奖 - 只更新积分和最后抽奖日期
-        c.execute(
-            "UPDATE users SET points = points + %s, last_draw = %s WHERE user_id = %s",
-            (reward["points"], str(today), user_id),
-        )
+        try:
+            supabase.table('users').update({
+                'points': points + reward["points"],
+                'last_draw_date': str(today)
+            }).eq('id', user_id).execute()
+        except Exception as e:
+            await ctx.send(f"更新用户数据时出错：{str(e)}")
+            return
     else:
         # 付费抽奖 - 更新积分、最后抽奖日期、今日付费抽奖次数和最后付费抽奖日期
         new_paid_draws = paid_draws_today + 1
-        c.execute(
-            "UPDATE users SET points = points + %s, last_draw = %s, paid_draws_today = %s, last_paid_draw_date = %s WHERE user_id = %s",
-            (reward["points"], str(today), new_paid_draws, str(today), user_id),
-        )
-    conn.commit()
-    conn.close()
+        new_points = points - WHEEL_COST + reward["points"]
+        try:
+            supabase.table('users').update({
+                'points': new_points,
+                'last_draw_date': str(today),
+                'paid_draws_today': new_paid_draws,
+                'last_paid_draw_date': str(today)
+            }).eq('id', user_id).execute()
+        except Exception as e:
+            await ctx.send(f"更新用户数据时出错：{str(e)}")
+            return
 
     # 为奖励创建精美的嵌入消息
     embed = discord.Embed(
@@ -125,15 +154,28 @@ async def draw(ctx):
     await ctx.send(embed=embed)
 
 async def check(ctx, member=None):
-    user_id = str(member.id) if member else str(ctx.author.id)
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
-    row = c.fetchone()
-    conn.close()
+    target_user = member if member else ctx.author
+    discord_user_id = target_user.id
+    guild_id = ctx.guild.id
+    
+    try:
+        supabase = get_connection()
+        
+        # 查询用户信息
+        user_response = supabase.table('users').select('points, last_draw_date, paid_draws_today, last_paid_draw_date').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
+        
+        if user_response.data:
+            user_data = user_response.data[0]
+            points = user_data['points']
+            last_draw = user_data['last_draw_date']
+            paid_draws_today = user_data['paid_draws_today'] or 0
+            last_paid_draw_date = user_data['last_paid_draw_date']
+            
+    except Exception as e:
+        await ctx.send(f"查询用户数据时出错：{str(e)}")
+        return
 
-    if row:
-        points, last_draw, paid_draws_today, last_paid_draw_date = row 
+    if user_response.data: 
 
         embed = discord.Embed(
             title=f"💰 {member.display_name if member else ctx.author.display_name} 的积分信息",
@@ -168,27 +210,38 @@ async def check(ctx, member=None):
         
         await ctx.send(embed=embed)
     else:
+        target_user = member if member else ctx.author
         embed = discord.Embed(
             title="❌ 用户信息",
-            description=f"{member.mention} 还没有参与过抽奖~",
+            description=f"{target_user.mention} 还没有参与过抽奖~",
             color=discord.Color.red()
         )
         await ctx.send(embed=embed)
 
 async def reset_draw(ctx, member):
-    user_id = str(member.id)
+    discord_user_id = member.id
+    guild_id = ctx.guild.id
     yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
 
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
-    if c.fetchone():
-        c.execute("UPDATE users SET last_draw = %s WHERE user_id = %s", (yesterday, user_id))
-        conn.commit()
-        await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
-    else:
-        await ctx.send(f"{ctx.author.mention} 该用户还没有抽奖记录，无法重置。")
-    conn.close()
+    try:
+        supabase = get_connection()
+        
+        # 检查用户是否存在
+        user_response = supabase.table('users').select('id').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
+        
+        if user_response.data:
+            user_id = user_response.data[0]['id']
+            # 更新用户的抽奖状态
+            supabase.table('users').update({
+                'last_draw_date': yesterday
+            }).eq('id', user_id).execute()
+            await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
+        else:
+            await ctx.send(f"{ctx.author.mention} 该用户还没有抽奖记录，无法重置。")
+            
+    except Exception as e:
+        await ctx.send(f"重置抽奖状态时出错：{str(e)}")
+        return
 
 async def reset_all(ctx, confirm=None):
     if confirm != "--confirm":
@@ -198,45 +251,37 @@ async def reset_all(ctx, confirm=None):
         )
         return
 
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM users")
-    conn.commit()
-    conn.close()
-
-    await ctx.send(f"{ctx.author.mention} ✅ 所有用户数据已被清除。")
+    try:
+        supabase = get_connection()
+        
+        # 删除所有用户数据
+        # 注意：Supabase需要先查询所有记录，然后删除
+        all_users = supabase.table('users').select('id').execute()
+        if all_users.data:
+            user_ids = [user['id'] for user in all_users.data]
+            for user_id in user_ids:
+                supabase.table('users').delete().eq('id', user_id).execute()
+        
+        await ctx.send(f"{ctx.author.mention} ✅ 所有用户数据已被清除。")
+        
+    except Exception as e:
+        await ctx.send(f"清除用户数据时出错：{str(e)}")
+        return
 
 async def fix_database(ctx):
-    """强制更新数据库架构以支持付费抽奖跟踪"""
-    conn = get_connection()
-    c = conn.cursor()
+    """
+    此函数已禁用 - 原本用于MySQL数据库架构更新
     
-    # 检查并添加缺失的列
-    c.execute("SHOW COLUMNS FROM users LIKE 'paid_draws_today'")
-    if not c.fetchone():
-        c.execute("ALTER TABLE users ADD COLUMN paid_draws_today INT DEFAULT 0")
-        print("Added paid_draws_today column")
-        await ctx.send("✅ 已添加 paid_draws_today 字段")
-    else:
-        await ctx.send("✅ paid_draws_today 字段已存在")
-    
-    c.execute("SHOW COLUMNS FROM users LIKE 'last_paid_draw_date'")
-    if not c.fetchone():
-        c.execute("ALTER TABLE users ADD COLUMN last_paid_draw_date DATE DEFAULT '1970-01-01'")
-        print("Added last_paid_draw_date column")
-        await ctx.send("✅ 已添加 last_paid_draw_date 字段")
-    else:
-        await ctx.send("✅ last_paid_draw_date 字段已存在")
-    
-    # 更新现有用户以具有适当的默认值
-    c.execute("UPDATE users SET paid_draws_today = 0 WHERE paid_draws_today IS NULL")
-    c.execute("UPDATE users SET last_paid_draw_date = '1970-01-01' WHERE last_paid_draw_date IS NULL")
-    
-    # 强制将所有用户更新为今天的日期以进行测试
-    today = now_est().date()
-    c.execute("UPDATE users SET last_paid_draw_date = %s WHERE last_paid_draw_date = '1970-01-01'", (str(today),))
-    
-    conn.commit()
-    conn.close()
-    
-    await ctx.send(f"{ctx.author.mention} ✅ 数据库结构已修复，付费抽奖追踪功能已启用。所有用户的 last_paid_draw_date 已更新为今天。")
+    在Supabase中，数据库架构应该通过Supabase控制台或迁移脚本来管理。
+    请确保users表包含以下字段：
+    - user_id (text)
+    - points (integer, default: 0)
+    - last_draw (text, default: '1970-01-01')
+    - paid_draws_today (integer, default: 0)
+    - last_paid_draw_date (text, default: '1970-01-01')
+    """
+    await ctx.send(
+        f"{ctx.author.mention} ❌ 此功能已禁用。\n"
+        "数据库架构管理现在通过Supabase控制台进行。\n"
+        "请确保users表包含所有必要的字段。"
+    )

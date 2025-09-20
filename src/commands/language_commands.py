@@ -33,27 +33,30 @@ class LanguageSelect(discord.ui.Select):
         selected_language = self.values[0]
         
         # 更新数据库中的语言设置
-        conn = get_connection()
-        cursor = conn.cursor()
+        supabase = get_connection()
         
-        # 检查是否已有该服务器的语言设置
-        cursor.execute("SELECT * FROM guild_settings WHERE guild_id = %s", (interaction.guild_id,))
-        result = cursor.fetchone()
-        
-        if result:
-            cursor.execute(
-                "UPDATE guild_settings SET language = %s WHERE guild_id = %s",
-                (selected_language, interaction.guild_id)
+        try:
+            # 检查是否已有该服务器的语言设置
+            result = supabase.table("guild_settings").select("*").eq("guild_id", str(interaction.guild_id)).execute()
+            
+            if result.data:
+                # 更新现有记录
+                supabase.table("guild_settings").update({
+                    "language": selected_language
+                }).eq("guild_id", str(interaction.guild_id)).execute()
+            else:
+                # 插入新记录
+                supabase.table("guild_settings").insert({
+                    "guild_id": str(interaction.guild_id),
+                    "language": selected_language
+                }).execute()
+        except Exception as e:
+            print(f"语言设置更新失败: {e}")
+            await interaction.response.send_message(
+                "语言设置更新失败，请稍后重试。",
+                ephemeral=True
             )
-        else:
-            cursor.execute(
-                "INSERT INTO guild_settings (guild_id, language) VALUES (%s, %s)",
-                (interaction.guild_id, selected_language)
-            )
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
+            return
         
         # 获取选定语言的名称
         language_name = AVAILABLE_LANGUAGES[selected_language]
@@ -99,4 +102,4 @@ async def language_command(interaction: discord.Interaction):
 
 # 注册命令到bot
 def setup(bot):
-    bot.tree.add_command(language_command) 
+    bot.tree.add_command(language_command)

@@ -6,7 +6,6 @@ from discord.ext import commands
 import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
-from src.db.database import init_db
 from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, language_commands, egg_commands, pet_commands
 
 # 设置机器人
@@ -161,9 +160,6 @@ async def help_command(interaction: discord.Interaction):
 
 # 注册语言命令
 language_commands.setup(bot)
-
-# 初始化数据库
-init_db()
 
 def main():
     # 运行机器人

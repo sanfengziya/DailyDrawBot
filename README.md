@@ -44,7 +44,8 @@ Daily Draw/
 ## 环境变量
 
 - `TOKEN`: Discord机器人令牌
-- `MYSQL_URL`: MySQL数据库URL
+- `SUPABASE_URL`: Supabase项目URL
+- `SUPABASE_KEY`: Supabase匿名密钥
 
 ## 安装
 

@@ -3,8 +3,8 @@ from discord.ext import commands
 from discord import app_commands
 import random
 import datetime
-from src.db.database import get_connection
 from src.utils.ui import create_embed
+from src.utils.helpers import get_user_internal_id
 
 class PetCommands(commands.Cog):
     def __init__(self, bot):
@@ -30,18 +30,23 @@ class PetCommands(commands.Cog):
 
     def add_fragments(self, player_id, rarity, amount):
         """添加碎片到玩家库存"""
-        conn = get_connection()
-        c = conn.cursor()
-        
-        c.execute("""
-            INSERT INTO pet_fragments (user_id, rarity, amount)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE amount = amount + %s
-        """, (player_id, rarity, amount, amount))
-        
-        conn.commit()
-        c.close()
-        conn.close()
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # 先查询是否存在
+            existing = supabase.table('user_pet_fragments').select('amount').eq('user_id', player_id).eq('rarity', rarity).execute()
+            
+            if existing.data:
+                # 更新现有记录
+                new_amount = existing.data[0]['amount'] + amount
+                supabase.table('user_pet_fragments').update({'amount': new_amount}).eq('user_id', player_id).eq('rarity', rarity).execute()
+            else:
+                # 插入新记录
+                supabase.table('user_pet_fragments').insert({'user_id': player_id, 'rarity': rarity, 'amount': amount}).execute()
+                
+        except Exception as e:
+            print(f"添加碎片时出错：{str(e)}")
     
     def calculate_pet_points(self, rarity, stars, hours):
         """计算宠物积分获取量"""
@@ -51,82 +56,83 @@ class PetCommands(commands.Cog):
     
     def update_pet_points(self, user_id):
         """更新装备宠物的时间戳（用于积分计算）"""
-        conn = get_connection()
-        c = conn.cursor()
-        
-        # 检查用户是否有装备的宠物
-        c.execute("""
-            SELECT equipped_pet_id
-            FROM users
-            WHERE user_id = %s AND equipped_pet_id IS NOT NULL
-        """, (user_id,))
-        
-        result = c.fetchone()
-        if not result:
-            c.close()
-            conn.close()
-            return
-        
-        # 更新最后更新时间为当前时间
-        now = datetime.datetime.now()
-        c.execute("""
-            UPDATE users 
-            SET last_pet_points_update = %s 
-            WHERE user_id = %s
-        """, (now, user_id))
-        
-        conn.commit()
-        c.close()
-        conn.close()
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # 检查用户是否有装备的宠物
+            user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_id).not_.is_('equipped_pet_id', None).execute()
+            
+            if not user_response.data:
+                return
+            
+            # 更新最后更新时间为当前时间
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+            supabase.table('users').update({'last_pet_points_update': now}).eq('id', user_id).execute()
+            
+        except Exception as e:
+            print(f"更新宠物积分时间戳时出错：{str(e)}")
 
     def calculate_pending_points(self, user_id):
         """基于时间差计算待领取的宠物积分（最多累积24小时）"""
-        conn = get_connection()
-        c = conn.cursor()
-        
-        # 获取用户装备的宠物信息和上次更新时间
-        c.execute("""
-            SELECT u.equipped_pet_id, u.last_pet_points_update, p.rarity, p.stars
-            FROM users u
-            LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
-            WHERE u.user_id = %s AND u.equipped_pet_id IS NOT NULL
-        """, (user_id,))
-        
-        result = c.fetchone()
-        if not result:
-            c.close()
-            conn.close()
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # 获取用户装备的宠物信息和上次更新时间
+            user_pet_response = supabase.table('users').select('equipped_pet_id, last_pet_points_update').eq('id', user_id).not_.is_('equipped_pet_id', None).execute()
+            
+            if not user_pet_response.data:
+                return 0
+            
+            user_data = user_pet_response.data[0]
+            equipped_pet_id = user_data['equipped_pet_id']
+            last_update = user_data['last_pet_points_update']
+            
+            # 获取宠物信息
+            pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', equipped_pet_id).execute()
+            
+            if not pet_response.data:
+                return 0
+            
+            pet_data = pet_response.data[0]
+            pet_template_id = pet_data['pet_template_id']
+            stars = pet_data['stars']
+            
+            # 获取宠物模板信息
+            template_response = supabase.table('pet_templates').select('rarity').eq('id', pet_template_id).execute()
+            if not template_response.data:
+                return 0
+            
+            rarity = template_response.data[0]['rarity']
+            
+            # 计算时间差（小时）
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if last_update:
+                # 解析ISO格式的时间戳
+                last_update_dt = datetime.datetime.fromisoformat(last_update.replace('Z', '+00:00'))
+                time_diff = now - last_update_dt
+                hours = time_diff.total_seconds() / 3600
+            else:
+                # 如果没有记录，说明刚装备，返回0
+                return 0
+            
+            # 限制最多累积24小时的积分
+            max_hours = 24
+            actual_hours = min(hours, max_hours)
+            
+            # 如果时间差小于0.1小时（6分钟），返回0
+            if actual_hours < 0.1:
+                return 0
+            
+            # 计算获得的积分
+            pending_points = self.calculate_pet_points(rarity, stars, actual_hours)
+            
+            return int(pending_points)
+            
+        except Exception as e:
+            print(f"计算待领取积分时出错：{str(e)}")
             return 0
-        
-        equipped_pet_id, last_update, rarity, stars = result
-        
-        # 计算时间差（小时）
-        now = datetime.datetime.now()
-        if last_update:
-            time_diff = now - last_update
-            hours = time_diff.total_seconds() / 3600
-        else:
-            # 如果没有记录，说明刚装备，返回0
-            c.close()
-            conn.close()
-            return 0
-        
-        # 限制最多累积24小时的积分
-        max_hours = 24
-        actual_hours = min(hours, max_hours)
-        
-        # 如果时间差小于0.1小时（6分钟），返回0
-        if actual_hours < 0.1:
-            c.close()
-            conn.close()
-            return 0
-        
-        # 计算获得的积分
-        pending_points = self.calculate_pet_points(rarity, stars, actual_hours)
-        
-        c.close()
-        conn.close()
-        return int(pending_points)
 
 # 宠物选择视图
 class PetSelectView(discord.ui.View):
@@ -137,22 +143,35 @@ class PetSelectView(discord.ui.View):
         
     async def setup_select(self):
         """设置宠物选择下拉菜单"""
-        conn = get_connection()
-        c = conn.cursor()
-        
-        c.execute("""
-            SELECT pet_id, pet_name, rarity, stars
-            FROM pets
-            WHERE user_id = %s
-            ORDER BY rarity DESC, stars DESC, pet_name
-            LIMIT 25
-        """, (self.user_id,))
-        
-        pets = c.fetchall()
-        c.close()
-        conn.close()
-        
-        if not pets:
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # 查询用户的宠物
+            pets_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('user_id', self.user_id).order('stars', desc=True).limit(25).execute()
+            
+            if not pets_response.data:
+                return False
+            
+            # 获取所有宠物模板信息
+            template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
+            templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
+            
+            # 创建模板映射
+            template_map = {template['id']: template for template in templates_response.data}
+            
+            pets = []
+            for pet in pets_response.data:
+                template = template_map.get(pet['pet_template_id'])
+                if template:
+                    pets.append((pet['id'], template['name'], template['rarity'], pet['stars']))
+            
+            # 按稀有度和星级排序
+            rarity_order = {'SSR': 4, 'SR': 3, 'R': 2, 'C': 1}
+            pets.sort(key=lambda x: (rarity_order.get(x[2], 0), x[3], x[1]), reverse=True)
+            
+        except Exception as e:
+            print(f"设置宠物选择菜单时出错：{str(e)}")
             return False
             
         # 稀有度颜色映射
@@ -234,8 +253,15 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     if action == "list":
         await handle_pet_list(interaction, page)
     elif action in ["info", "upgrade", "dismantle", "equip"]:
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
         # 显示宠物选择界面
-        view = PetSelectView(str(interaction.user.id), action)
+        view = PetSelectView(user_internal_id, action)
         has_pets = await view.setup_select()
         
         if not has_pets:
@@ -271,53 +297,92 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
 
 async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
     """查看我的宠物"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 分页查询
-    per_page = 10
-    offset = (page - 1) * per_page
-    
-    c.execute("""
-        SELECT pet_id, pet_name, rarity, stars, max_stars, created_at
-        FROM pets
-        WHERE user_id = %s
-        ORDER BY rarity DESC, stars DESC, created_at DESC
-        LIMIT %s OFFSET %s
-    """, (str(interaction.user.id), per_page, offset))
-    
-    pets = c.fetchall()
-    
-    # 获取总数
-    c.execute("SELECT COUNT(*) FROM pets WHERE user_id = %s", (str(interaction.user.id),))
-    total_pets = c.fetchone()[0]
-    
-    c.close()
-    conn.close()
-    
-    if not pets:
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 分页查询
+        per_page = 10
+        offset = (page - 1) * per_page
+        
+        # 查询宠物列表 - 先获取用户宠物，然后获取模板和稀有度配置
+        pets_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at').eq('user_id', user_internal_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
+        
+        # 获取总数
+        count_response = supabase.table('user_pets').select('id', count='exact').eq('user_id', user_internal_id).execute()
+        total_pets = count_response.count
+        
+        if not pets_response.data:
+            embed = create_embed(
+                "🐾 我的宠物",
+                f"{interaction.user.mention} 你还没有任何宠物呢！快去抽蛋孵化吧！",
+                discord.Color.orange()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 获取所有相关的宠物模板
+        template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
+        templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
+        templates_dict = {template['id']: template for template in templates_response.data}
+        
+        # 获取稀有度配置
+        rarities = list(set([template['rarity'] for template in templates_response.data]))
+        rarity_configs_response = supabase.table('pet_rarity_configs').select('rarity, max_stars').in_('rarity', rarities).execute()
+        rarity_configs_dict = {config['rarity']: config for config in rarity_configs_response.data}
+        
+        # 组合数据并按稀有度和星级排序
+        pets_data = []
+        for pet in pets_response.data:
+            template = templates_dict.get(pet['pet_template_id'])
+            if template:
+                rarity_config = rarity_configs_dict.get(template['rarity'])
+                max_stars = rarity_config['max_stars'] if rarity_config else 0
+                pets_data.append({
+                    'id': pet['id'],
+                    'name': template['name'],
+                    'rarity': template['rarity'],
+                    'stars': pet['stars'],
+                    'max_stars': max_stars,
+                    'created_at': pet['created_at']
+                })
+        
+        # 按稀有度和星级排序
+        rarity_order = {'SSR': 1, 'SR': 2, 'R': 3, 'C': 4}
+        pets_data.sort(key=lambda x: (rarity_order.get(x['rarity'], 5), -x['stars'], x['created_at']), reverse=False)
+        
+        pets = [(pet['id'], pet['name'], pet['rarity'], pet['stars'], pet['max_stars'], pet['created_at']) for pet in pets_data]
+        
+        rarity_colors = {
+            'C': '🤍',
+            'R': '💙',
+            'SR': '💜',
+            'SSR': '💛'
+        }
+        
+        description = ""
+        for pet_id, pet_name, rarity, stars, max_stars, created_at in pets:
+            star_display = '⭐' * stars if stars > 0 else '无星'
+            description += f"{rarity_colors[rarity]} **{pet_name}** (ID: {pet_id})\n"
+            description += f"   星级: {star_display} ({stars}/{max_stars})\n\n"
+        
+        total_pages = (total_pets + per_page - 1) // per_page
+        
+    except Exception as e:
         embed = create_embed(
-            "🐾 我的宠物",
-            f"{interaction.user.mention} 你还没有任何宠物呢！快去抽蛋孵化吧！",
-            discord.Color.orange()
+            "❌ 错误",
+            f"查询宠物列表时出错：{str(e)}",
+            discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
         return
-    
-    rarity_colors = {
-        'C': '🤍',
-        'R': '💙',
-        'SR': '💜',
-        'SSR': '💛'
-    }
-    
-    description = ""
-    for pet_id, pet_name, rarity, stars, max_stars, created_at in pets:
-        star_display = '⭐' * stars if stars > 0 else '无星'
-        description += f"{rarity_colors[rarity]} **{pet_name}** (ID: {pet_id})\n"
-        description += f"   星级: {star_display} ({stars}/{max_stars})\n\n"
-    
-    total_pages = (total_pets + per_page - 1) // per_page
     
     embed = create_embed(
         f"🐾 {interaction.user.mention} 的宠物 (第 {page}/{total_pages} 页)",
@@ -329,41 +394,69 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
 
 async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     """查看宠物详情"""
-    conn = get_connection()
-    c = conn.cursor()
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 查询宠物基本信息
+        pet_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+
+        pet_data = pet_response.data[0]
+        
+        # 获取宠物模板信息
+        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        if not template_response.data:
+            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        template_data = template_response.data[0]
+        
+        # 获取稀有度配置
+        rarity_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', template_data['rarity']).execute()
+        if not rarity_response.data:
+            embed = create_embed("❌ 错误", "稀有度配置不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_name = template_data['name']
+        rarity = template_data['rarity']
+        stars = pet_data['stars']
+        max_stars = rarity_response.data[0]['max_stars']
+        created_at = pet_data['created_at']
+        
+        if stars >= max_stars:
+            embed = create_embed(
+                "⭐ 已满星",
+                f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
+                discord.Color.yellow()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
     
-    c.execute("""
-        SELECT pet_name, rarity, stars, max_stars, created_at
-        FROM pets
-        WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, str(interaction.user.id)))
-    
-    result = c.fetchone()
-    c.close()
-    conn.close()
-    
-    if not result:
+    except Exception as e:
         embed = create_embed(
             "❌ 错误",
-            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+            f"查询宠物信息时出错：{str(e)}",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-
-    pet_name, rarity, stars, max_stars = result
-    
-    if stars >= max_stars:
-        embed = create_embed(
-            "⭐ 已满星",
-            f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
-            discord.Color.yellow()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
     
     rarity_colors = {
@@ -388,7 +481,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         f"**宠物ID：** {pet_id}\n"
         f"**稀有度：** {rarity}\n"
         f"**星级：** {star_display} ({stars}/{max_stars})\n"
-        f"**获得时间：** {created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        f"**获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d %H:%M:%S')}"
         f"{upgrade_info}",
         discord.Color.green()
     )
@@ -396,146 +489,191 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
 
 async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     """升星宠物"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 获取宠物信息
-    c.execute("""
-        SELECT pet_name, rarity, stars, max_stars
-        FROM pets
-        WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, str(interaction.user.id)))
-    
-    result = c.fetchone()
-    if not result:
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 获取宠物信息
+        pet_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_data = pet_response.data[0]
+        
+        # 获取宠物模板信息
+        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        if not template_response.data:
+            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        template_data = template_response.data[0]
+        
+        # 获取稀有度配置
+        rarity_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', template_data['rarity']).execute()
+        if not rarity_response.data:
+            embed = create_embed("❌ 错误", "稀有度配置不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_name = template_data['name']
+        rarity = template_data['rarity']
+        stars = pet_data['stars']
+        max_stars = rarity_response.data[0]['max_stars']
+        
+        if stars >= max_stars:
+            embed = create_embed(
+                "⭐ 已满星",
+                f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
+                discord.Color.yellow()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 获取升星费用
+        cost = PetCommands.UPGRADE_COSTS[stars]
+        required_fragments = cost['fragments']
+        required_points = cost['points']
+        
+        # 检查用户积分
+        user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
+        if not user_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 无法获取你的资源信息！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        points = user_response.data[0]['points']
+        
+        # 检查用户碎片
+        fragments_response = supabase.table('user_pet_fragments').select('amount').eq('user_id', user_internal_id).eq('rarity', rarity).execute()
+        fragments = fragments_response.data[0]['amount'] if fragments_response.data else 0
+        
+        if points < required_points:
+            embed = create_embed(
+                "💰 积分不足",
+                f"{interaction.user.mention} 升星需要 {required_points} 积分，你只有 {points} 积分！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        if fragments < required_fragments:
+            embed = create_embed(
+                "🧩 碎片不足",
+                f"{interaction.user.mention} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 执行升星
+        # 扣除积分
+        supabase.table('users').update({'points': points - required_points}).eq('id', user_internal_id).execute()
+        
+        # 扣除碎片
+        supabase.table('user_pet_fragments').update({'amount': fragments - required_fragments}).eq('user_id', user_internal_id).eq('rarity', rarity).execute()
+        
+        # 升星
+        supabase.table('user_pets').update({'stars': stars + 1}).eq('id', pet_id).execute()
+        
+        new_stars = stars + 1
+        star_display = '⭐' * new_stars
+        
+        embed = create_embed(
+            "🌟 升星成功！",
+            f"{interaction.user.mention} 你的 **{pet_name}** 成功升星！\n"
+            f"星级：{star_display} ({new_stars}/{max_stars})\n"
+            f"消耗：{required_fragments} 个 {rarity} 碎片 + {required_points} 积分",
+            discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+        
+    except Exception as e:
         embed = create_embed(
             "❌ 错误",
-            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+            f"升星宠物时出错：{str(e)}",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
-    
-    pet_name, rarity, stars, max_stars = result
-    
-    if stars >= max_stars:
-        embed = create_embed(
-            "⭐ 已满星",
-            f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
-            discord.Color.yellow()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    # 获取升星费用
-    cost = PetCommands.UPGRADE_COSTS[stars]
-    required_fragments = cost['fragments']
-    required_points = cost['points']
-    
-    # 检查用户资源
-    c.execute("""
-        SELECT u.points, COALESCE(pf.amount, 0) as fragments
-        FROM users u
-        LEFT JOIN pet_fragments pf ON u.user_id = pf.user_id AND pf.rarity = %s
-        WHERE u.user_id = %s
-    """, (rarity, str(interaction.user.id)))
-    
-    resource_result = c.fetchone()
-    if not resource_result:
-        embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 无法获取你的资源信息！",
-            discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    points, fragments = resource_result
-    
-    if points < required_points:
-        embed = create_embed(
-            "💰 积分不足",
-            f"{interaction.user.mention} 升星需要 {required_points} 积分，你只有 {points} 积分！",
-            discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    if fragments < required_fragments:
-        embed = create_embed(
-            "🧩 碎片不足",
-            f"{interaction.user.mention} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！",
-            discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    # 执行升星
-    # 扣除积分
-    c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", 
-             (required_points, str(interaction.user.id)))
-    
-    # 扣除碎片
-    c.execute("""
-        UPDATE pet_fragments 
-        SET amount = amount - %s 
-        WHERE user_id = %s AND rarity = %s
-    """, (required_fragments, str(interaction.user.id), rarity))
-    
-    # 升星
-    c.execute("UPDATE pets SET stars = stars + 1 WHERE pet_id = %s", (pet_id,))
-    
-    conn.commit()
-    c.close()
-    conn.close()
-    
-    new_stars = stars + 1
-    star_display = '⭐' * new_stars
-    
-    embed = create_embed(
-        "🌟 升星成功！",
-        f"{interaction.user.mention} 你的 **{pet_name}** 成功升星！\n"
-        f"星级：{star_display} ({new_stars}/{max_stars})\n"
-        f"消耗：{required_fragments} 个 {rarity} 碎片 + {required_points} 积分",
-        discord.Color.green()
-    )
-    await interaction.response.send_message(embed=embed)
 
 async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
     """分解宠物"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 获取宠物信息
-    c.execute("""
-        SELECT pet_name, rarity, stars
-        FROM pets
-        WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, str(interaction.user.id)))
-    
-    result = c.fetchone()
-    if not result:
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 检查宠物是否正在装备
+        user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
+        if user_response.data and user_response.data[0]['equipped_pet_id'] == pet_id:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 不能分解正在装备的宠物！请先卸下宠物再进行分解。",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+
+        # 获取宠物信息
+        pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_data = pet_response.data[0]
+        pet_template_id = pet_data['pet_template_id']
+        stars = pet_data['stars']
+        
+        # 获取宠物模板信息
+        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        if not template_response.data:
+            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        template_data = template_response.data[0]
+        pet_name = template_data['name']
+        rarity = template_data['rarity']
+        
+    except Exception as e:
         embed = create_embed(
             "❌ 错误",
-            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+            f"{interaction.user.mention} 查询宠物信息时出错了！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
-    
-    pet_name, rarity, stars = result
     
     # 计算分解收益
     base_fragments = 10
@@ -556,30 +694,39 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         discord.Color.orange()
     )
     
-    view = DismantleConfirmView(str(interaction.user.id), pet_id, pet_name, rarity, total_fragments, total_points)
+    view = DismantleConfirmView(str(interaction.user.id), user_internal_id, pet_id, pet_name, rarity, total_fragments, total_points)
     await interaction.response.send_message(embed=embed, view=view)
 
 async def handle_pet_fragments(interaction: discord.Interaction):
     """查看碎片库存"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    c.execute("""
-        SELECT rarity, amount
-        FROM pet_fragments
-        WHERE user_id = %s AND amount > 0
-        ORDER BY 
-            CASE rarity 
-                WHEN 'SSR' THEN 1 
-                WHEN 'SR' THEN 2 
-                WHEN 'R' THEN 3 
-                WHEN 'C' THEN 4 
-            END
-    """, (str(interaction.user.id),))
-    
-    fragments = c.fetchall()
-    c.close()
-    conn.close()
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 查询碎片库存
+        response = supabase.table('user_pet_fragments').select('rarity, amount').eq('user_id', user_internal_id).gt('amount', 0).execute()
+        
+        fragments = response.data
+        
+        # 手动排序（Supabase不支持复杂的CASE排序）
+        rarity_order = {'SSR': 1, 'SR': 2, 'R': 3, 'C': 4}
+        fragments.sort(key=lambda x: rarity_order.get(x['rarity'], 5))
+        
+    except Exception as e:
+        embed = create_embed(
+            "❌ 错误",
+            f"{interaction.user.mention} 查询碎片库存时出错了！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
+        return
     
     if not fragments:
         embed = create_embed(
@@ -598,7 +745,9 @@ async def handle_pet_fragments(interaction: discord.Interaction):
     }
     
     description = ""
-    for rarity, amount in fragments:
+    for fragment in fragments:
+        rarity = fragment['rarity']
+        amount = fragment['amount']
         description += f"{rarity_colors[rarity]} **{rarity} 碎片：** {amount} 个\n"
     
     embed = create_embed(
@@ -609,9 +758,10 @@ async def handle_pet_fragments(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 class DismantleConfirmView(discord.ui.View):
-    def __init__(self, user_id, pet_id, pet_name, rarity, fragments, points):
+    def __init__(self, discord_user_id, user_internal_id, pet_id, pet_name, rarity, fragments, points):
         super().__init__(timeout=30)
-        self.user_id = user_id
+        self.discord_user_id = discord_user_id  # 用于验证用户身份
+        self.user_internal_id = user_internal_id  # 用于数据库操作
         self.pet_id = pet_id
         self.pet_name = pet_name
         self.rarity = rarity
@@ -620,43 +770,58 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='确认分解', style=discord.ButtonStyle.danger, emoji='💥')
     async def confirm_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if str(interaction.user.id) != self.user_id:
+        if str(interaction.user.id) != self.discord_user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
-        conn = get_connection()
-        c = conn.cursor()
-        
-        # 删除宠物
-        c.execute("DELETE FROM pets WHERE pet_id = %s AND user_id = %s", 
-                 (self.pet_id, self.user_id))
-        
-        if c.rowcount == 0:
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # 删除宠物
+            delete_response = supabase.table('user_pets').delete().eq('id', self.pet_id).eq('user_id', self.user_internal_id).execute()
+            
+            if not delete_response.data:
+                embed = create_embed(
+                    "❌ 错误",
+                    f"{interaction.user.mention} 宠物不存在或已被分解！",
+                    discord.Color.red()
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+                return
+            
+            # 检查是否已有该稀有度的碎片记录
+            fragment_response = supabase.table('user_pet_fragments').select('amount').eq('user_id', self.user_internal_id).eq('rarity', self.rarity).execute()
+            
+            if fragment_response.data:
+                # 更新现有碎片数量
+                current_amount = fragment_response.data[0]['amount']
+                new_amount = current_amount + self.fragments
+                supabase.table('user_pet_fragments').update({'amount': new_amount}).eq('user_id', self.user_internal_id).eq('rarity', self.rarity).execute()
+            else:
+                # 插入新的碎片记录
+                supabase.table('user_pet_fragments').insert({
+                    'user_id': self.user_internal_id,
+                    'rarity': self.rarity,
+                    'amount': self.fragments
+                }).execute()
+            
+            # 添加积分
+            if self.points > 0:
+                user_response = supabase.table('users').select('points').eq('id', self.user_internal_id).execute()
+                if user_response.data:
+                    current_points = user_response.data[0]['points']
+                    new_points = current_points + self.points
+                    supabase.table('users').update({'points': new_points}).eq('id', self.user_internal_id).execute()
+                    
+        except Exception as e:
             embed = create_embed(
                 "❌ 错误",
-                f"{interaction.user.mention} 宠物不存在或已被分解！",
+                f"{interaction.user.mention} 分解宠物时出错了！",
                 discord.Color.red()
             )
             await interaction.response.edit_message(embed=embed, view=None)
-            c.close()
-            conn.close()
             return
-        
-        # 添加碎片
-        c.execute("""
-            INSERT INTO pet_fragments (user_id, rarity, amount)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE amount = amount + %s
-        """, (self.user_id, self.rarity, self.fragments, self.fragments))
-        
-        # 添加积分
-        if self.points > 0:
-            c.execute("UPDATE users SET points = points + %s WHERE user_id = %s", 
-                     (self.points, self.user_id))
-        
-        conn.commit()
-        c.close()
-        conn.close()
         
         embed = create_embed(
             "💥 分解成功",
@@ -670,7 +835,7 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='取消', style=discord.ButtonStyle.secondary, emoji='❌')
     async def cancel_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if str(interaction.user.id) != self.user_id:
+        if str(interaction.user.id) != self.discord_user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
@@ -683,48 +848,72 @@ class DismantleConfirmView(discord.ui.View):
 
 async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     """装备宠物"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 检查宠物是否存在且属于用户
-    c.execute("""
-        SELECT pet_name, rarity, stars
-        FROM pets
-        WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, str(interaction.user.id)))
-    
-    result = c.fetchone()
-    if not result:
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 检查宠物是否存在且属于用户
+        pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_data = pet_response.data[0]
+        pet_template_id = pet_data['pet_template_id']
+        stars = pet_data['stars']
+        
+        # 获取宠物模板信息
+        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        if not template_response.data:
+            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        template_data = template_response.data[0]
+        pet_name = template_data['name']
+        rarity = template_data['rarity']
+        
+        # 检查是否已经装备了这只宠物
+        equipped_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
+        
+        current_equipped_id = None
+        if equipped_response.data:
+            current_equipped_id = equipped_response.data[0]['equipped_pet_id']
+        
+        if current_equipped_id == pet_id:
+            embed = create_embed(
+                "⚠️ 已装备",
+                f"{interaction.user.mention} 你已经装备了 **{pet_name}**！",
+                discord.Color.yellow()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+            
+    except Exception as e:
         embed = create_embed(
             "❌ 错误",
-            f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+            f"{interaction.user.mention} 装备宠物时出错了！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    pet_name, rarity, stars = result
-    
-    # 检查是否已经装备了这只宠物
-    c.execute("SELECT equipped_pet_id FROM users WHERE user_id = %s", (str(interaction.user.id),))
-    current_equipped = c.fetchone()
-    
-    if current_equipped and current_equipped[0] == pet_id:
-        embed = create_embed(
-            "⚠️ 已装备",
-            f"{interaction.user.mention} 你已经装备了 **{pet_name}**！",
-            discord.Color.yellow()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
     
     # 检查是否有待领取的积分
     pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
+    pending_points = pet_commands.calculate_pending_points(user_internal_id)
     if pending_points > 0:
         embed = create_embed(
             "⚠️ 请先领取积分",
@@ -733,31 +922,24 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
     
     # 如果有其他宠物装备，先更新积分累积
-    if current_equipped and current_equipped[0]:
+    if current_equipped_id:
         pet_commands = PetCommands(None)
-        pet_commands.update_pet_points(str(interaction.user.id))
+        pet_commands.update_pet_points(user_internal_id)
     
     # 装备新宠物
-    now = datetime.datetime.now()
-    c.execute("""
-        UPDATE users 
-        SET equipped_pet_id = %s, last_pet_points_update = %s 
-        WHERE user_id = %s
-    """, (pet_id, now, str(interaction.user.id)))
-    
-    conn.commit()
-    c.close()
-    conn.close()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    supabase.table('users').update({
+        'equipped_pet_id': pet_id,
+        'last_pet_points_update': now.isoformat(timespec='seconds')
+    }).eq('id', user_internal_id).execute()
     
     # 计算每小时积分和待领取积分
     pet_commands = PetCommands(None)
     hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
-    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
+    pending_points = pet_commands.calculate_pending_points(user_internal_id)
     
     star_display = '⭐' * stars if stars > 0 else '⚪'
     rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
@@ -776,34 +958,64 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
 
 async def handle_pet_unequip(interaction: discord.Interaction):
     """卸下宠物"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 检查是否有装备的宠物
-    c.execute("""
-        SELECT u.equipped_pet_id, p.pet_name, p.rarity, p.stars
-        FROM users u
-        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
-        WHERE u.user_id = %s AND u.equipped_pet_id IS NOT NULL
-    """, (str(interaction.user.id),))
-    
-    result = c.fetchone()
-    if not result:
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if not user_internal_id:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 查询用户装备的宠物
+        user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
+        if not user_response.data:
+            embed = create_embed("❌ 错误", "用户信息异常！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        equipped_pet_id = user_response.data[0]['equipped_pet_id']
+        
+        if not equipped_pet_id:
+            embed = create_embed(
+                "❌ 没有装备宠物",
+                f"{interaction.user.mention} 你当前没有装备任何宠物！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 获取装备宠物的详细信息
+        pet_response = supabase.table('user_pets').select('stars, pet_templates(name, rarity)').eq('id', equipped_pet_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 错误",
+                f"{interaction.user.mention} 装备的宠物信息异常！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_data = pet_response.data[0]
+        pet_name = pet_data['pet_templates']['name']
+        rarity = pet_data['pet_templates']['rarity']
+        stars = pet_data['stars']
+        
+    except Exception as e:
         embed = create_embed(
-            "❌ 没有装备宠物",
-            f"{interaction.user.mention} 你当前没有装备任何宠物！",
+            "❌ 错误",
+            f"{interaction.user.mention} 卸下宠物时出错了！",
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
-    
-    equipped_pet_id, pet_name, rarity, stars = result
     
     # 检查是否有待领取的积分
     pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
+    pending_points = pet_commands.calculate_pending_points(user_internal_id)
     if pending_points > 0:
         embed = create_embed(
             "⚠️ 请先领取积分",
@@ -812,24 +1024,17 @@ async def handle_pet_unequip(interaction: discord.Interaction):
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
         return
     
     # 更新积分累积
     pet_commands = PetCommands(None)
-    pet_commands.update_pet_points(str(interaction.user.id))
+    pet_commands.update_pet_points(user_internal_id)
     
     # 卸下宠物
-    c.execute("""
-        UPDATE users 
-        SET equipped_pet_id = NULL, last_pet_points_update = NULL 
-        WHERE user_id = %s
-    """, (str(interaction.user.id),))
-    
-    conn.commit()
-    c.close()
-    conn.close()
+    supabase.table('users').update({
+        'equipped_pet_id': None,
+        'last_pet_points_update': None
+    }).eq('id', user_internal_id).execute()
     
     embed = create_embed(
         "📤 卸下成功！",
@@ -841,164 +1046,205 @@ async def handle_pet_unequip(interaction: discord.Interaction):
 
 async def handle_pet_status(interaction: discord.Interaction):
     """查看装备状态"""
-    conn = get_connection()
-    c = conn.cursor()
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if user_internal_id is None:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 查询用户信息
+        user_response = supabase.table('users').select('equipped_pet_id, points').eq('id', user_internal_id).execute()
+        if not user_response.data:
+            embed = create_embed("❌ 错误", "用户数据异常！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        user_data = user_response.data[0]
+        equipped_pet_id = user_data.get('equipped_pet_id')
+        current_points = user_data.get('points', 0)
+        
+        if not equipped_pet_id:
+            embed = create_embed(
+                "👀 装备状态",
+                f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
+                f"💰 **当前积分：** {current_points}\n\n"
+                f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+                discord.Color.orange()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 获取宠物详细信息
+        pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', equipped_pet_id).execute()
+        
+        if not pet_response.data:
+            embed = create_embed(
+                "❌ 宠物不存在",
+                f"{interaction.user.mention} 装备的宠物不存在！",
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        pet_data = pet_response.data[0]
+        pet_template_id = pet_data['pet_template_id']
+        stars = pet_data['stars']
+        
+        # 获取宠物模板信息
+        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        if not template_response.data:
+            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        template_data = template_response.data[0]
+        pet_name = template_data['name']
+        rarity = template_data['rarity']
     
-    # 获取用户装备信息
-    c.execute("""
-        SELECT u.equipped_pet_id, u.points, p.pet_name, p.rarity, p.stars
-        FROM users u
-        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
-        WHERE u.user_id = %s
-    """, (str(interaction.user.id),))
-    
-    result = c.fetchone()
-    if not result:
-        embed = create_embed(
-            "❌ 用户不存在",
-            f"{interaction.user.mention} 无法获取你的信息！",
-            discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    equipped_pet_id, current_points, pet_name, rarity, stars = result
-    
-    if not equipped_pet_id:
-        embed = create_embed(
-            "👀 装备状态",
-            f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
-            f"💰 **当前积分：** {current_points}\n\n"
-            f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
-            discord.Color.orange()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    # 计算每小时积分和待领取积分
-    pet_commands = PetCommands(None)
-    hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
-    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
-    
-    star_display = '⭐' * stars if stars > 0 else '⚪'
-    rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
-    rarity_color = rarity_colors.get(rarity, '🤍')
-    
-    embed = create_embed(
-        "👀 装备状态",
-        f"{interaction.user.mention} 的宠物装备状态：\n\n"
-        f"🐾 **装备宠物：** {pet_name}\n"
-        f"{rarity_color} **稀有度：** {rarity}\n"
-        f"{star_display} **星级：** {stars}\n"
-        f"💰 **每小时积分：** {hourly_points}\n"
-        f"⏰ **待领取积分：** {pending_points}\n"
-        f"💎 **当前总积分：** {current_points}\n\n"
-        f"💡 使用 `/pet claim` 来领取你的宠物积分！",
-        discord.Color.blue()
-    )
-    await interaction.response.send_message(embed=embed)
-    c.close()
-    conn.close()
-
-async def handle_pet_claim_points(interaction: discord.Interaction):
-    """领取宠物积分"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # 查询用户的装备宠物信息
-    c.execute("""
-        SELECT u.equipped_pet_id, u.points, p.pet_name, p.rarity, p.stars
-        FROM users u
-        LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
-        WHERE u.user_id = %s
-    """, (str(interaction.user.id),))
-    
-    result = c.fetchone()
-    
-    if not result:
-        embed = create_embed(
-            "❌ 用户不存在",
-            "请先使用任何命令来初始化你的账户！",
-            discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        c.close()
-        conn.close()
-        return
-    
-    equipped_pet_id, current_points, pet_name, rarity, stars = result
-    
-    # 使用新方法计算待领取积分
-    pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
-    
-    if not equipped_pet_id:
-        embed = create_embed(
-            "❌ 没有装备宠物",
-            f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
-            f"💰 **当前积分：** {current_points}\n\n"
-            f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
-            discord.Color.orange()
-        )
-        await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
-    
-    if pending_points <= 0:
+        # 计算每小时积分和待领取积分
+        pet_commands = PetCommands(None)
+        hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
+        pending_points = pet_commands.calculate_pending_points(user_internal_id)
+        
         star_display = '⭐' * stars if stars > 0 else '⚪'
         rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
         rarity_color = rarity_colors.get(rarity, '🤍')
         
         embed = create_embed(
-            "💰 没有可领取的积分",
-            f"{interaction.user.mention} 当前没有可领取的积分！\n\n"
+            "👀 装备状态",
+            f"{interaction.user.mention} 的宠物装备状态：\n\n"
             f"🐾 **装备宠物：** {pet_name}\n"
             f"{rarity_color} **稀有度：** {rarity}\n"
             f"{star_display} **星级：** {stars}\n"
-            f"💎 **当前积分：** {current_points}\n\n"
-            f"💡 宠物会随着时间自动累积积分，请稍后再来领取！",
+            f"💰 **每小时积分：** {hourly_points}\n"
+            f"⏰ **待领取积分：** {pending_points}\n"
+            f"💎 **当前总积分：** {current_points}\n\n"
+            f"💡 使用 `/pet claim` 来领取你的宠物积分！",
             discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed)
-        c.close()
-        conn.close()
-        return
+    except Exception as e:
+        embed = create_embed(
+            "❌ 错误",
+            f"{interaction.user.mention} 查看装备状态时发生错误！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
+
+async def handle_pet_claim_points(interaction: discord.Interaction):
+    """领取宠物积分"""
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        if user_internal_id is None:
+            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # 查询用户信息
+        user_response = supabase.table('users').select('equipped_pet_id, points').eq('id', user_internal_id).execute()
+        if not user_response.data:
+            embed = create_embed("❌ 错误", "用户数据异常！", discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        user_data = user_response.data[0]
+        equipped_pet_id = user_data.get('equipped_pet_id')
+        current_points = user_data.get('points', 0)
+        
+        # 获取宠物详细信息（如果有装备宠物）
+        pet_name = None
+        rarity = None
+        stars = None
+        
+        if equipped_pet_id:
+            pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', equipped_pet_id).execute()
+            if pet_response.data:
+                pet_data = pet_response.data[0]
+                pet_template_id = pet_data['pet_template_id']
+                stars = pet_data['stars']
+                
+                # 获取宠物模板信息
+                template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+                if template_response.data:
+                    template_data = template_response.data[0]
+                    pet_name = template_data['name']
+                    rarity = template_data['rarity']
     
-    # 领取积分
-    new_total_points = current_points + pending_points
-    now = datetime.datetime.now()
-    
-    c.execute("""
-        UPDATE users 
-        SET points = %s, last_pet_points_update = %s
-        WHERE user_id = %s
-    """, (new_total_points, now, str(interaction.user.id)))
-    
-    conn.commit()
-    
-    star_display = '⭐' * stars if stars > 0 else '⚪'
-    rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
-    rarity_color = rarity_colors.get(rarity, '🤍')
-    
-    embed = create_embed(
-        "💰 积分领取成功！",
-        f"{interaction.user.mention} 成功领取了宠物积分！\n\n"
-        f"🐾 **装备宠物：** {pet_name}\n"
-        f"{rarity_color} **稀有度：** {rarity}\n"
-        f"{star_display} **星级：** {stars}\n"
-        f"✨ **领取积分：** +{pending_points}\n"
-        f"💎 **当前总积分：** {new_total_points}\n\n"
-        f"🎉 继续让你的宠物为你赚取更多积分吧！",
-        discord.Color.green()
-    )
-    await interaction.response.send_message(embed=embed)
-    c.close()
-    conn.close()
+        # 使用新方法计算待领取积分
+        pet_commands = PetCommands(None)
+        pending_points = pet_commands.calculate_pending_points(user_internal_id)
+        
+        if not equipped_pet_id:
+            embed = create_embed(
+                "❌ 没有装备宠物",
+                f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
+                f"💰 **当前积分：** {current_points}\n\n"
+                f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+                discord.Color.orange()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        if pending_points <= 0:
+            star_display = '⭐' * stars if stars > 0 else '⚪'
+            rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+            rarity_color = rarity_colors.get(rarity, '🤍')
+            
+            embed = create_embed(
+                "💰 没有可领取的积分",
+                f"{interaction.user.mention} 当前没有可领取的积分！\n\n"
+                f"🐾 **装备宠物：** {pet_name}\n"
+                f"{rarity_color} **稀有度：** {rarity}\n"
+                f"{star_display} **星级：** {stars}\n"
+                f"💎 **当前积分：** {current_points}\n\n"
+                f"💡 宠物会随着时间自动累积积分，请稍后再来领取！",
+                discord.Color.blue()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # 领取积分
+        new_total_points = current_points + pending_points
+        now = datetime.datetime.now(datetime.timezone.utc)
+        
+        supabase.table('users').update({
+            'points': new_total_points,
+            'last_pet_points_update': now.isoformat(timespec='seconds')
+        }).eq('id', user_internal_id).execute()
+        
+        star_display = '⭐' * stars if stars > 0 else '⚪'
+        rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
+        rarity_color = rarity_colors.get(rarity, '🤍')
+        
+        embed = create_embed(
+            "💰 积分领取成功！",
+            f"{interaction.user.mention} 成功领取了宠物积分！\n\n"
+            f"🐾 **装备宠物：** {pet_name}\n"
+            f"{rarity_color} **稀有度：** {rarity}\n"
+            f"{star_display} **星级：** {stars}\n"
+            f"✨ **领取积分：** +{pending_points}\n"
+            f"💎 **当前总积分：** {new_total_points}\n\n"
+            f"🎉 继续让你的宠物为你赚取更多积分吧！",
+            discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        print(f"领取积分时发生错误：{str(e)}")
+        embed = create_embed(
+            "❌ 错误",
+            f"{interaction.user.mention} 领取积分时发生错误！",
+            discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
 
 def setup(bot):
     """注册斜杠命令"""

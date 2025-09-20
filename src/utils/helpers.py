@@ -23,6 +23,25 @@ def get_weighted_reward():
     # 从池中随机选择
     return random.choice(reward_pool)
 
+def get_user_internal_id(guild_id, discord_user_id):
+    """获取用户在数据库中的内部ID"""
+    supabase = get_connection()
+    
+    try:
+        # 确保参数是整数类型，匹配数据库的bigint字段
+        guild_id_int = int(guild_id)
+        discord_user_id_int = int(discord_user_id)
+        
+        user_result = supabase.table("users").select("id").eq("guild_id", guild_id_int).eq("discord_user_id", discord_user_id_int).execute()
+        
+        if user_result.data:
+            return user_result.data[0]["id"]
+        else:
+            return None
+    except Exception as e:
+        print(f"获取用户内部ID失败: {e}")
+        return None
+
 def get_guild_language(guild_id):
     """获取服务器的语言设置，如果没有则返回默认语言（英文）"""
     conn = get_connection()
@@ -41,4 +60,4 @@ def get_guild_language(guild_id):
     if not result:
         return "en"
     
-    return result[0] 
+    return result[0]

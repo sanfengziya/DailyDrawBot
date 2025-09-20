@@ -6,14 +6,21 @@ import os
 from src.db.database import get_connection
 
 async def ranking(ctx):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT user_id, points FROM users ORDER BY points DESC LIMIT 10")
-    rows = c.fetchall()
-    conn.close()
-
-    if not rows:
-        await ctx.send("没有排名数据。")
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+        
+        # 查询排名前10的用户
+        ranking_response = supabase.table('users').select('discord_user_id, points').order('points', desc=True).limit(10).execute()
+        
+        if not ranking_response.data:
+            await ctx.send("没有排名数据。")
+            return
+            
+        rows = [(user['discord_user_id'], user['points']) for user in ranking_response.data]
+        
+    except Exception as e:
+        await ctx.send(f"查询排名数据时出错：{str(e)}")
         return
 
     entries = []
@@ -55,4 +62,4 @@ async def ranking(ctx):
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
-    await ctx.send(file=File(fp=buffer, filename="ranking.png")) 
+    await ctx.send(file=File(fp=buffer, filename="ranking.png"))
