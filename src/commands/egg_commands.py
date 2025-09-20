@@ -610,4 +610,3 @@ class EggSelect(discord.ui.Select):
 def setup(bot):
     """注册斜杠命令"""
     bot.tree.add_command(egg)
-    bot.add_cog(EggCommands(bot))

@@ -1003,4 +1003,3 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
 def setup(bot):
     """注册斜杠命令"""
     bot.tree.add_command(pet)
-    bot.add_cog(PetCommands(bot))

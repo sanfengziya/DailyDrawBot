@@ -136,7 +136,7 @@ async def check(ctx, member=None):
         points, last_draw, paid_draws_today, last_paid_draw_date = row 
 
         embed = discord.Embed(
-            title=f"💰 {member.display_name} 的积分信息",
+            title=f"💰 {member.display_name if member else ctx.author.display_name} 的积分信息",
             color=discord.Color.blue()
         )
         embed.add_field(name="当前积分", value=f"**{points}** 分", inline=True)
