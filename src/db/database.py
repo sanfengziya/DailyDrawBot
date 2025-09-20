@@ -12,14 +12,13 @@ def init_db() -> None:
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
+            user_id VARCHAR(20) PRIMARY KEY,
             points INT DEFAULT 0,
             last_draw DATE,
             paid_draws_today INT DEFAULT 0,
             last_paid_draw_date DATE DEFAULT '1970-01-01',
             equipped_pet_id INT DEFAULT NULL COMMENT '当前装备的宠物ID',
-            last_pet_points_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上次宠物积分更新时间',
-            pending_pet_points INT DEFAULT 0 COMMENT '待领取的宠物积分'
+            last_pet_points_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上次宠物积分更新时间'
         )
         """
     )
@@ -50,15 +49,11 @@ def init_db() -> None:
             "ALTER TABLE users ADD COLUMN last_pet_points_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上次宠物积分更新时间'"
         )
     
-    c.execute("SHOW COLUMNS FROM users LIKE 'pending_pet_points'")
-    if not c.fetchone():
-        c.execute(
-            "ALTER TABLE users ADD COLUMN pending_pet_points INT DEFAULT 0 COMMENT '待领取的宠物积分'"
-        )
+
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS tags (
-            role_id BIGINT PRIMARY KEY,
+            role_id VARCHAR(20) PRIMARY KEY,
             price INT NOT NULL
         )
         """
@@ -81,7 +76,7 @@ def init_db() -> None:
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS guild_settings (
-            guild_id BIGINT PRIMARY KEY,
+            guild_id VARCHAR(20) PRIMARY KEY,
             language VARCHAR(10) DEFAULT 'en'
         )
         """
@@ -92,7 +87,7 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS player_eggs (
             egg_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT NOT NULL,
+            user_id VARCHAR(20) NOT NULL,
             egg_code VARCHAR(10) NOT NULL COMMENT '蛋的类型代码（C/R/SR/SSR）',
             status ENUM('待孵化','孵化中','已完成','已领取') DEFAULT '待孵化' COMMENT '蛋的状态',
             start_time DATETIME NULL COMMENT '开始孵化时间',
@@ -110,7 +105,7 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS pets (
             pet_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT NOT NULL,
+            user_id VARCHAR(20) NOT NULL,
             pet_name VARCHAR(100) NOT NULL,
             rarity VARCHAR(10) NOT NULL COMMENT '稀有度（C/R/SR/SSR）',
             stars INT DEFAULT 0 COMMENT '星级',
@@ -139,7 +134,7 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS pet_fragments (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT NOT NULL,
+            user_id VARCHAR(20) NOT NULL,
             rarity VARCHAR(10) NOT NULL COMMENT '碎片稀有度（C/R/SR/SSR）',
             amount INT DEFAULT 0 COMMENT '碎片数量',
             UNIQUE KEY unique_user_rarity (user_id, rarity),

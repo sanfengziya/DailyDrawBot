@@ -143,7 +143,7 @@ async def quiz(ctx, category, number):
                     not m.author.bot
                     and m.channel == ctx.channel
                     and m.content.upper() in ["A", "B", "C", "D", "1", "2", "3", "4"]
-                    and m.author.id not in attempted_users
+                    and str(m.author.id) not in attempted_users
                 )
 
             try:
@@ -151,7 +151,7 @@ async def quiz(ctx, category, number):
             except asyncio.TimeoutError:
                 break
 
-            attempted_users.add(reply.author.id)
+            attempted_users.add(str(reply.author.id))
             txt = reply.content.upper()
             if txt in ["1", "2", "3", "4"]:
                 choice = int(txt)
@@ -166,7 +166,7 @@ async def quiz(ctx, category, number):
                 c.execute(
                     "INSERT INTO users (user_id, points, last_draw) VALUES (%s, %s, %s) "
                     "ON DUPLICATE KEY UPDATE points = points + VALUES(points)",
-                    (reply.author.id, 10, "1970-01-01"),
+                    (str(reply.author.id), 10, "1970-01-01"),
                 )
                 conn.commit()
                 conn.close()

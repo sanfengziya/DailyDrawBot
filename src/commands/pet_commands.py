@@ -235,7 +235,7 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
         await handle_pet_list(interaction, page)
     elif action in ["info", "upgrade", "dismantle", "equip"]:
         # 显示宠物选择界面
-        view = PetSelectView(interaction.user.id, action)
+        view = PetSelectView(str(interaction.user.id), action)
         has_pets = await view.setup_select()
         
         if not has_pets:
@@ -284,12 +284,12 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         WHERE user_id = %s
         ORDER BY rarity DESC, stars DESC, created_at DESC
         LIMIT %s OFFSET %s
-    """, (interaction.user.id, per_page, offset))
+    """, (str(interaction.user.id), per_page, offset))
     
     pets = c.fetchall()
     
     # 获取总数
-    c.execute("SELECT COUNT(*) FROM pets WHERE user_id = %s", (interaction.user.id,))
+    c.execute("SELECT COUNT(*) FROM pets WHERE user_id = %s", (str(interaction.user.id),))
     total_pets = c.fetchone()[0]
     
     c.close()
@@ -336,7 +336,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         SELECT pet_name, rarity, stars, max_stars, created_at
         FROM pets
         WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, interaction.user.id))
+    """, (pet_id, str(interaction.user.id)))
     
     result = c.fetchone()
     c.close()
@@ -404,7 +404,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         SELECT pet_name, rarity, stars, max_stars
         FROM pets
         WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, interaction.user.id))
+    """, (pet_id, str(interaction.user.id)))
     
     result = c.fetchone()
     if not result:
@@ -442,7 +442,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         FROM users u
         LEFT JOIN pet_fragments pf ON u.user_id = pf.user_id AND pf.rarity = %s
         WHERE u.user_id = %s
-    """, (rarity, interaction.user.id))
+    """, (rarity, str(interaction.user.id)))
     
     resource_result = c.fetchone()
     if not resource_result:
@@ -483,14 +483,14 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     # 执行升星
     # 扣除积分
     c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", 
-             (required_points, interaction.user.id))
+             (required_points, str(interaction.user.id)))
     
     # 扣除碎片
     c.execute("""
         UPDATE pet_fragments 
         SET amount = amount - %s 
         WHERE user_id = %s AND rarity = %s
-    """, (required_fragments, interaction.user.id, rarity))
+    """, (required_fragments, str(interaction.user.id), rarity))
     
     # 升星
     c.execute("UPDATE pets SET stars = stars + 1 WHERE pet_id = %s", (pet_id,))
@@ -521,7 +521,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         SELECT pet_name, rarity, stars
         FROM pets
         WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, interaction.user.id))
+    """, (pet_id, str(interaction.user.id)))
     
     result = c.fetchone()
     if not result:
@@ -556,7 +556,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         discord.Color.orange()
     )
     
-    view = DismantleConfirmView(interaction.user.id, pet_id, pet_name, rarity, total_fragments, total_points)
+    view = DismantleConfirmView(str(interaction.user.id), pet_id, pet_name, rarity, total_fragments, total_points)
     await interaction.response.send_message(embed=embed, view=view)
 
 async def handle_pet_fragments(interaction: discord.Interaction):
@@ -575,7 +575,7 @@ async def handle_pet_fragments(interaction: discord.Interaction):
                 WHEN 'R' THEN 3 
                 WHEN 'C' THEN 4 
             END
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     
     fragments = c.fetchall()
     c.close()
@@ -620,7 +620,7 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='确认分解', style=discord.ButtonStyle.danger, emoji='💥')
     async def confirm_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
+        if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
@@ -670,7 +670,7 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='取消', style=discord.ButtonStyle.secondary, emoji='❌')
     async def cancel_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
+        if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
@@ -691,7 +691,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         SELECT pet_name, rarity, stars
         FROM pets
         WHERE pet_id = %s AND user_id = %s
-    """, (pet_id, interaction.user.id))
+    """, (pet_id, str(interaction.user.id)))
     
     result = c.fetchone()
     if not result:
@@ -708,7 +708,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     pet_name, rarity, stars = result
     
     # 检查是否已经装备了这只宠物
-    c.execute("SELECT equipped_pet_id FROM users WHERE user_id = %s", (interaction.user.id,))
+    c.execute("SELECT equipped_pet_id FROM users WHERE user_id = %s", (str(interaction.user.id),))
     current_equipped = c.fetchone()
     
     if current_equipped and current_equipped[0] == pet_id:
@@ -724,7 +724,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     
     # 检查是否有待领取的积分
     pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
     if pending_points > 0:
         embed = create_embed(
             "⚠️ 请先领取积分",
@@ -740,7 +740,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     # 如果有其他宠物装备，先更新积分累积
     if current_equipped and current_equipped[0]:
         pet_commands = PetCommands(None)
-        pet_commands.update_pet_points(interaction.user.id)
+        pet_commands.update_pet_points(str(interaction.user.id))
     
     # 装备新宠物
     now = datetime.datetime.now()
@@ -748,7 +748,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         UPDATE users 
         SET equipped_pet_id = %s, last_pet_points_update = %s 
         WHERE user_id = %s
-    """, (pet_id, now, interaction.user.id))
+    """, (pet_id, now, str(interaction.user.id)))
     
     conn.commit()
     c.close()
@@ -757,7 +757,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     # 计算每小时积分和待领取积分
     pet_commands = PetCommands(None)
     hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
-    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
     
     star_display = '⭐' * stars if stars > 0 else '⚪'
     rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
@@ -785,7 +785,7 @@ async def handle_pet_unequip(interaction: discord.Interaction):
         FROM users u
         LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
         WHERE u.user_id = %s AND u.equipped_pet_id IS NOT NULL
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     
     result = c.fetchone()
     if not result:
@@ -803,7 +803,7 @@ async def handle_pet_unequip(interaction: discord.Interaction):
     
     # 检查是否有待领取的积分
     pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
     if pending_points > 0:
         embed = create_embed(
             "⚠️ 请先领取积分",
@@ -818,14 +818,14 @@ async def handle_pet_unequip(interaction: discord.Interaction):
     
     # 更新积分累积
     pet_commands = PetCommands(None)
-    pet_commands.update_pet_points(interaction.user.id)
+    pet_commands.update_pet_points(str(interaction.user.id))
     
     # 卸下宠物
     c.execute("""
         UPDATE users 
         SET equipped_pet_id = NULL, last_pet_points_update = NULL 
         WHERE user_id = %s
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     
     conn.commit()
     c.close()
@@ -850,7 +850,7 @@ async def handle_pet_status(interaction: discord.Interaction):
         FROM users u
         LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
         WHERE u.user_id = %s
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     
     result = c.fetchone()
     if not result:
@@ -882,7 +882,7 @@ async def handle_pet_status(interaction: discord.Interaction):
     # 计算每小时积分和待领取积分
     pet_commands = PetCommands(None)
     hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
-    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
     
     star_display = '⭐' * stars if stars > 0 else '⚪'
     rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
@@ -915,7 +915,7 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         FROM users u
         LEFT JOIN pets p ON u.equipped_pet_id = p.pet_id
         WHERE u.user_id = %s
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     
     result = c.fetchone()
     
@@ -934,7 +934,7 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
     
     # 使用新方法计算待领取积分
     pet_commands = PetCommands(None)
-    pending_points = pet_commands.calculate_pending_points(interaction.user.id)
+    pending_points = pet_commands.calculate_pending_points(str(interaction.user.id))
     
     if not equipped_pet_id:
         embed = create_embed(
@@ -977,7 +977,7 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         UPDATE users 
         SET points = %s, last_pet_points_update = %s
         WHERE user_id = %s
-    """, (new_total_points, now, interaction.user.id))
+    """, (new_total_points, now, str(interaction.user.id)))
     
     conn.commit()
     

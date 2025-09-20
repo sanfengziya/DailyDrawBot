@@ -7,7 +7,7 @@ from src.utils.helpers import now_est, get_weighted_reward
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
 
 async def draw(ctx):
-    user_id = ctx.author.id
+    user_id = str(ctx.author.id)
     now = now_est()
     today = now.date()
 
@@ -125,9 +125,7 @@ async def draw(ctx):
     await ctx.send(embed=embed)
 
 async def check(ctx, member=None):
-    if member is None:
-        member = ctx.author
-    user_id = member.id
+    user_id = str(member.id) if member else str(ctx.author.id)
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
@@ -178,7 +176,7 @@ async def check(ctx, member=None):
         await ctx.send(embed=embed)
 
 async def reset_draw(ctx, member):
-    user_id = member.id
+    user_id = str(member.id)
     yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
 
     conn = get_connection()

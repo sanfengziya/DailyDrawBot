@@ -5,7 +5,7 @@ from src.utils.helpers import now_est
 
 async def debug_user(ctx, member):
     """调试用户的付费抽奖信息"""
-    user_id = member.id
+    user_id = str(member.id)
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT points, last_draw, paid_draws_today, last_paid_draw_date FROM users WHERE user_id = %s", (user_id,))
@@ -34,7 +34,7 @@ async def debug_user(ctx, member):
 
 async def test_update(ctx, member):
     """测试付费抽奖的数据库更新"""
-    user_id = member.id
+    user_id = str(member.id)
     today = now_est().date()
     
     conn = get_connection()
@@ -110,7 +110,7 @@ async def check_database(ctx):
 
 async def detailed_debug(ctx, member):
     """付费抽奖逻辑的详细调试"""
-    user_id = member.id
+    user_id = str(member.id)
     today = now_est().date()
     
     conn = get_connection()
@@ -220,4 +220,4 @@ async def testdraw(ctx, times=100):
             inline=True
         )
     
-    await ctx.send(embed=embed) 
+    await ctx.send(embed=embed)

@@ -104,12 +104,12 @@ async def handle_egg_draw(interaction: discord.Interaction):
     conn = get_connection()
     c = conn.cursor()
     
-    c.execute("SELECT points FROM users WHERE user_id = %s", (interaction.user.id,))
+    c.execute("SELECT points FROM users WHERE user_id = %s", (str(interaction.user.id),))
     result = c.fetchone()
     
     if not result:
         # 创建新用户
-        c.execute("INSERT INTO users (user_id, points) VALUES (%s, 0)", (interaction.user.id,))
+        c.execute("INSERT INTO users (user_id, points) VALUES (%s, 0)", (str(interaction.user.id),))
         conn.commit()
         points = 0
     else:
@@ -152,7 +152,7 @@ async def handle_egg_hatch(interaction: discord.Interaction):
     c.execute("""
         SELECT egg_id, egg_code, start_time, end_time FROM player_eggs 
         WHERE user_id = %s AND status = '孵化中'
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     incubating_egg = c.fetchone()
     
     if incubating_egg:
@@ -197,7 +197,7 @@ async def handle_egg_hatch(interaction: discord.Interaction):
         WHERE user_id = %s AND status = '待孵化'
         ORDER BY created_at DESC
         LIMIT 25
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     eggs = c.fetchall()
     
     if not eggs:
@@ -231,7 +231,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         WHERE user_id = %s AND status = '孵化中' AND end_time <= %s
         ORDER BY end_time ASC
         LIMIT 10
-    """, (interaction.user.id, current_time))
+    """, (str(interaction.user.id), current_time))
     ready_eggs = c.fetchall()
     
     if not ready_eggs:
@@ -275,7 +275,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         c.execute("""
             INSERT INTO pets (user_id, pet_name, rarity, stars, max_stars, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
-        """, (interaction.user.id, pet_name, pet_rarity, initial_stars, EggCommands.MAX_STARS[pet_rarity], datetime.datetime.now()))
+        """, (str(interaction.user.id), pet_name, pet_rarity, initial_stars, EggCommands.MAX_STARS[pet_rarity], datetime.datetime.now()))
         
         # 更新蛋状态
         c.execute("""
@@ -323,7 +323,7 @@ async def egg_list(interaction: discord.Interaction):
         SELECT egg_id, egg_code, created_at FROM player_eggs 
         WHERE user_id = %s AND status = '待孵化'
         ORDER BY created_at DESC
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     eggs = c.fetchall()
     
     # 查询孵化中的蛋
@@ -331,7 +331,7 @@ async def egg_list(interaction: discord.Interaction):
         SELECT egg_id, egg_code, start_time, end_time FROM player_eggs
         WHERE user_id = %s AND status = '孵化中'
         ORDER BY end_time ASC
-    """, (interaction.user.id,))
+    """, (str(interaction.user.id),))
     incubating = c.fetchall()
     
     # 查询可领取的蛋
@@ -339,7 +339,7 @@ async def egg_list(interaction: discord.Interaction):
     c.execute("""
         SELECT COUNT(*) FROM player_eggs 
         WHERE user_id = %s AND status = '孵化中' AND end_time <= %s
-    """, (interaction.user.id, current_time))
+    """, (str(interaction.user.id), current_time))
     ready_count = c.fetchone()[0]
     
     c.close()
@@ -433,7 +433,7 @@ class EggDrawView(discord.ui.View):
         c = conn.cursor()
         
         # 检查积分
-        c.execute("SELECT points FROM users WHERE user_id = %s", (interaction.user.id,))
+        c.execute("SELECT points FROM users WHERE user_id = %s", (str(interaction.user.id),))
         result = c.fetchone()
         
         if not result or result[0] < cost:
@@ -449,7 +449,7 @@ class EggDrawView(discord.ui.View):
         await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
         
         # 扣除积分
-        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (cost, interaction.user.id))
+        c.execute("UPDATE users SET points = points - %s WHERE user_id = %s", (cost, str(interaction.user.id)))
         
         # 纯概率抽蛋
         results = self.draw_eggs(count)
@@ -461,7 +461,7 @@ class EggDrawView(discord.ui.View):
             c.execute("""
                 INSERT INTO player_eggs (user_id, egg_code, status, created_at)
                 VALUES (%s, %s, '待孵化', %s)
-            """, (interaction.user.id, egg_code, datetime.datetime.now()))
+            """, (str(interaction.user.id), egg_code, datetime.datetime.now()))
         
         # 不再需要抽蛋统计（已删除保底机制）
         
@@ -584,7 +584,7 @@ class EggSelect(discord.ui.Select):
             UPDATE player_eggs 
             SET status = '孵化中', start_time = %s, end_time = %s
             WHERE egg_id = %s AND user_id = %s
-        """, (start_time, end_time, egg_id, interaction.user.id))
+        """, (start_time, end_time, egg_id, str(interaction.user.id)))
         
         conn.commit()
         c.close()
