@@ -407,17 +407,31 @@ async def handle_egg_claim(interaction: discord.Interaction):
         return
     
     # 创建结果展示
-    result_text = ""
-    for pet in claimed_pets:
-        stars_text = "⭐" * pet['stars']
-        result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text}\n"
-    
-    embed = create_embed(
-        "🎉 宠物领取成功！",
-        f"恭喜 {interaction.user.mention} 获得了以下宠物：\n\n{result_text}\n"
-        f"总共领取了 **{len(claimed_pets)}** 只宠物！",
-        discord.Color.gold()
-    )
+    if not claimed_pets:
+        # 如果没有领取到任何宠物
+        embed = create_embed(
+            "⏰ 暂无可领取的宠物",
+            f"{interaction.user.mention} 目前没有可以领取的宠物！\n\n"
+            "可能的原因：\n"
+            "• 蛋还在孵化中，请耐心等待\n"
+            "• 所有蛋都已经领取过了\n"
+            "• 系统数据异常\n\n"
+            "请稍后再试或联系管理员！",
+            discord.Color.orange()
+        )
+    else:
+        # 如果成功领取到宠物
+        result_text = ""
+        for pet in claimed_pets:
+            stars_text = "⭐" * pet['stars']
+            result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text}\n"
+        
+        embed = create_embed(
+            "🎉 宠物领取成功！",
+            f"恭喜 {interaction.user.mention} 获得了以下宠物：\n\n{result_text}\n"
+            f"总共领取了 **{len(claimed_pets)}** 只宠物！",
+            discord.Color.gold()
+        )
     
     await interaction.response.send_message(embed=embed)
 
