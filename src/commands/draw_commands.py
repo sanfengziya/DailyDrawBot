@@ -3,7 +3,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 from src.db.database import get_connection
-from src.utils.helpers import now_est, get_weighted_reward
+from src.utils.helpers import now_est, get_weighted_reward, get_user_id_with_validation_ctx
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
 
 async def draw(ctx):
@@ -219,25 +219,21 @@ async def check(ctx, member=None):
         await ctx.send(embed=embed)
 
 async def reset_draw(ctx, member):
-    discord_user_id = member.id
-    guild_id = ctx.guild.id
     yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
+
+    # 获取用户ID并验证
+    user_id, success = await get_user_id_with_validation_ctx(ctx, member)
+    if not success:
+        return
 
     try:
         supabase = get_connection()
         
-        # 检查用户是否存在
-        user_response = supabase.table('users').select('id').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
-        
-        if user_response.data:
-            user_id = user_response.data[0]['id']
-            # 更新用户的抽奖状态
-            supabase.table('users').update({
-                'last_draw_date': yesterday
-            }).eq('id', user_id).execute()
-            await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
-        else:
-            await ctx.send(f"{ctx.author.mention} 该用户还没有抽奖记录，无法重置。")
+        # 更新用户的抽奖状态
+        supabase.table('users').update({
+            'last_draw_date': yesterday
+        }).eq('id', user_id).execute()
+        await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
             
     except Exception as e:
         await ctx.send(f"重置抽奖状态时出错：{str(e)}")

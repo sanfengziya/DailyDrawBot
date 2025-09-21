@@ -385,9 +385,9 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         return
     
     embed = create_embed(
-        f"🐾 {interaction.user.mention} 的宠物 (第 {page}/{total_pages} 页)",
-        description,
-        discord.Color.blue()
+        title="宠物查询",
+        description=f"{interaction.user.mention} 的宠物 (第 {page}/{total_pages} 页)\n {description}",
+        color=discord.Color.blue()
     )
     embed.set_footer(text=f"总共 {total_pets} 只宠物")
     await interaction.response.send_message(embed=embed)
@@ -751,9 +751,9 @@ async def handle_pet_fragments(interaction: discord.Interaction):
         description += f"{rarity_colors[rarity]} **{rarity} 碎片：** {amount} 个\n"
     
     embed = create_embed(
-        f"🧩 {interaction.user.mention} 的碎片",
-        description,
-        discord.Color.purple()
+        title="🧩 我的碎片",
+        description=f"{interaction.user.mention} 的碎片\n {description}",
+        color=discord.Color.purple()
     )
     await interaction.response.send_message(embed=embed)
 

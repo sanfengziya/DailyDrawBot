@@ -6,6 +6,7 @@ import datetime
 from src.db.database import get_connection
 from src.utils.ui import create_embed
 from src.config.languages import get_text
+from src.utils.helpers import get_user_id_with_validation, get_user_data_with_validation, get_user_data_sync
 
 class EggCommands(commands.Cog):
     def __init__(self, bot):
@@ -183,18 +184,12 @@ async def handle_egg_list(interaction: discord.Interaction):
 async def handle_egg_hatch(interaction: discord.Interaction):
     """处理孵化蛋功能"""
     supabase = get_connection()
-    discord_user_id = interaction.user.id
-    guild_id = interaction.guild.id
     
     try:
-        # 首先获取用户的 user_id
-        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
-        
-        if not user_response.data:
-            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+        # 获取用户ID并验证
+        user_id, success = await get_user_id_with_validation(interaction)
+        if not success:
             return
-            
-        user_id = user_response.data[0]["id"]
         
         # 首先检查是否已经有蛋在孵化中
         result = supabase.table("user_eggs").select("id, rarity, hatch_started_at, hatch_completed_at").eq("user_id", user_id).eq("status", "hatching").execute()
@@ -286,18 +281,12 @@ async def handle_egg_hatch(interaction: discord.Interaction):
 async def handle_egg_claim(interaction: discord.Interaction):
     """处理领取宠物功能"""
     supabase = get_connection()
-    discord_user_id = interaction.user.id
-    guild_id = interaction.guild.id
     
     try:
-        # 首先获取用户的 user_id
-        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
-        
-        if not user_response.data:
-            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+        # 获取用户ID并验证
+        user_id, success = await get_user_id_with_validation(interaction)
+        if not success:
             return
-            
-        user_id = user_response.data[0]["id"]
         
         # 查询已完成孵化的蛋
         current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -439,17 +428,11 @@ async def egg_list(interaction: discord.Interaction):
     """查看蛋和孵化状态"""
     try:
         supabase = get_connection()
-        discord_user_id = interaction.user.id
-        guild_id = interaction.guild.id
         
-        # 首先获取用户的 user_id
-        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
-        
-        if not user_response.data:
-            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=True)
+        # 获取用户ID并验证
+        user_id, success = await get_user_id_with_validation(interaction)
+        if not success:
             return
-            
-        user_id = user_response.data[0]["id"]
         
         # 查询用户的蛋
         eggs_response = supabase.table('user_eggs').select('id, rarity, created_at').eq('user_id', user_id).eq('status', 'pending').order('created_at', desc=True).execute()
@@ -560,27 +543,28 @@ class EggDrawView(discord.ui.View):
         """执行抽蛋"""
         try:
             supabase = get_connection()
-            discord_user_id = interaction.user.id
-            guild_id = interaction.guild.id
             
-            # 检查积分
-            user_response = supabase.table('users').select('id, points').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
+            # 获取用户数据并检查积分
+            user_data, success, error_msg = get_user_data_sync(interaction, 'id, points')
             
-            if not user_response.data or user_response.data[0]['points'] < cost:
-                current_points = user_response.data[0]['points'] if user_response.data else 0
+            if not success:
+                await interaction.response.send_message(error_msg, ephemeral=True)
+                return
+                
+            if user_data['points'] < cost:
                 await interaction.response.send_message(
-                    f"积分不足！需要 {cost} 积分，你只有 {current_points} 积分。",
+                    f"积分不足！需要 {cost} 积分，你只有 {user_data['points']} 积分。",
                     ephemeral=True
                 )
                 return
             
-            user_id = user_response.data[0]['id']
+            user_id = user_data['id']
             
             # 先发送初始响应，避免交互超时
             await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
             
             # 扣除积分
-            supabase.table('users').update({'points': user_response.data[0]['points'] - cost}).eq('id', user_id).execute()
+            supabase.table('users').update({'points': user_data['points'] - cost}).eq('id', user_id).execute()
             
             # 纯概率抽蛋
             results = self.draw_eggs(count)
