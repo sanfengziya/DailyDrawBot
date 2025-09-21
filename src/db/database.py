@@ -220,22 +220,72 @@ def create_user_by_guild_and_discord_id(guild_id: str, discord_user_id: str) -> 
         if existing_user:
             return existing_user
         
-        # 创建新用户
-        result = db_helper.execute_query(
-            "users",
-            "insert",
-            data={
-                "guild_id": guild_id,
-                "discord_user_id": discord_user_id,
-                "points": 0,
-                "last_draw_date": None,
-                "paid_draws_today": 0,
-                "last_paid_draw_date": "1970-01-01",
-                "equipped_pet_id": None,
-                "last_pet_points_update": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
-            }
-        )
-        return result.data[0] if result.data else None
+        # 创建新用户 - 优先使用缺失的ID（1-6）
+        missing_id = get_missing_user_id()
+        
+        if missing_id is not None:
+            # 使用缺失的ID创建用户
+            return create_user_with_specific_id(missing_id, guild_id, discord_user_id)
+        else:
+            # 1-6都已存在，使用正常的自增长ID
+            result = db_helper.execute_query(
+                "users",
+                "insert",
+                data={
+                    "guild_id": guild_id,
+                    "discord_user_id": discord_user_id,
+                    "points": 0,
+                    "last_draw_date": None,
+                    "paid_draws_today": 0,
+                    "last_paid_draw_date": "1970-01-01",
+                    "equipped_pet_id": None,
+                    "last_pet_points_update": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+                }
+            )
+            return result.data[0] if result.data else None
     except Exception as e:
         print(f"创建用户错误: {e}")
+        return None
+
+def get_missing_user_id() -> Optional[int]:
+    """
+    检查1-6范围内缺失的第一个用户ID
+    返回缺失的第一个ID，如果1-6都存在则返回None
+    """
+    try:
+        supabase = get_connection()
+        
+        # 检查1-6这些ID是否存在
+        for user_id in range(1, 7):
+            response = supabase.table('users').select('id').eq('id', user_id).execute()
+            if not response.data:  # 如果这个ID不存在
+                return user_id
+        
+        return None  # 1-6都存在，返回None
+    except Exception as e:
+        print(f"检查缺失ID错误: {e}")
+        return None
+
+def create_user_with_specific_id(user_id: int, guild_id: str, discord_user_id: str) -> Optional[Dict]:
+    """
+    创建指定ID的用户
+    """
+    try:
+        supabase = get_connection()
+        
+        result = supabase.table('users').insert({
+            'id': user_id,
+            'guild_id': guild_id,
+            'discord_user_id': discord_user_id,
+            'points': 0,
+            'last_draw_date': '1970-01-01',
+            'paid_draws_today': 0,
+            'last_paid_draw_date': '1970-01-01',
+            'equipped_pet_id': None,
+            'last_pet_points_update': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+        }).execute()
+        
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"创建指定ID用户错误: {e}")
         return None

@@ -5,8 +5,7 @@ import random
 import datetime
 from src.db.database import get_connection
 from src.utils.ui import create_embed
-from src.config.languages import get_text
-from src.utils.helpers import get_user_id_with_validation, get_user_data_with_validation, get_user_data_sync
+from src.utils.helpers import get_user_internal_id, get_user_data_sync
 
 class EggCommands(commands.Cog):
     def __init__(self, bot):
@@ -15,22 +14,6 @@ class EggCommands(commands.Cog):
     # 抽蛋成本配置
     SINGLE_DRAW_COST = 500
     TEN_DRAW_COST = 4500
-    
-    # 星级配置
-    MAX_STARS = {
-        'C': 2,
-        'R': 3,
-        'SR': 4,
-        'SSR': 6
-    }
-    
-    # 初始星级范围
-    INITIAL_STARS = {
-        'C': (0, 1),
-        'R': (0, 2),
-        'SR': (1, 2),
-        'SSR': (1, 3)
-    }
     
     @staticmethod
     def get_pet_names():
@@ -126,23 +109,13 @@ async def handle_egg_draw(interaction: discord.Interaction):
     """处理抽蛋功能"""
     # 检查用户积分
     supabase = get_connection()
-    discord_user_id = interaction.user.id
-    guild_id = interaction.guild.id
     
     try:
-        result = supabase.table("users").select("points").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
+        user_internal_id = get_user_internal_id(interaction)
+        result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
         
         if not result.data:
-            # 创建新用户
-            supabase.table("users").insert({
-                "guild_id": guild_id,
-                "discord_user_id": discord_user_id,
-                "points": 0,
-                "last_draw_date": "1970-01-01",
-                "paid_draws_today": 0,
-                "last_paid_draw_date": "1970-01-01"
-            }).execute()
-            points = 0
+            raise Exception("用户积分不存在")
         else:
             points = result.data[0]["points"]
         
@@ -187,8 +160,8 @@ async def handle_egg_hatch(interaction: discord.Interaction):
     
     try:
         # 获取用户ID并验证
-        user_id, success = await get_user_id_with_validation(interaction)
-        if not success:
+        user_id = get_user_internal_id(interaction)
+        if not user_id:
             return
         
         # 首先检查是否已经有蛋在孵化中
@@ -284,8 +257,8 @@ async def handle_egg_claim(interaction: discord.Interaction):
     
     try:
         # 获取用户ID并验证
-        user_id, success = await get_user_id_with_validation(interaction)
-        if not success:
+        user_id = get_user_internal_id(interaction)
+        if not user_id:
             return
         
         # 查询已完成孵化的蛋
@@ -430,8 +403,8 @@ async def egg_list(interaction: discord.Interaction):
         supabase = get_connection()
         
         # 获取用户ID并验证
-        user_id, success = await get_user_id_with_validation(interaction)
-        if not success:
+        user_id = get_user_internal_id(interaction)
+        if not user_id:
             return
         
         # 查询用户的蛋

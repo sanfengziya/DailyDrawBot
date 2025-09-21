@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import random
 import datetime
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id
@@ -176,11 +175,10 @@ class PetSelectView(discord.ui.View):
             
         # 稀有度颜色映射
         rarity_emojis = {
-            "普通": "⚪",
-            "稀有": "🔵", 
-            "史诗": "🟣",
-            "传说": "🟡",
-            "神话": "🔴"
+            "C": "⚪",
+            "R": "🔵", 
+            "SR": "🟣",
+            "SSR": "🟡",
         }
         
         options = []
@@ -254,7 +252,7 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
         await handle_pet_list(interaction, page)
     elif action in ["info", "upgrade", "dismantle", "equip"]:
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -302,7 +300,7 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -399,7 +397,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -440,15 +438,6 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         stars = pet_data['stars']
         max_stars = rarity_response.data[0]['max_stars']
         created_at = pet_data['created_at']
-        
-        if stars >= max_stars:
-            embed = create_embed(
-                "⭐ 已满星",
-                f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
-                discord.Color.yellow()
-            )
-            await interaction.response.send_message(embed=embed)
-            return
     
     except Exception as e:
         embed = create_embed(
@@ -477,11 +466,12 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         upgrade_info = "\n**已达到最大星级！**"
     
     embed = create_embed(
-        f"{rarity_colors[rarity]} {interaction.user.mention} 的 {pet_name}",
+        "宠物信息",
+        f"{rarity_colors[rarity]} {interaction.user.mention} 的 {pet_name}\n"
         f"**宠物ID：** {pet_id}\n"
         f"**稀有度：** {rarity}\n"
         f"**星级：** {star_display} ({stars}/{max_stars})\n"
-        f"**获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d %H:%M:%S')}"
+        f"**获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d')}"
         f"{upgrade_info}",
         discord.Color.green()
     )
@@ -494,7 +484,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -622,7 +612,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -704,7 +694,7 @@ async def handle_pet_fragments(interaction: discord.Interaction):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -853,7 +843,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -963,7 +953,7 @@ async def handle_pet_unequip(interaction: discord.Interaction):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1051,7 +1041,7 @@ async def handle_pet_status(interaction: discord.Interaction):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if user_internal_id is None:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1143,7 +1133,7 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(interaction.guild.id, interaction.user.id)
+        user_internal_id = get_user_internal_id(interaction)
         if user_internal_id is None:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)

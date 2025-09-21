@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import datetime
-from src.db.database import get_connection
+from src.db.database import get_connection, get_missing_user_id, create_user_with_specific_id
 from src.utils.helpers import now_est, get_weighted_reward, get_user_id_with_validation_ctx
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
 
@@ -25,17 +25,30 @@ async def draw(ctx):
             paid_draws_today = user_data['paid_draws_today'] or 0
             last_paid_draw_date = datetime.datetime.strptime(user_data['last_paid_draw_date'], '%Y-%m-%d').date() if user_data['last_paid_draw_date'] else datetime.date(1970, 1, 1)
         else:
-            # 创建新用户
-            create_response = supabase.table('users').insert({
-                'guild_id': ctx.guild.id,
-                'discord_user_id': ctx.author.id,
-                'points': 0,
-                'last_draw_date': '1970-01-01',
-                'paid_draws_today': 0,
-                'last_paid_draw_date': '1970-01-01'
-            }).execute()
-            user_id = create_response.data[0]['id']
-            points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
+            # 创建新用户 - 优先使用缺失的ID（1-6）
+            missing_id = get_missing_user_id()
+            
+            if missing_id is not None:
+                # 使用缺失的ID创建用户
+                create_response = create_user_with_specific_id(missing_id, ctx.guild.id, ctx.author.id)
+                if create_response:
+                    user_id = create_response['id']
+                    points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
+                else:
+                    await ctx.send("创建用户时出错，请稍后重试。")
+                    return
+            else:
+                # 1-6都已存在，使用正常的自增长ID
+                create_response = supabase.table('users').insert({
+                    'guild_id': ctx.guild.id,
+                    'discord_user_id': ctx.author.id,
+                    'points': 0,
+                    'last_draw_date': '1970-01-01',
+                    'paid_draws_today': 0,
+                    'last_paid_draw_date': '1970-01-01'
+                }).execute()
+                user_id = create_response.data[0]['id']
+                points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
             
     except Exception as e:
         await ctx.send(f"查询用户数据时出错：{str(e)}")

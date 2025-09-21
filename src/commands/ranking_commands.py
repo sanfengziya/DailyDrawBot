@@ -3,7 +3,6 @@ from discord import File
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import os
-from src.db.database import get_connection
 
 async def ranking(ctx):
     try:

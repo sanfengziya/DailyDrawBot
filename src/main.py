@@ -6,7 +6,7 @@ from discord.ext import commands
 import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
-from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, language_commands, egg_commands, pet_commands
+from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands
 
 # 设置机器人
 intents = discord.Intents.default()
@@ -157,9 +157,6 @@ async def ranking(ctx):
 @bot.tree.command(name="help", description="显示所有可用命令的帮助信息")
 async def help_command(interaction: discord.Interaction):
     await help_commands.help_command(interaction)
-
-# 注册语言命令
-language_commands.setup(bot)
 
 def main():
     # 运行机器人

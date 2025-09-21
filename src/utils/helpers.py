@@ -23,14 +23,14 @@ def get_weighted_reward():
     # 从池中随机选择
     return random.choice(reward_pool)
 
-def get_user_internal_id(guild_id, discord_user_id):
+def get_user_internal_id(interaction):
     """获取用户在数据库中的内部ID"""
     supabase = get_connection()
     
     try:
         # 确保参数是整数类型，匹配数据库的bigint字段
-        guild_id_int = int(guild_id)
-        discord_user_id_int = int(discord_user_id)
+        guild_id_int = int(interaction.guild.id)
+        discord_user_id_int = int(interaction.user.id)
         
         user_result = supabase.table("users").select("id").eq("guild_id", guild_id_int).eq("discord_user_id", discord_user_id_int).execute()
         
@@ -41,36 +41,6 @@ def get_user_internal_id(guild_id, discord_user_id):
     except Exception as e:
         print(f"获取用户内部ID失败: {e}")
         return None
-
-async def get_user_id_with_validation(interaction, ephemeral=True):
-    """
-    获取用户ID并验证用户是否存在
-    
-    Args:
-        interaction: Discord交互对象
-        ephemeral: 错误消息是否为私密消息
-    
-    Returns:
-        tuple: (user_id, success) - 如果成功返回(user_id, True)，失败返回(None, False)
-    """
-    supabase = get_connection()
-    discord_user_id = interaction.user.id
-    guild_id = str(interaction.guild.id)
-    
-    try:
-        user_response = supabase.table("users").select("id").eq("discord_user_id", discord_user_id).eq("guild_id", guild_id).execute()
-        
-        if not user_response.data:
-            await interaction.response.send_message("你还没有注册，请先使用其他功能来创建账户！", ephemeral=ephemeral)
-            return None, False
-            
-        user_id = user_response.data[0]["id"]
-        return user_id, True
-        
-    except Exception as e:
-        print(f"获取用户ID失败: {e}")
-        await interaction.response.send_message("系统错误，请稍后再试！", ephemeral=ephemeral)
-        return None, False
 
 async def get_user_data_with_validation(interaction, fields="id", ephemeral=True):
     """
@@ -163,23 +133,3 @@ async def get_user_id_with_validation_ctx(ctx, target_user=None):
     except Exception as e:
         await ctx.send(f"获取用户信息时出错：{str(e)}")
         return None, False
-
-def get_guild_language(guild_id):
-    """获取服务器的语言设置，如果没有则返回默认语言（英文）"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT language FROM guild_settings WHERE guild_id = %s",
-        (guild_id,)
-    )
-    result = cursor.fetchone()
-    
-    cursor.close()
-    conn.close()
-    
-    # 如果没有设置，返回默认语言（英文）
-    if not result:
-        return "en"
-    
-    return result[0]
