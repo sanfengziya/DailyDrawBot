@@ -685,7 +685,7 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
     )
     
     view = DismantleConfirmView(str(interaction.user.id), user_internal_id, pet_id, pet_name, rarity, total_fragments, total_points)
-    await interaction.response.send_message(embed=embed, view=view)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def handle_pet_fragments(interaction: discord.Interaction):
     """查看碎片库存"""
