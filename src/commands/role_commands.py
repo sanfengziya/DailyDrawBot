@@ -54,7 +54,7 @@ async def buytag(ctx, role_name):
         price = tag_result.data[0]["price"]
 
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(ctx.guild.id, ctx.author.id)
+        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, ctx.author.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
@@ -147,7 +147,7 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
             return
         
         # 获取接收者内部ID
-        receiver_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+        receiver_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
         if not receiver_internal_id:
             await ctx.send("❌ 接收者信息获取失败，请稍后重试。")
             return
@@ -222,7 +222,7 @@ async def setpoints(ctx, member: discord.Member, points: int):
     
     try:
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
