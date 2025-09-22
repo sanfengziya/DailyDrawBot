@@ -214,7 +214,7 @@ async def check(ctx, member=None):
         # 只有在确实是新的一天且需要显示重置值时才重置
         # 出于显示目的，我们将显示实际的数据库值
         display_paid_draws = paid_draws_today
-        if last_paid_draw_date != today:
+        if str(last_paid_draw_date) != str(today):
             # 这只是用于显示计算，不修改实际值
             display_paid_draws = 0
         
@@ -230,67 +230,3 @@ async def check(ctx, member=None):
             color=discord.Color.red()
         )
         await ctx.send(embed=embed)
-
-async def reset_draw(ctx, member):
-    yesterday = (now_est().date() - datetime.timedelta(days=1)).isoformat()
-
-    # 获取用户ID并验证
-    user_id, success = await get_user_id_with_validation_ctx(ctx, member)
-    if not success:
-        return
-
-    try:
-        supabase = get_connection()
-        
-        # 更新用户的抽奖状态
-        supabase.table('users').update({
-            'last_draw_date': yesterday
-        }).eq('id', user_id).execute()
-        await ctx.send(f"{ctx.author.mention} 已成功重置 {member.mention} 的抽奖状态 ✅")
-            
-    except Exception as e:
-        await ctx.send(f"重置抽奖状态时出错：{str(e)}")
-        return
-
-async def reset_all(ctx, confirm=None):
-    if confirm != "--confirm":
-        await ctx.send(
-            f"{ctx.author.mention} ⚠️ 此操作将永久清空所有用户数据！\n"
-            "如确定请使用：`!resetall --confirm`"
-        )
-        return
-
-    try:
-        supabase = get_connection()
-        
-        # 删除所有用户数据
-        # 注意：Supabase需要先查询所有记录，然后删除
-        all_users = supabase.table('users').select('id').execute()
-        if all_users.data:
-            user_ids = [user['id'] for user in all_users.data]
-            for user_id in user_ids:
-                supabase.table('users').delete().eq('id', user_id).execute()
-        
-        await ctx.send(f"{ctx.author.mention} ✅ 所有用户数据已被清除。")
-        
-    except Exception as e:
-        await ctx.send(f"清除用户数据时出错：{str(e)}")
-        return
-
-async def fix_database(ctx):
-    """
-    此函数已禁用 - 原本用于MySQL数据库架构更新
-    
-    在Supabase中，数据库架构应该通过Supabase控制台或迁移脚本来管理。
-    请确保users表包含以下字段：
-    - user_id (text)
-    - points (integer, default: 0)
-    - last_draw (text, default: '1970-01-01')
-    - paid_draws_today (integer, default: 0)
-    - last_paid_draw_date (text, default: '1970-01-01')
-    """
-    await ctx.send(
-        f"{ctx.author.mention} ❌ 此功能已禁用。\n"
-        "数据库架构管理现在通过Supabase控制台进行。\n"
-        "请确保users表包含所有必要的字段。"
-    )
