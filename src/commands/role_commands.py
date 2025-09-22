@@ -108,7 +108,7 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
     
     try:
         # 获取赠送者内部ID
-        sender_internal_id = get_user_internal_id(ctx.guild.id, ctx.author.id)
+        sender_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, ctx.author.id)
         if not sender_internal_id:
             await ctx.send("❌ 用户信息获取失败，请稍后重试。")
             return
