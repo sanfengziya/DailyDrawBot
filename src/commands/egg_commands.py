@@ -14,7 +14,24 @@ class EggCommands(commands.Cog):
     # 抽蛋成本配置
     SINGLE_DRAW_COST = 500
     TEN_DRAW_COST = 4500
+
+    # 星级配置
+    MAX_STARS = {
+        'C': 2,
+        'R': 3,
+        'SR': 4,
+        'SSR': 6
+    }
     
+    # 初始星级范围
+    INITIAL_STARS = {
+        'C': (0, 1),
+        'R': (0, 2),
+        'SR': (1, 2),
+        'SSR': (1, 3)
+    }
+
+
     @staticmethod
     def get_pet_names():
         """从数据库获取宠物名称"""

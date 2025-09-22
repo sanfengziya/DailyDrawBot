@@ -42,6 +42,25 @@ def get_user_internal_id(interaction):
         print(f"获取用户内部ID失败: {e}")
         return None
 
+def get_user_internal_id_with_guild_and_discord_id(guild_id, discord_user_id):
+    """根据guild_id和discord_user_id获取用户在数据库中的内部ID"""
+    supabase = get_connection()
+    
+    try:
+        # 确保参数是整数类型，匹配数据库的bigint字段
+        guild_id_int = int(guild_id)
+        discord_user_id_int = int(discord_user_id)
+        
+        user_result = supabase.table("users").select("id").eq("guild_id", guild_id_int).eq("discord_user_id", discord_user_id_int).execute()
+        
+        if user_result.data:
+            return user_result.data[0]["id"]
+        else:
+            return None
+    except Exception as e:
+        print(f"获取用户内部ID失败: {e}")
+        return None
+
 async def get_user_data_with_validation(interaction, fields="id", ephemeral=True):
     """
     获取用户数据并验证用户是否存在

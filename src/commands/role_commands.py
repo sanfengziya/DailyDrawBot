@@ -2,7 +2,7 @@ import discord
 import asyncio
 from src.db.database import get_connection
 from src.utils.ui import RolePageView
-from src.utils.helpers import get_user_internal_id
+from src.utils.helpers import get_user_internal_id, get_user_internal_id_with_guild_and_discord_id
 
 async def addtag(ctx, price, role):
     supabase = get_connection()
@@ -189,7 +189,7 @@ async def givepoints(ctx, member: discord.Member, amount: int):
     
     try:
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
