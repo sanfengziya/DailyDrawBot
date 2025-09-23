@@ -105,10 +105,10 @@ class EggCommands(commands.Cog):
 @app_commands.command(name="egg", description="🥚 蛋系统 - 抽蛋、孵化、查看")
 @app_commands.describe(action="选择操作类型")
 @app_commands.choices(action=[
-    app_commands.Choice(name="🎰 抽蛋", value="draw"),
-    app_commands.Choice(name="📋 查看蛋列表", value="list"),
-    app_commands.Choice(name="🐣 孵化蛋", value="hatch"),
-    app_commands.Choice(name="🎁 领取宠物", value="claim")
+    app_commands.Choice(name="抽蛋", value="draw"),
+    app_commands.Choice(name="查看蛋列表", value="list"),
+    app_commands.Choice(name="孵化蛋", value="hatch"),
+    app_commands.Choice(name="领取宠物", value="claim")
 ])
 @app_commands.guild_only()
 async def egg(interaction: discord.Interaction, action: str):

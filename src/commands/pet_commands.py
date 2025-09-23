@@ -245,16 +245,16 @@ class PetSelect(discord.ui.Select):
     page="页码（查看列表时使用，默认第1页）"
 )
 @app_commands.choices(action=[
-    app_commands.Choice(name="list", value="list"),
-    app_commands.Choice(name="info", value="info"),
-    app_commands.Choice(name="upgrade", value="upgrade"),
-    app_commands.Choice(name="dismantle", value="dismantle"),
-    app_commands.Choice(name="fragments", value="fragments"),
-    app_commands.Choice(name="equip", value="equip"),
-    app_commands.Choice(name="unequip", value="unequip"),
-    app_commands.Choice(name="status", value="status"),
-    app_commands.Choice(name="claim", value="claim"),
-    app_commands.Choice(name="feed", value="feed"),
+    app_commands.Choice(name="查看列表", value="list"),
+    app_commands.Choice(name="查看详情", value="info"),
+    app_commands.Choice(name="升星", value="upgrade"),
+    app_commands.Choice(name="分解", value="dismantle"),
+    app_commands.Choice(name="查看碎片", value="fragments"),
+    app_commands.Choice(name="装备", value="equip"),
+    app_commands.Choice(name="卸下", value="unequip"),
+    app_commands.Choice(name="状态", value="status"),
+    app_commands.Choice(name="领取积分", value="claim"),
+    app_commands.Choice(name="喂食", value="feed"),
 ])
 async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""

@@ -160,8 +160,8 @@ async def item_autocomplete(
     quantity="购买数量（默认为1）"
 )
 @app_commands.choices(action=[
-    app_commands.Choice(name="menu", value="menu"),
-    app_commands.Choice(name="buy", value="buy")
+    app_commands.Choice(name="查看商品", value="menu"),
+    app_commands.Choice(name="购买", value="buy")
 ])
 @app_commands.autocomplete(item=item_autocomplete)
 async def shop(interaction: discord.Interaction, action: str, item: str = None, quantity: int = 1):
