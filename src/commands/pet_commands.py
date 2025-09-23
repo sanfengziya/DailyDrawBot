@@ -47,11 +47,16 @@ class PetCommands(commands.Cog):
         except Exception as e:
             print(f"添加碎片时出错：{str(e)}")
     
-    def calculate_pet_points(self, rarity, stars, hours):
-        """计算宠物积分获取量"""
+    def calculate_pet_points(self, rarity, stars, hours, level=1):
+        """计算宠物积分获取量（包含等级里程碑奖励）"""
         base_points = self.PET_POINTS_PER_HOUR.get(rarity, 0)
+
+        # 等级里程碑奖励：每到3的倍数等级，基础积分+1
+        level_bonus = level // 3  # 3级+1，6级+2，9级+3，等等
+        adjusted_base_points = base_points + level_bonus
+
         multiplier = stars + 1
-        return int(base_points * multiplier * hours)
+        return int(adjusted_base_points * multiplier * hours)
     
     def update_pet_points(self, user_id):
         """更新装备宠物的时间戳（用于积分计算）"""
@@ -89,7 +94,7 @@ class PetCommands(commands.Cog):
             last_update = user_data['last_pet_points_update']
             
             # 获取宠物信息
-            pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', equipped_pet_id).execute()
+            pet_response = supabase.table('user_pets').select('pet_template_id, stars, level').eq('id', equipped_pet_id).execute()
             
             if not pet_response.data:
                 return 0
@@ -97,6 +102,7 @@ class PetCommands(commands.Cog):
             pet_data = pet_response.data[0]
             pet_template_id = pet_data['pet_template_id']
             stars = pet_data['stars']
+            level = pet_data['level']
             
             # 获取宠物模板信息
             template_response = supabase.table('pet_templates').select('rarity').eq('id', pet_template_id).execute()
@@ -125,7 +131,7 @@ class PetCommands(commands.Cog):
                 return 0
             
             # 计算获得的积分
-            pending_points = self.calculate_pet_points(rarity, stars, actual_hours)
+            pending_points = self.calculate_pet_points(rarity, stars, actual_hours, level)
             
             return int(pending_points)
             
@@ -210,9 +216,10 @@ class PetSelect(discord.ui.Select):
     def get_action_name(self):
         action_names = {
             "info": "查看详情",
-            "upgrade": "升星", 
+            "upgrade": "升星",
             "dismantle": "分解",
-            "equip": "装备"
+            "equip": "装备",
+            "feed": "喂食"
         }
         return action_names.get(self.action, "操作")
     
@@ -227,6 +234,8 @@ class PetSelect(discord.ui.Select):
             await handle_pet_dismantle(interaction, pet_id)
         elif self.action == "equip":
             await handle_pet_equip(interaction, pet_id)
+        elif self.action == "feed":
+            await handle_pet_feed(interaction, pet_id)
 
 # 主宠物命令
 @app_commands.command(name="pet", description="🐾 宠物系统 - 查看、升星、分解")
@@ -236,32 +245,33 @@ class PetSelect(discord.ui.Select):
     page="页码（查看列表时使用，默认第1页）"
 )
 @app_commands.choices(action=[
-    app_commands.Choice(name="📋 查看宠物列表", value="list"),
-    app_commands.Choice(name="🔍 查看宠物详情", value="info"),
-    app_commands.Choice(name="⭐ 升星宠物", value="upgrade"),
-    app_commands.Choice(name="💥 分解宠物", value="dismantle"),
-    app_commands.Choice(name="🧩 查看碎片库存", value="fragments"),
-    app_commands.Choice(name="🎒 装备宠物", value="equip"),
-    app_commands.Choice(name="📤 卸下宠物", value="unequip"),
-    app_commands.Choice(name="👀 查看装备状态", value="status"),
-    app_commands.Choice(name="💰 领取宠物积分", value="claim")
+    app_commands.Choice(name="list", value="list"),
+    app_commands.Choice(name="info", value="info"),
+    app_commands.Choice(name="upgrade", value="upgrade"),
+    app_commands.Choice(name="dismantle", value="dismantle"),
+    app_commands.Choice(name="fragments", value="fragments"),
+    app_commands.Choice(name="equip", value="equip"),
+    app_commands.Choice(name="unequip", value="unequip"),
+    app_commands.Choice(name="status", value="status"),
+    app_commands.Choice(name="claim", value="claim"),
+    app_commands.Choice(name="feed", value="feed"),
 ])
 async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""
     if action == "list":
         await handle_pet_list(interaction, page)
-    elif action in ["info", "upgrade", "dismantle", "equip"]:
+    elif action in ["info", "upgrade", "dismantle", "equip", "feed"]:
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
             embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        
+
         # 显示宠物选择界面
         view = PetSelectView(user_internal_id, action)
         has_pets = await view.setup_select()
-        
+
         if not has_pets:
             embed = create_embed(
                 "❌ 没有宠物",
@@ -270,14 +280,15 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-            
+
         action_names = {
             "info": "查看宠物详情",
-            "upgrade": "升星宠物", 
+            "upgrade": "升星宠物",
             "dismantle": "分解宠物",
-            "equip": "装备宠物"
+            "equip": "装备宠物",
+            "feed": "喂食宠物"
         }
-        
+
         embed = create_embed(
             f"🐾 {action_names[action]}",
             "请从下方选择要操作的宠物：",
@@ -404,7 +415,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
             return
         
         # 查询宠物基本信息
-        pet_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        pet_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at, level, xp_current, xp_total, satiety, favorite_flavor, dislike_flavor').eq('id', pet_id).eq('user_id', user_internal_id).execute()
         
         if not pet_response.data:
             embed = create_embed(
@@ -465,14 +476,78 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     else:
         upgrade_info = "\n**已达到最大星级！**"
     
+    # 获取宠物的等级、经验和饱食度信息
+    level = pet_data['level']
+    xp_current = pet_data['xp_current']
+    xp_total = pet_data['xp_total']
+    satiety = pet_data['satiety']
+    favorite_flavor = pet_data['favorite_flavor']
+    dislike_flavor = pet_data['dislike_flavor']
+    
+    # 口味表情映射（与喂食界面保持一致）
+    flavor_emojis = {
+        'SWEET': '🍯 甜味',
+        'SALTY': '🧂 咸味',
+        'SOUR': '🍋 酸味',
+        'SPICY': '🌶️ 辣味',
+        'UMAMI': '🍄 鲜味'
+    }
+    
+    # 计算升级所需经验（使用与喂食系统一致的公式）
+    from src.utils.feeding_system import FeedingSystem
+    xp_needed_for_next_level = FeedingSystem.calculate_level_xp_requirement(level)
+    
+    # 计算经验进度条
+    progress_bar_length = 10
+    if xp_needed_for_next_level > 0:
+        progress = min(xp_current / xp_needed_for_next_level, 1.0)
+        filled_blocks = int(progress * progress_bar_length)
+        progress_bar = "█" * filled_blocks + "░" * (progress_bar_length - filled_blocks)
+        progress_percent = int(progress * 100)
+    else:
+        progress_bar = "█" * progress_bar_length
+        progress_percent = 100
+    
+    # 饱食度进度条
+    satiety_progress = satiety / 100
+    satiety_filled = int(satiety_progress * progress_bar_length)
+    satiety_bar = "🟢" * satiety_filled + "⚪" * (progress_bar_length - satiety_filled)
+    
+    # 口味偏好显示
+    favorite_flavor_display = flavor_emojis.get(favorite_flavor, '无偏好')
+    dislike_flavor_display = flavor_emojis.get(dislike_flavor, '无')
+    
+    # 构建描述内容
+    description = f"{rarity_colors[rarity]} **{pet_name}**\n\n"
+    
+    # 基本信息
+    description += f"🆔 **宠物ID：** {pet_id}\n"
+    description += f"💎 **稀有度：** {rarity}\n"
+    description += f"⭐ **星级：** {star_display} ({stars}/{max_stars})\n\n"
+    
+    # 等级和经验
+    description += f"📊 **等级：** {level}\n"
+    description += f"✨ **经验：** {xp_current}/{xp_needed_for_next_level}\n"
+    description += f"📈 {progress_bar} {progress_percent}%\n\n"
+    
+    # 饱食度
+    description += f"🍽️ **饱食度：** {satiety}/100\n"
+    description += f"📊 {satiety_bar} {satiety}%\n\n"
+    
+    # 口味偏好
+    description += f"💖 **喜欢：** {favorite_flavor_display}\n"
+    description += f"💔 **讨厌：** {dislike_flavor_display}\n\n"
+    
+    # 总经验和获得时间
+    description += f"🏆 **总经验：** {xp_total}\n"
+    description += f"📅 **获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d')}\n"
+    
+    # 升星信息
+    description += f"{upgrade_info}"
+
     embed = create_embed(
-        "宠物信息",
-        f"{rarity_colors[rarity]} {interaction.user.mention} 的 {pet_name}\n"
-        f"**宠物ID：** {pet_id}\n"
-        f"**稀有度：** {rarity}\n"
-        f"**星级：** {star_display} ({stars}/{max_stars})\n"
-        f"**获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d')}"
-        f"{upgrade_info}",
+        "🐾 宠物信息",
+        description,
         discord.Color.green()
     )
     await interaction.response.send_message(embed=embed)
@@ -850,7 +925,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
             return
         
         # 检查宠物是否存在且属于用户
-        pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', pet_id).eq('user_id', user_internal_id).execute()
+        pet_response = supabase.table('user_pets').select('pet_template_id, stars, level').eq('id', pet_id).eq('user_id', user_internal_id).execute()
         
         if not pet_response.data:
             embed = create_embed(
@@ -864,18 +939,19 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         pet_data = pet_response.data[0]
         pet_template_id = pet_data['pet_template_id']
         stars = pet_data['stars']
-        
+        level = pet_data['level']
+
         # 获取宠物模板信息
         template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
         if not template_response.data:
             embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
-        
+
         template_data = template_response.data[0]
         pet_name = template_data['name']
         rarity = template_data['rarity']
-        
+
         # 检查是否已经装备了这只宠物
         equipped_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
         
@@ -928,7 +1004,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     
     # 计算每小时积分和待领取积分
     pet_commands = PetCommands(None)
-    hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
+    hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1, level)
     pending_points = pet_commands.calculate_pending_points(user_internal_id)
     
     star_display = '⭐' * stars if stars > 0 else '⚪'
@@ -1070,7 +1146,7 @@ async def handle_pet_status(interaction: discord.Interaction):
             return
         
         # 获取宠物详细信息
-        pet_response = supabase.table('user_pets').select('pet_template_id, stars').eq('id', equipped_pet_id).execute()
+        pet_response = supabase.table('user_pets').select('pet_template_id, stars, level').eq('id', equipped_pet_id).execute()
         
         if not pet_response.data:
             embed = create_embed(
@@ -1084,21 +1160,22 @@ async def handle_pet_status(interaction: discord.Interaction):
         pet_data = pet_response.data[0]
         pet_template_id = pet_data['pet_template_id']
         stars = pet_data['stars']
-        
+        level = pet_data['level']
+
         # 获取宠物模板信息
         template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
         if not template_response.data:
             embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
-        
+
         template_data = template_response.data[0]
         pet_name = template_data['name']
         rarity = template_data['rarity']
-    
+
         # 计算每小时积分和待领取积分
         pet_commands = PetCommands(None)
-        hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1)
+        hourly_points = pet_commands.calculate_pet_points(rarity, stars, 1, level)
         pending_points = pet_commands.calculate_pending_points(user_internal_id)
         
         star_display = '⭐' * stars if stars > 0 else '⚪'
@@ -1235,6 +1312,271 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
             discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
+
+async def handle_pet_feed(interaction: discord.Interaction, pet_id: int):
+    """处理宠物喂食"""
+    from src.utils.feeding_system import get_pet_feeding_info
+    from src.utils.helpers import get_user_internal_id
+
+    # 获取用户内部ID
+    user_internal_id = get_user_internal_id(interaction)
+    if not user_internal_id:
+        embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    # 获取宠物喂食信息
+    pet_info = get_pet_feeding_info(pet_id)
+    if not pet_info:
+        embed = create_embed("❌ 错误", "宠物不存在或不属于你！", discord.Color.red())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    # 检查宠物所有权
+    if pet_info['user_id'] != user_internal_id:
+        embed = create_embed("❌ 错误", "这只宠物不属于你！", discord.Color.red())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    # 显示宠物喂食界面
+    view = PetFeedingView(user_internal_id, pet_id, pet_info)
+    embed = view.create_feeding_embed()
+
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class PetFeedingView(discord.ui.View):
+    def __init__(self, user_id: int, pet_id: int, pet_info: dict):
+        super().__init__(timeout=300)
+        self.user_id = user_id
+        self.pet_id = pet_id
+        self.pet_info = pet_info
+
+        # 添加食粮选择下拉菜单
+        self.add_item(FoodSelectForFeeding(user_id, pet_id))
+
+    def create_feeding_embed(self) -> discord.Embed:
+        """创建喂食界面embed"""
+        from src.utils.feeding_system import FeedingSystem
+
+        # 稀有度颜色映射
+        rarity_colors = {
+            'C': '⚪',
+            'R': '🔵',
+            'SR': '🟣',
+            'SSR': '🟡'
+        }
+
+        # 口味表情映射
+        flavor_emojis = {
+            'SWEET': '🍯 甜味',
+            'SALTY': '🧂 咸味',
+            'SOUR': '🍋 酸味',
+            'SPICY': '🌶️ 辣味',
+            'UMAMI': '🍄 鲜味'
+        }
+
+        rarity_color = rarity_colors.get(self.pet_info['rarity'], '⚪')
+        favorite_flavor = flavor_emojis.get(self.pet_info['favorite_flavor'], '无偏好')
+        dislike_flavor = flavor_emojis.get(self.pet_info['dislike_flavor'], '无')
+
+        # 计算经验进度条
+        progress_bar_length = 10
+        if self.pet_info['xp_next_level'] > 0:
+            progress = min(self.pet_info['xp_current'] / self.pet_info['xp_next_level'], 1.0)
+            filled_blocks = int(progress * progress_bar_length)
+            progress_bar = "█" * filled_blocks + "░" * (progress_bar_length - filled_blocks)
+        else:
+            progress_bar = "█" * progress_bar_length
+
+        # 饱食度进度条
+        satiety_progress = self.pet_info['satiety'] / 100
+        satiety_filled = int(satiety_progress * progress_bar_length)
+        satiety_bar = "🟢" * satiety_filled + "⚪" * (progress_bar_length - satiety_filled)
+
+        description = f"{rarity_color} **{self.pet_info['name']}**\n\n"
+
+        # 基本信息
+        description += f"📊 **等级：** {self.pet_info['level']}\n"
+        description += f"✨ **经验：** {self.pet_info['xp_current']}/{self.pet_info['xp_next_level']}\n"
+        description += f"📈 {progress_bar} {int(progress * 100) if self.pet_info['xp_next_level'] > 0 else 100}%\n\n"
+
+        # 饱食度
+        description += f"🍽️ **饱食度：** {self.pet_info['satiety']}/100\n"
+        description += f"📊 {satiety_bar} {self.pet_info['satiety']}%\n\n"
+
+        # 口味偏好
+        description += f"💖 **喜欢：** {favorite_flavor}\n"
+        description += f"💔 **讨厌：** {dislike_flavor}\n\n"
+
+        # 喂食说明
+        if self.pet_info['satiety'] >= FeedingSystem.SATIETY_MAX:
+            description += "⚠️ **宠物已经吃饱了！**\n请等待饱食度重置后再来喂食。"
+        else:
+            description += "🍴 **选择食粮进行喂食：**\n"
+            description += "• 匹配口味偏好可获得额外经验\n"
+            description += "• 讨厌的口味会减少经验获得\n"
+            description += "• 饱食度每日重置2次（美东时间0点和12点）"
+
+        embed = create_embed(
+            "🍽️ 宠物喂食",
+            description,
+            discord.Color.green() if self.pet_info['satiety'] < FeedingSystem.SATIETY_MAX else discord.Color.orange()
+        )
+
+        return embed
+
+class FoodSelectForFeeding(discord.ui.Select):
+    def __init__(self, user_id: int, pet_id: int):
+        self.user_id = user_id
+        self.pet_id = pet_id
+
+        options = self._load_food_options()
+
+        super().__init__(
+            placeholder="选择要投喂的食粮...",
+            options=options
+        )
+
+    def _load_food_options(self) -> list:
+        """加载用户的食粮选项"""
+        from src.db.database import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # 查询用户食粮库存
+        response = supabase.table('user_food_inventory').select('''
+            quantity,
+            food_templates(*)
+        ''').eq('user_id', self.user_id).gt('quantity', 0).execute()
+
+        if not response.data:
+            return [discord.SelectOption(
+                label="没有食粮库存",
+                description="去杂货铺购买食粮吧！",
+                value="none",
+                emoji="❌"
+            )]
+
+        # 稀有度表情映射
+        rarity_emojis = {
+            'C': '🤍',
+            'R': '💙',
+            'SR': '💜',
+            'SSR': '💛'
+        }
+
+        # 口味表情映射
+        flavor_emojis = {
+            'SWEET': '🍯',
+            'SALTY': '🧂',
+            'SOUR': '🍋',
+            'SPICY': '🌶️',
+            'UMAMI': '🍄'
+        }
+
+        options = []
+        for item in response.data:
+            food = item['food_templates']
+            quantity = item['quantity']
+
+            rarity_emoji = rarity_emojis.get(food['rarity'], '⚪')
+            flavor_emoji = flavor_emojis.get(food['flavor'], '🍽️')
+
+            label = f"{food['name']} {flavor_emoji}"
+            description = f"库存:{quantity} | {food['base_xp']}经验 | +5-8饱食度"
+
+            options.append(discord.SelectOption(
+                label=label[:100],
+                description=description[:100],
+                value=str(food['id']),
+                emoji=rarity_emoji
+            ))
+
+        return options
+
+    async def callback(self, interaction: discord.Interaction):
+        """处理食粮选择回调"""
+        if self.values[0] == "none":
+            await interaction.response.send_message("❌ 没有可用的食粮！请先去杂货铺购买。", ephemeral=True)
+            return
+
+        food_template_id = int(self.values[0])
+
+        # 执行喂食
+        await execute_feeding(interaction, self.user_id, self.pet_id, food_template_id)
+
+async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id: int, food_template_id: int):
+    """执行喂食逻辑"""
+    from src.db.database import get_supabase_client
+    from src.utils.feeding_system import feed_pet
+
+    supabase = get_supabase_client()
+
+    try:
+        # 检查食粮库存
+        inventory_response = supabase.table('user_food_inventory').select('quantity').eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
+
+        if not inventory_response.data or inventory_response.data[0]['quantity'] <= 0:
+            await interaction.response.send_message("❌ 食粮库存不足！", ephemeral=True)
+            return
+
+        # 执行喂食
+        result = feed_pet(pet_id, food_template_id)
+
+        if not result['success']:
+            embed = create_embed("❌ 喂食失败", result['message'], discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # 扣除食粮库存
+        current_quantity = inventory_response.data[0]['quantity']
+        new_quantity = current_quantity - 1
+
+        if new_quantity > 0:
+            supabase.table('user_food_inventory').update({'quantity': new_quantity}).eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
+        else:
+            supabase.table('user_food_inventory').delete().eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
+
+        # 创建成功消息
+        description = f"🍽️ **{result['pet_name']}** 吃了 **{result['food_name']}**！\n\n"
+
+        # 经验获得
+        description += f"✨ **获得经验：** +{result['xp_gained']}\n"
+
+        # 口味匹配bonus
+        if result['flavor_bonus'] == 'favorite':
+            description += f"💖 **口味匹配：** 额外30%经验！\n"
+        elif result['flavor_bonus'] == 'dislike':
+            description += f"💔 **不喜欢：** 经验减少10%\n"
+
+        # 饱食度
+        description += f"🍽️ **饱食度：** +{result['satiety_gained']} → {result['new_satiety']}/100\n"
+
+        # 等级提升
+        if result['level_up']:
+            description += f"\n🎉 **恭喜！宠物升级了！**\n"
+            description += f"🆙 **新等级：** {result['new_level']}\n"
+
+        embed = create_embed(
+            "🍴 喂食成功！",
+            description,
+            discord.Color.green()
+        )
+
+        # 如果饱食度满了，添加提示
+        if result['new_satiety'] >= 100:
+            embed.add_field(
+                name="⚠️ 提示",
+                value="宠物已经吃饱了！饱食度会在美东时间0点和12点重置。",
+                inline=False
+            )
+
+        await interaction.response.send_message(embed=embed)
+
+    except Exception as e:
+        print(f"喂食执行错误: {e}")
+        embed = create_embed("❌ 错误", "喂食过程中发生错误！", discord.Color.red())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 def setup(bot):
     """注册斜杠命令"""

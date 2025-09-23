@@ -231,3 +231,12 @@ PET_SYSTEM_README.md
 README.env
 CLAUDE.md
 .mcp.json
+宠物喂食以及等级方案.md
+FEEDING_SYSTEM.md
+todo.md
+test_feeding_system.py
+.vscode/settings.json
+PERFORMANCE_OPTIMIZATIONS.md
+test_level_milestone_bonus.py
+test_food_descriptions.py
+test_resetshop_command.py
