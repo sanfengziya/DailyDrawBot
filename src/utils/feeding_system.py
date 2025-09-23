@@ -37,7 +37,7 @@ class FeedingSystem:
     SATIETY_MAX = 100       # 最大饱食度
 
     # 购买限制配置
-    MAX_DAILY_FOOD_PURCHASES = 10  # 每日最大食粮购买数量
+    MAX_DAILY_FOOD_PURCHASES = 30  # 每日最大食粮购买数量
 
     # 经验等级计算参数
     XP_BASE = 20           # 基础经验需求

@@ -252,7 +252,7 @@ class PetSelect(discord.ui.Select):
     app_commands.Choice(name="查看碎片", value="fragments"),
     app_commands.Choice(name="装备", value="equip"),
     app_commands.Choice(name="卸下", value="unequip"),
-    app_commands.Choice(name="状态", value="status"),
+    app_commands.Choice(name="装备状态", value="status"),
     app_commands.Choice(name="领取积分", value="claim"),
     app_commands.Choice(name="喂食", value="feed"),
 ])
@@ -390,7 +390,10 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
             f"查询宠物列表时出错：{str(e)}",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     embed = create_embed(
@@ -456,7 +459,10 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
             f"查询宠物信息时出错：{str(e)}",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     rarity_colors = {
@@ -677,7 +683,10 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
             f"升星宠物时出错：{str(e)}",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
 
 async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
@@ -737,7 +746,10 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
             f"{interaction.user.mention} 查询宠物信息时出错了！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     # 计算分解收益
@@ -790,7 +802,10 @@ async def handle_pet_fragments(interaction: discord.Interaction):
             f"{interaction.user.mention} 查询碎片库存时出错了！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     if not fragments:
@@ -974,7 +989,10 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
             f"{interaction.user.mention} 装备宠物时出错了！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     # 检查是否有待领取的积分
@@ -1076,7 +1094,10 @@ async def handle_pet_unequip(interaction: discord.Interaction):
             f"{interaction.user.mention} 卸下宠物时出错了！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
     # 检查是否有待领取的积分
@@ -1188,6 +1209,7 @@ async def handle_pet_status(interaction: discord.Interaction):
             f"🐾 **装备宠物：** {pet_name}\n"
             f"{rarity_color} **稀有度：** {rarity}\n"
             f"{star_display} **星级：** {stars}\n"
+            f"🔢 **等级：** {level}\n"
             f"💰 **每小时积分：** {hourly_points}\n"
             f"⏰ **待领取积分：** {pending_points}\n"
             f"💎 **当前总积分：** {current_points}\n\n"
@@ -1201,7 +1223,10 @@ async def handle_pet_status(interaction: discord.Interaction):
             f"{interaction.user.mention} 查看装备状态时发生错误！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def handle_pet_claim_points(interaction: discord.Interaction):
     """领取宠物积分"""
@@ -1311,7 +1336,10 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
             f"{interaction.user.mention} 领取积分时发生错误！",
             discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def handle_pet_feed(interaction: discord.Interaction, pet_id: int):
     """处理宠物喂食"""
@@ -1576,7 +1604,10 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
     except Exception as e:
         print(f"喂食执行错误: {e}")
         embed = create_embed("❌ 错误", "喂食过程中发生错误！", discord.Color.red())
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 def setup(bot):
     """注册斜杠命令"""
