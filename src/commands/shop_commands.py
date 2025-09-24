@@ -118,7 +118,7 @@ def get_shop_menu_embed(shop_items, user_points: int, food_purchased_today: int 
         if description:
             items_text += f"📖 {description}\n"
 
-    embed.description += f"\n{items_text}\n📝 购买说明\n• 食粮用于喂养宠物获得经验\n• 每人每日最多购买10份食粮\n\n营业时间：全天24小时 | 每日0点刷新商品"
+    embed.description += f"\n{items_text}\n📝 购买说明\n• 食粮用于喂养宠物获得经验\n• 每人每日最多购买{max_purchases}份食粮\n\n营业时间：全天24小时 | 每日0点刷新商品"
 
     # 保留购买提示
     embed.set_footer(text="💡 使用 /shop buy <商品名> <数量> 进行购买")
