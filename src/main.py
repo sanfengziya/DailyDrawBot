@@ -128,6 +128,24 @@ async def reset_shop(ctx):
     except Exception as e:
         await ctx.send(f"❌ 重置杂货铺时出错: {e}")
 
+@bot.command(name="testshop")
+@commands.has_permissions(administrator=True)
+async def test_shop(ctx):
+    """测试杂货铺刷新功能（调试用）"""
+    try:
+        from src.utils.feeding_system import FoodShopManager
+
+        # 运行测试
+        test_result = FoodShopManager.test_shop_refresh()
+
+        if test_result:
+            await ctx.send("✅ 杂货铺刷新功能测试通过！所有功能正常。")
+        else:
+            await ctx.send("⚠️ 杂货铺刷新功能测试未完全通过，请检查日志。")
+
+    except Exception as e:
+        await ctx.send(f"❌ 测试杂货铺功能时出错: {e}")
+
 @bot.command(name="schedulerstatus")
 @commands.has_permissions(administrator=True)
 async def scheduler_status(ctx):

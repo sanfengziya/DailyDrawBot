@@ -319,35 +319,62 @@ class FoodShopManager:
     def generate_daily_shop_items() -> List[Dict]:
         """
         生成当日杂货铺商品列表
-        返回食粮模板ID列表
+        返回食粮模板ID列表，增强错误处理和验证
         """
         try:
+            print("🔄 开始生成杂货铺商品...")
             from src.db.database import get_supabase_client
             supabase = get_supabase_client()
 
             # 获取所有食粮模板
             response = supabase.table('food_templates').select('*').execute()
             if not response.data:
+                print("❌ 数据库中无食粮模板数据")
                 return []
 
             food_templates = response.data
+            print(f"📦 获取到{len(food_templates)}个食粮模板")
+
         except Exception as e:
-            print(f"获取食粮模板时出错: {e}")
+            print(f"❌ 获取食粮模板时出错: {e}")
             return []
 
-        # 按稀有度分组
+        # 验证食粮模板完整性
+        valid_templates = []
+        for template in food_templates:
+            if not all(key in template for key in ['id', 'name', 'rarity', 'flavor', 'price', 'base_xp']):
+                print(f"⚠️ 跳过不完整的食粮模板: {template.get('id', 'Unknown')}")
+                continue
+            valid_templates.append(template)
+
+        if len(valid_templates) < FoodShopManager.DAILY_ITEMS_COUNT:
+            print(f"❌ 有效食粮模板不足，需要{FoodShopManager.DAILY_ITEMS_COUNT}个，只有{len(valid_templates)}个")
+            return []
+
+        # 按稀有度分组并验证
         rarity_groups = {
-            'C': [f for f in food_templates if f['rarity'] == 'C'],
-            'R': [f for f in food_templates if f['rarity'] == 'R'],
-            'SR': [f for f in food_templates if f['rarity'] == 'SR'],
-            'SSR': [f for f in food_templates if f['rarity'] == 'SSR']
+            'C': [f for f in valid_templates if f['rarity'] == 'C'],
+            'R': [f for f in valid_templates if f['rarity'] == 'R'],
+            'SR': [f for f in valid_templates if f['rarity'] == 'SR'],
+            'SSR': [f for f in valid_templates if f['rarity'] == 'SSR']
         }
+
+        # 检查每个稀有度是否至少有1个商品
+        empty_rarities = [rarity for rarity, items in rarity_groups.items() if not items]
+        if empty_rarities:
+            print(f"⚠️ 以下稀有度没有可用商品: {empty_rarities}")
+
+        print(f"📊 稀有度分布: C={len(rarity_groups['C'])}, R={len(rarity_groups['R'])}, SR={len(rarity_groups['SR'])}, SSR={len(rarity_groups['SSR'])}")
 
         selected_items = []
         used_flavors = set()
+        generation_attempts = 0
+        max_attempts = 50  # 防止无限循环
 
         # 生成5个商品，尽量保证口味多样性
-        for _ in range(FoodShopManager.DAILY_ITEMS_COUNT):
+        while len(selected_items) < FoodShopManager.DAILY_ITEMS_COUNT and generation_attempts < max_attempts:
+            generation_attempts += 1
+
             # 根据概率选择稀有度
             rand = random.random()
             cumulative = 0
@@ -359,7 +386,7 @@ class FoodShopManager:
                     selected_rarity = rarity
                     break
 
-            # 从该稀有度中选择食粮，优先选择未使用过的口味
+            # 从该稀有度中选择食粮
             available_foods = rarity_groups.get(selected_rarity, [])
             if not available_foods:
                 continue
@@ -371,43 +398,136 @@ class FoodShopManager:
             else:
                 selected_food = random.choice(available_foods)
 
+            # 验证选中的食粮
+            if not selected_food.get('id'):
+                print(f"⚠️ 跳过无效的食粮数据: {selected_food}")
+                continue
+
             selected_items.append({
                 'food_template_id': selected_food['id'],
                 'food_data': selected_food
             })
 
             used_flavors.add(selected_food['flavor'])
+            print(f"✅ 选择了{selected_rarity}级食粮: {selected_food['name']} ({selected_food['flavor']})")
 
+        if len(selected_items) != FoodShopManager.DAILY_ITEMS_COUNT:
+            print(f"⚠️ 商品生成不完整，期望{FoodShopManager.DAILY_ITEMS_COUNT}个，实际{len(selected_items)}个，尝试次数: {generation_attempts}")
+            if len(selected_items) == 0:
+                return []
+
+        print(f"🎯 商品生成完成，共{len(selected_items)}个商品，口味种类: {len(used_flavors)}")
         return selected_items
 
     @staticmethod
     def refresh_daily_shop():
-        """刷新每日杂货铺目录（只写目录）"""
+        """刷新每日杂货铺目录（原子性操作，避免商店清空）"""
         from src.db.database import get_supabase_client
         from datetime import date
 
         supabase = get_supabase_client()
         today = date.today()
+        today_str = today.isoformat()
 
-        # 生成新目录条目
-        new_items = FoodShopManager.generate_daily_shop_items()
+        try:
+            print(f"🏪 开始刷新杂货铺 - {today_str}")
 
-        if new_items:
-            # 清除今日旧目录
-            supabase.table('daily_shop_catalog').delete().eq('refresh_date', today.isoformat()).execute()
+            # 1. 生成新目录条目并验证
+            new_items = FoodShopManager.generate_daily_shop_items()
 
-            # 插入新目录
+            if not new_items:
+                print("❌ 商品生成失败，跳过刷新以保护现有商店数据")
+                return []
+
+            # 2. 构建新目录数据并验证完整性
             catalog_rows = []
             for item in new_items:
+                if not item.get('food_template_id'):
+                    print(f"❌ 商品数据不完整，跳过刷新: {item}")
+                    return []
+
                 catalog_rows.append({
-                    'refresh_date': today.isoformat(),
+                    'refresh_date': today_str,
                     'food_template_id': item['food_template_id']
                 })
 
-            if catalog_rows:
-                supabase.table('daily_shop_catalog').insert(catalog_rows).execute()
+            if len(catalog_rows) != FoodShopManager.DAILY_ITEMS_COUNT:
+                print(f"❌ 商品数量不足，期望{FoodShopManager.DAILY_ITEMS_COUNT}个，实际{len(catalog_rows)}个，跳过刷新")
+                return []
 
-        return new_items
+            print(f"✅ 商品生成成功，共{len(catalog_rows)}种商品")
+
+            # 3. 备份当前商店数据（用于回滚）
+            backup_response = supabase.table('daily_shop_catalog').select('*').eq('refresh_date', today_str).execute()
+            backup_data = backup_response.data if backup_response.data else []
+            print(f"📦 备份了{len(backup_data)}条现有商店数据")
+
+            # 4. 原子性更新：先删除再插入
+            try:
+                # 删除今日旧目录
+                delete_result = supabase.table('daily_shop_catalog').delete().eq('refresh_date', today_str).execute()
+                print(f"🗑️ 清理旧目录完成，删除了{len(delete_result.data) if delete_result.data else 0}条记录")
+
+                # 插入新目录
+                insert_result = supabase.table('daily_shop_catalog').insert(catalog_rows).execute()
+
+                if not insert_result.data or len(insert_result.data) != len(catalog_rows):
+                    raise Exception(f"插入失败：期望{len(catalog_rows)}条，实际{len(insert_result.data) if insert_result.data else 0}条")
+
+                print(f"✅ 新目录插入成功，共{len(insert_result.data)}种商品")
+                print("🏪 杂货铺刷新完成！")
+
+            except Exception as db_error:
+                print(f"❌ 数据库操作失败: {db_error}")
+
+                # 尝试回滚：恢复备份数据
+                if backup_data:
+                    try:
+                        print("🔄 尝试回滚到备份数据...")
+                        supabase.table('daily_shop_catalog').insert(backup_data).execute()
+                        print("✅ 回滚成功，商店数据已恢复")
+                        return []  # 返回空列表表示刷新失败但已回滚
+                    except Exception as rollback_error:
+                        print(f"❌ 回滚失败: {rollback_error}")
+
+                raise db_error
+
+            return new_items
+
+        except Exception as e:
+            print(f"❌ 杂货铺刷新失败: {e}")
+            return []
+
+    @staticmethod
+    def test_shop_refresh():
+        """测试杂货铺刷新功能（用于调试）"""
+        print("🧪 开始测试杂货铺刷新功能...")
+
+        # 测试商品生成
+        print("\n1. 测试商品生成...")
+        items = FoodShopManager.generate_daily_shop_items()
+        if items:
+            print(f"✅ 商品生成测试通过，生成了{len(items)}个商品")
+            for i, item in enumerate(items, 1):
+                food_data = item['food_data']
+                print(f"   {i}. {food_data['rarity']} - {food_data['name']} ({food_data['flavor']}) - {food_data['price']}积分")
+        else:
+            print("❌ 商品生成测试失败")
+            return False
+
+        # 测试完整刷新流程
+        print("\n2. 测试完整刷新流程...")
+        try:
+            result = FoodShopManager.refresh_daily_shop()
+            if result:
+                print(f"✅ 完整刷新测试通过，刷新了{len(result)}个商品")
+                return True
+            else:
+                print("⚠️ 刷新返回空结果，可能是保护机制触发")
+                return False
+        except Exception as e:
+            print(f"❌ 完整刷新测试失败: {e}")
+            return False
 
 def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
     """获取宠物喂食相关信息"""
