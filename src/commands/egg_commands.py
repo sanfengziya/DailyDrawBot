@@ -351,12 +351,25 @@ async def handle_egg_claim(interaction: discord.Interaction):
             else:
                 # 如果找不到对应的模板，跳过这个宠物
                 continue
-            
+
+            # 生成随机偏好食物和厌恶事物
+            from src.utils.feeding_system import FlavorType
+            flavors = [flavor.value for flavor in FlavorType]
+
+            # 随机选择偏好食物
+            favorite_flavor = random.choice(flavors)
+
+            # 从剩余口味中随机选择厌恶事物
+            remaining_flavors = [f for f in flavors if f != favorite_flavor]
+            dislike_flavor = random.choice(remaining_flavors)
+
             # 添加到宠物库存
             supabase.table("user_pets").insert({
                 "user_id": user_id,
                 "pet_template_id": pet_template_id,
                 "stars": initial_stars,
+                "favorite_flavor": favorite_flavor,
+                "dislike_flavor": dislike_flavor,
                 "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
             }).execute()
             
