@@ -18,23 +18,26 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 async def on_ready():
     print(f"已登录为 {bot.user}")
 
-    # 加载Cog命令
-    try:
-        await bot.add_cog(egg_commands.EggCommands(bot))
-        await bot.add_cog(pet_commands.PetCommands(bot))
-        print("已加载宠物蛋系统命令")
-    except Exception as e:
-        print(f"加载Cog时出错: {e}")
+    # 注册斜杠命令（避免重复注册）
+    setup_functions = [
+        ('egg_commands', egg_commands.setup),
+        ('pet_commands', pet_commands.setup),
+        ('shop_commands', shop_commands.setup),
+        ('forge_commands', forge_commands.setup)
+    ]
 
-    # 注册斜杠命令
-    try:
-        egg_commands.setup(bot)
-        pet_commands.setup(bot)
-        shop_commands.setup(bot)
-        forge_commands.setup(bot)
-        print("已注册宠物蛋系统、杂货铺和锻造台斜杠命令")
-    except Exception as e:
-        print(f"注册斜杠命令时出错: {e}")
+    for module_name, setup_func in setup_functions:
+        try:
+            # 检查命令是否已经注册，避免重复
+            existing_commands = [cmd.name for cmd in bot.tree.get_commands()]
+            setup_func(bot)
+            print(f"已注册 {module_name} 斜杠命令")
+        except Exception as e:
+            # 如果是重复注册错误，跳过并继续
+            if "already registered" in str(e):
+                print(f"{module_name} 命令已存在，跳过重复注册")
+            else:
+                print(f"注册 {module_name} 斜杠命令时出错: {e}")
 
     try:
         synced = await bot.tree.sync()

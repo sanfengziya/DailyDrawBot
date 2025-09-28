@@ -641,3 +641,314 @@ def feed_pet(pet_id: int, food_template_id: int) -> Dict:
         'food_name': food_data['name'],
         'pet_name': pet_info['name']
     }
+
+class AutoFeedingSystem:
+    """一键喂食系统"""
+
+    # 喂食模式枚举
+    MODE_OPTIMAL_XP = "optimal_xp"
+    MODE_FLAVOR_MATCH = "flavor_match"
+    MODE_ECONOMIC = "economic"
+    MODE_CLEAR_INVENTORY = "clear_inventory"
+
+    @staticmethod
+    def calculate_food_score(food_item: dict, pet_preferences: dict, mode: str) -> float:
+        """
+        计算食粮评分
+        评分 = 基础分数 + 口味匹配加分 + 经验效率分数 - 稀有度惩罚
+        """
+        base_score = food_item['base_xp']
+
+        # 口味匹配加分
+        flavor_bonus = 0
+        if food_item['flavor'] == pet_preferences.get('favorite'):
+            flavor_bonus = base_score * 0.3  # 匹配偏好+30%
+        elif food_item['flavor'] == pet_preferences.get('dislike'):
+            flavor_bonus = -base_score * 0.5  # 厌恶口味大幅扣分
+
+        # 经验效率分数（经验/价格比）
+        efficiency_score = base_score / max(food_item['price'], 1)
+
+        # 稀有度惩罚（避免浪费高级食粮）
+        rarity_penalty = {'C': 0, 'R': -5, 'SR': -15, 'SSR': -30}
+        rarity_malus = rarity_penalty.get(food_item['rarity'], 0)
+
+        # 根据模式调整评分
+        if mode == AutoFeedingSystem.MODE_OPTIMAL_XP:
+            # 最优经验模式：重视经验和口味匹配
+            total_score = base_score + flavor_bonus + efficiency_score * 8 + rarity_malus
+        elif mode == AutoFeedingSystem.MODE_FLAVOR_MATCH:
+            # 口味匹配模式：重视口味匹配，轻视效率
+            if food_item['flavor'] == pet_preferences.get('favorite'):
+                total_score = base_score * 2 + flavor_bonus + efficiency_score * 2
+            elif food_item['flavor'] == pet_preferences.get('dislike'):
+                total_score = -1000  # 严重惩罚厌恶口味
+            else:
+                total_score = base_score + efficiency_score * 2 + rarity_malus
+        elif mode == AutoFeedingSystem.MODE_ECONOMIC:
+            # 节约模式：重视性价比，惩罚稀有食粮
+            total_score = efficiency_score * 15 + rarity_malus * 2 + flavor_bonus * 0.5
+        elif mode == AutoFeedingSystem.MODE_CLEAR_INVENTORY:
+            # 清空库存模式：优先数量多的食粮
+            quantity_bonus = food_item.get('quantity', 0) * 5
+            total_score = quantity_bonus + efficiency_score * 5 + flavor_bonus
+        else:
+            # 默认模式
+            total_score = base_score + flavor_bonus + efficiency_score * 10 + rarity_malus
+
+        return total_score
+
+    @staticmethod
+    def get_user_food_inventory(user_id: int) -> list:
+        """获取用户食粮库存"""
+        from src.db.database import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        response = supabase.table('user_food_inventory').select('''
+            quantity,
+            food_templates(*)
+        ''').eq('user_id', user_id).gt('quantity', 0).execute()
+
+        inventory = []
+        for item in response.data:
+            food_data = item['food_templates']
+            food_data['quantity'] = item['quantity']
+            inventory.append(food_data)
+
+        return inventory
+
+    @staticmethod
+    def select_optimal_foods(inventory: list, pet_preferences: dict, mode: str, max_feeds: int = None) -> list:
+        """
+        选择最优食粮组合
+        返回: [(food_data, quantity), ...]
+        """
+        if not inventory:
+            return []
+
+        # 计算每种食粮的评分
+        scored_foods = []
+        for food in inventory:
+            score = AutoFeedingSystem.calculate_food_score(food, pet_preferences, mode)
+            scored_foods.append((food, score))
+
+        # 按评分排序（从高到低）
+        scored_foods.sort(key=lambda x: x[1], reverse=True)
+
+        # 选择食粮进行喂食
+        selected_foods = []
+        remaining_feeds = max_feeds if max_feeds else float('inf')
+
+        for food, score in scored_foods:
+            if remaining_feeds <= 0:
+                break
+
+            if score <= 0:  # 跳过评分为负的食粮
+                continue
+
+            available_quantity = food['quantity']
+            use_quantity = min(available_quantity, remaining_feeds)
+
+            if use_quantity > 0:
+                selected_foods.append((food, use_quantity))
+                remaining_feeds -= use_quantity
+
+        return selected_foods
+
+    @staticmethod
+    def calculate_feeding_needs(current_satiety: int, target_satiety: int = None) -> int:
+        """计算达到目标饱食度需要的喂食次数"""
+        if target_satiety is None:
+            target_satiety = FeedingSystem.SATIETY_MAX
+
+        if current_satiety >= target_satiety:
+            return 0
+
+        # 每次喂食平均增加饱食度（取中位数）
+        avg_satiety_gain = (FeedingSystem.SATIETY_MIN_GAIN + FeedingSystem.SATIETY_MAX_GAIN) / 2
+
+        needed_satiety = target_satiety - current_satiety
+        feeds_needed = math.ceil(needed_satiety / avg_satiety_gain)
+
+        return feeds_needed
+
+    @staticmethod
+    def auto_feed_pet(user_id: int, pet_id: int, mode: str = MODE_OPTIMAL_XP, max_feeds: int = None) -> dict:
+        """
+        一键喂食宠物
+
+        Args:
+            user_id: 用户ID
+            pet_id: 宠物ID
+            mode: 喂食模式
+            max_feeds: 最大喂食次数，None表示喂到饱
+
+        Returns:
+            dict: 喂食结果
+        """
+        from src.db.database import get_supabase_client
+
+        # 获取宠物信息
+        pet_info = get_pet_feeding_info(pet_id)
+        if not pet_info:
+            return {'success': False, 'message': '宠物不存在！'}
+
+        if pet_info['user_id'] != user_id:
+            return {'success': False, 'message': '这只宠物不属于你！'}
+
+        # 检查饱食度
+        if pet_info['satiety'] >= FeedingSystem.SATIETY_MAX:
+            return {'success': False, 'message': '宠物已经吃饱了！'}
+
+        # 计算需要的喂食次数
+        if max_feeds is None:
+            max_feeds = AutoFeedingSystem.calculate_feeding_needs(pet_info['satiety'])
+
+        if max_feeds <= 0:
+            return {'success': False, 'message': '不需要喂食！'}
+
+        # 获取食粮库存
+        inventory = AutoFeedingSystem.get_user_food_inventory(user_id)
+        if not inventory:
+            return {'success': False, 'message': '没有可用的食粮！'}
+
+        # 选择最优食粮组合
+        pet_preferences = {
+            'favorite': pet_info.get('favorite_flavor'),
+            'dislike': pet_info.get('dislike_flavor')
+        }
+
+        selected_foods = AutoFeedingSystem.select_optimal_foods(
+            inventory, pet_preferences, mode, max_feeds
+        )
+
+        if not selected_foods:
+            return {'success': False, 'message': '没有合适的食粮可以使用！'}
+
+        # 执行批量喂食
+        try:
+            result = AutoFeedingSystem.execute_batch_feeding(
+                user_id, pet_id, selected_foods, pet_info
+            )
+            return result
+        except Exception as e:
+            return {'success': False, 'message': f'喂食过程中出错：{str(e)}'}
+
+    @staticmethod
+    def execute_batch_feeding(user_id: int, pet_id: int, selected_foods: list, pet_info: dict) -> dict:
+        """执行批量喂食操作"""
+        from src.db.database import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # 统计信息
+        total_xp_gained = 0
+        total_satiety_gained = 0
+        total_feeds = 0
+        foods_used = []
+        original_level = pet_info['level']
+        original_satiety = pet_info['satiety']
+        original_total_xp = pet_info['xp_total']
+
+        current_satiety = original_satiety
+        current_total_xp = original_total_xp
+
+        # 依次使用选中的食粮
+        for food_data, use_quantity in selected_foods:
+            for _ in range(use_quantity):
+                # 检查饱食度是否已满
+                if current_satiety >= FeedingSystem.SATIETY_MAX:
+                    break
+
+                # 计算这次喂食的收益
+                xp_gained = FeedingSystem.calculate_feeding_xp(
+                    food_data['base_xp'],
+                    food_data['xp_flow'],
+                    pet_info.get('favorite_flavor'),
+                    pet_info.get('dislike_flavor'),
+                    food_data['flavor']
+                )
+
+                satiety_gained = FeedingSystem.calculate_satiety_gain()
+                current_satiety = FeedingSystem.apply_satiety_gain(current_satiety, satiety_gained)
+                current_total_xp += xp_gained
+
+                # 累计统计
+                total_xp_gained += xp_gained
+                total_satiety_gained += satiety_gained
+                total_feeds += 1
+
+                # 记录使用的食粮
+                foods_used.append({
+                    'name': food_data['name'],
+                    'flavor': food_data['flavor'],
+                    'rarity': food_data['rarity'],
+                    'xp_gained': xp_gained,
+                    'flavor_match': food_data['flavor'] == pet_info.get('favorite_flavor')
+                })
+
+                # 扣除食粮库存
+                inventory_response = supabase.table('user_food_inventory').select('quantity').eq('user_id', user_id).eq('food_template_id', food_data['id']).execute()
+
+                if inventory_response.data:
+                    current_quantity = inventory_response.data[0]['quantity']
+                    new_quantity = current_quantity - 1
+
+                    if new_quantity > 0:
+                        supabase.table('user_food_inventory').update({'quantity': new_quantity}).eq('user_id', user_id).eq('food_template_id', food_data['id']).execute()
+                    else:
+                        supabase.table('user_food_inventory').delete().eq('user_id', user_id).eq('food_template_id', food_data['id']).execute()
+
+                # 如果饱食度满了就停止
+                if current_satiety >= FeedingSystem.SATIETY_MAX:
+                    break
+
+        # 计算新等级
+        new_level, new_current_xp, new_next_requirement = FeedingSystem.calculate_current_level_xp(current_total_xp)
+
+        # 更新宠物数据
+        current_time = datetime.now(timezone.utc)
+        update_data = {
+            'xp_total': current_total_xp,
+            'xp_current': new_current_xp,
+            'level': new_level,
+            'satiety': current_satiety,
+            'last_feeding': current_time.isoformat()
+        }
+
+        supabase.table('user_pets').update(update_data).eq('id', pet_id).execute()
+
+        # 检查是否升级
+        level_up = new_level > original_level
+
+        # 统计食粮使用情况
+        food_summary = {}
+        for food in foods_used:
+            key = f"{food['name']}"
+            if key not in food_summary:
+                food_summary[key] = {
+                    'count': 0,
+                    'xp': 0,
+                    'flavor_matches': 0,
+                    'rarity': food['rarity'],
+                    'flavor': food['flavor']
+                }
+            food_summary[key]['count'] += 1
+            food_summary[key]['xp'] += food['xp_gained']
+            if food['flavor_match']:
+                food_summary[key]['flavor_matches'] += 1
+
+        return {
+            'success': True,
+            'total_feeds': total_feeds,
+            'total_xp_gained': total_xp_gained,
+            'total_satiety_gained': total_satiety_gained,
+            'original_level': original_level,
+            'new_level': new_level,
+            'original_satiety': original_satiety,
+            'new_satiety': current_satiety,
+            'level_up': level_up,
+            'food_summary': food_summary,
+            'pet_name': pet_info['name']
+        }
