@@ -6,7 +6,7 @@ from discord.ext import commands
 import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
-from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands, shop_commands
+from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands, shop_commands, forge_commands
 
 # 设置机器人
 intents = discord.Intents.default()
@@ -31,7 +31,8 @@ async def on_ready():
         egg_commands.setup(bot)
         pet_commands.setup(bot)
         shop_commands.setup(bot)
-        print("已注册宠物蛋系统和杂货铺斜杠命令")
+        forge_commands.setup(bot)
+        print("已注册宠物蛋系统、杂货铺和锻造台斜杠命令")
     except Exception as e:
         print(f"注册斜杠命令时出错: {e}")
 
