@@ -1819,7 +1819,7 @@ def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str)
             if info['flavor_matches'] > 0:
                 match_text = f" (匹配偏好 +30% 经验 x{info['flavor_matches']})"
 
-            description += f"• {rarity_color} {food_name} {flavor_emoji} x{info['count']}{match_text}\n"
+            description += f"{rarity_color} {food_name} {flavor_emoji} x{info['count']}{match_text}\n"
         description += "\n"
 
     # 等级变化
