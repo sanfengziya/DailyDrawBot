@@ -12,8 +12,8 @@ class EggCommands(commands.Cog):
         self.bot = bot
 
     # 抽蛋成本配置
-    SINGLE_DRAW_COST = 500
-    TEN_DRAW_COST = 4500
+    SINGLE_DRAW_COST = 250
+    TEN_DRAW_COST = 2500
 
     # 星级配置
     MAX_STARS = {
@@ -538,15 +538,15 @@ class EggDrawView(discord.ui.View):
         super().__init__(timeout=300)
         self.user = user
 
-    @discord.ui.button(label="单抽 (500积分)", style=discord.ButtonStyle.primary, emoji="🎲")
+    @discord.ui.button(label="单抽 (250积分)", style=discord.ButtonStyle.primary, emoji="🎲")
     async def single_draw(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
             await interaction.response.send_message("你无法使用别人的抽蛋界面！", ephemeral=True)
             return
-        
+
         await self.perform_draw(interaction, 1, EggCommands.SINGLE_DRAW_COST)
 
-    @discord.ui.button(label="十连抽 (4500积分)", style=discord.ButtonStyle.success, emoji="🎰")
+    @discord.ui.button(label="十连抽 (2500积分)", style=discord.ButtonStyle.success, emoji="🎰")
     async def ten_draw(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
             await interaction.response.send_message("你无法使用别人的抽蛋界面！", ephemeral=True)
