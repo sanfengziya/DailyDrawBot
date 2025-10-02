@@ -124,21 +124,22 @@ async def egg(interaction: discord.Interaction, action: str):
 
 async def handle_egg_draw(interaction: discord.Interaction):
     """处理抽蛋功能"""
-    # 检查用户积分
+    # 检查用户积分和保底进度
     supabase = get_connection()
-    
+
     try:
         user_internal_id = get_user_internal_id(interaction)
-        result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
-        
+        result = supabase.table("users").select("points, egg_pity_counter").eq("id", user_internal_id).execute()
+
         if not result.data:
             raise Exception("用户积分不存在")
         else:
             points = result.data[0]["points"]
-        
+            pity_counter = result.data[0].get("egg_pity_counter", 0)
+
         # 获取实际的抽蛋概率
         draw_probabilities = EggCommands.get_draw_probabilities()
-        
+
     except Exception as e:
         print(f"抽蛋功能错误: {e}")
         embed = discord.Embed(
@@ -148,22 +149,33 @@ async def handle_egg_draw(interaction: discord.Interaction):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
-    
+
     # 构建概率显示文本
     rarity_names = {'SSR': '💛 传说蛋', 'SR': '💜 史诗蛋', 'R': '💙 稀有蛋', 'C': '🤍 普通蛋'}
     probability_text = "**蛋稀有度概率：**\n"
     for rarity, probability in draw_probabilities:
         probability_text += f"{rarity_names[rarity]}：{float(probability)}%\n"
-    
+
+    # 保底进度显示
+    remaining_draws = 50 - pity_counter
+    pity_text = f"\n**🎯 保底进度：** {pity_counter}/50"
+    if remaining_draws <= 10:
+        pity_text += f" ⚠️ 还有 **{remaining_draws}** 抽必出传说蛋！"
+    elif remaining_draws == 50:
+        pity_text += f" 📊 距离保底还有 {remaining_draws} 抽"
+    else:
+        pity_text += f" 📊 距离保底还有 {remaining_draws} 抽"
+
     embed = create_embed(
         "🎰 抽蛋界面",
         f"你当前有 **{points}** 积分\n\n"
         f"**单抽：** {EggCommands.SINGLE_DRAW_COST} 积分\n"
         f"**十连：** {EggCommands.TEN_DRAW_COST} 积分（9折优惠！）\n\n"
-        f"{probability_text}",
+        f"{probability_text}"
+        f"{pity_text}",
         discord.Color.gold()
     )
-    
+
     view = EggDrawView(interaction.user)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -546,32 +558,36 @@ class EggDrawView(discord.ui.View):
         """执行抽蛋"""
         try:
             supabase = get_connection()
-            
-            # 获取用户数据并检查积分
-            user_data, success, error_msg = get_user_data_sync(interaction, 'id, points')
-            
+
+            # 获取用户数据并检查积分和保底计数
+            user_data, success, error_msg = get_user_data_sync(interaction, 'id, points, egg_pity_counter')
+
             if not success:
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
-                
+
             if user_data['points'] < cost:
                 await interaction.response.send_message(
                     f"积分不足！需要 {cost} 积分，你只有 {user_data['points']} 积分。",
                     ephemeral=True
                 )
                 return
-            
+
             user_id = user_data['id']
-            
+            current_pity = user_data.get('egg_pity_counter', 0)
+
             # 先发送初始响应，避免交互超时
             await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
-            
+
             # 扣除积分
             supabase.table('users').update({'points': user_data['points'] - cost}).eq('id', user_id).execute()
-            
-            # 纯概率抽蛋
-            results = self.draw_eggs(count)
-            
+
+            # 带保底机制的抽蛋
+            results, new_pity = self.draw_eggs_with_pity(count, current_pity)
+
+            # 更新保底计数
+            supabase.table('users').update({'egg_pity_counter': new_pity}).eq('id', user_id).execute()
+
             # 添加蛋到玩家库存
             eggs_to_insert = []
             for rarity in results:
@@ -582,10 +598,10 @@ class EggDrawView(discord.ui.View):
                     'status': 'pending',
                     'created_at': datetime.datetime.now().isoformat(timespec='seconds')
                 })
-            
+
             if eggs_to_insert:
                 supabase.table('user_eggs').insert(eggs_to_insert).execute()
-            
+
         except Exception as e:
             await interaction.edit_original_response(content=f"抽蛋时出错：{str(e)}")
             return
@@ -595,48 +611,82 @@ class EggDrawView(discord.ui.View):
         rarity_count = {}
         for rarity in results:
             rarity_count[rarity] = rarity_count.get(rarity, 0) + 1
-        
+
         for rarity in ['SSR', 'SR', 'R', 'C']:
             if rarity in rarity_count:
                 emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[rarity]
                 name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[rarity]
                 result_text += f"{emoji} {name}蛋 x{rarity_count[rarity]}\n"
-        
+
+        # 检查是否触发了保底
+        pity_triggered = current_pity + count > 49 and 'SSR' in rarity_count
+        pity_info = ""
+        if pity_triggered and current_pity >= 49:
+            pity_info = "\n\n🎯 **恭喜！触发50抽保底，获得传说蛋！**"
+
+        # 显示新的保底进度
+        remaining = 50 - new_pity
+        pity_progress = f"\n**保底进度：** {new_pity}/50 (距离保底还有 {remaining} 抽)"
+
         embed = create_embed(
             f"🎉 抽蛋结果 - {count}抽",
             f"**{interaction.user.mention} 获得：**\n{result_text}\n"
-            f"**消耗：** {cost} 积分",
+            f"**消耗：** {cost} 积分"
+            f"{pity_info}"
+            f"{pity_progress}",
             discord.Color.green()
         )
-        
+
         # 先编辑原始私有消息
         await interaction.edit_original_response(content="✅ 抽蛋完成！", embed=None, view=None)
         # 然后发送公开的结果消息
         await interaction.followup.send(embed=embed)
 
-    def draw_eggs(self, count):
-        """纯概率抽蛋，无保底机制"""
+    def draw_eggs_with_pity(self, count, current_pity):
+        """
+        带保底机制的抽蛋系统
+
+        Args:
+            count: 抽取次数
+            current_pity: 当前保底计数
+
+        Returns:
+            tuple: (results, new_pity) - 抽取结果列表和新的保底计数
+        """
         # 获取抽蛋概率配置
         draw_probabilities = EggCommands.get_draw_probabilities()
-        
+
         results = []
-        
+        pity = current_pity
+
         for i in range(count):
-            # 使用数据库配置的概率进行抽取
-            rand = random.random() * 100
-            cumulative_prob = 0
-            
-            # 按概率从高到低排序，累积概率判断
-            for rarity, probability in draw_probabilities:
-                cumulative_prob += float(probability)
-                if rand < cumulative_prob:
-                    results.append(rarity)
-                    break
+            # 检查是否达到保底（50抽）
+            if pity >= 49:  # 因为是0-49，所以49就是第50抽
+                # 保底触发，必出SSR
+                results.append('SSR')
+                pity = 0  # 重置保底计数
             else:
-                # 如果没有匹配到任何概率（理论上不应该发生），默认给C
-                results.append('C')
-        
-        return results
+                # 正常概率抽取
+                rand = random.random() * 100
+                cumulative_prob = 0
+                drawn_rarity = 'C'  # 默认值
+
+                # 按概率从高到低排序，累积概率判断
+                for rarity, probability in draw_probabilities:
+                    cumulative_prob += float(probability)
+                    if rand < cumulative_prob:
+                        drawn_rarity = rarity
+                        break
+
+                results.append(drawn_rarity)
+
+                # 如果抽到SSR，重置保底计数；否则增加计数
+                if drawn_rarity == 'SSR':
+                    pity = 0
+                else:
+                    pity += 1
+
+        return results, pity
 
 
 class EggHatchView(discord.ui.View):

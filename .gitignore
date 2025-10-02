@@ -229,6 +229,7 @@ project_rules.md
 # readme
 PET_SYSTEM_README.md
 README.env
+
 CLAUDE.md
 .mcp.json
 宠物喂食以及等级方案.md
@@ -245,3 +246,4 @@ test_resetshop_command.py
 项目概括.md
 data.md
 KOFI_SETUP.md
+test_pity_system.py
