@@ -400,7 +400,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
                 'rarity_name': rarity_names[pet_rarity],
                 'emoji': rarity_emojis[pet_rarity],
                 'stars': initial_stars,
-                'egg_rarity': rarity  # 记录原始蛋的稀有度
+                'egg_rarity': rarity_names[rarity]  # 记录原始蛋的稀有度
             })
             
     except Exception as e:
@@ -431,7 +431,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         result_text = ""
         for pet in claimed_pets:
             stars_text = "⭐" * pet['stars']
-            result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text}\n"
+            result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} ({pet['egg_rarity']})\n"
         
         embed = create_embed(
             "🎉 宠物领取成功！",
