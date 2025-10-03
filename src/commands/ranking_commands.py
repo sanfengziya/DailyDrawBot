@@ -3,24 +3,25 @@ from discord import File
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import os
+from src.utils.ranking import RankingManager
 
 async def ranking(ctx):
     try:
-        from src.db.database import get_supabase_client
-        supabase = get_supabase_client()
-        
         # 获取当前服务器ID
-        guild_id = str(ctx.guild.id)
-        
-        # 查询当前服务器排名前10的用户
-        ranking_response = supabase.table('users').select('discord_user_id, points').eq('guild_id', guild_id).order('points', desc=True).limit(10).execute()
-        
-        if not ranking_response.data:
-            await ctx.send("当前服务器还没有排名数据。")
-            return
-            
-        rows = [(user['discord_user_id'], user['points']) for user in ranking_response.data]
-        
+        guild_id = ctx.guild.id
+
+        # 使用Redis获取排行榜数据
+        rows = RankingManager.get_top_rankings(guild_id, limit=10)
+
+        if not rows:
+            # 如果Redis没有数据,从数据库初始化
+            await RankingManager.initialize_ranking(guild_id)
+            rows = RankingManager.get_top_rankings(guild_id, limit=10)
+
+            if not rows:
+                await ctx.send("当前服务器还没有排名数据。")
+                return
+
     except Exception as e:
         await ctx.send(f"查询排名数据时出错：{str(e)}")
         return

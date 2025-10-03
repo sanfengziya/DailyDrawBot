@@ -1,11 +1,11 @@
 import discord
 import datetime
 from src.db.database import get_connection
-from src.utils.helpers import now_est, get_user_internal_id
+from src.utils.helpers import now_est, get_user_internal_id_with_guild_and_discord_id
 
 async def debug_user(ctx, member):
     """调试用户的付费抽奖信息"""
-    user_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+    user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
     if user_internal_id is None:
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
         return
@@ -45,7 +45,7 @@ async def debug_user(ctx, member):
 
 async def test_update(ctx, member):
     """测试付费抽奖的数据库更新"""
-    user_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+    user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
     if user_internal_id is None:
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
         return
@@ -137,7 +137,7 @@ async def check_database(ctx):
 
 async def detailed_debug(ctx, member):
     """详细调试用户数据"""
-    user_internal_id = get_user_internal_id(ctx.guild.id, member.id)
+    user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
     if user_internal_id is None:
         await ctx.send(f"❌ 用户 {member.mention} 不存在于数据库中。")
         return

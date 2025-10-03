@@ -5,40 +5,31 @@ import datetime
 from src.db.database import get_connection, get_missing_user_id, create_user_with_specific_id
 from src.utils.helpers import now_est, get_weighted_reward, get_user_id_with_validation_ctx
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
+from src.utils.cache import UserCache
+from src.utils.draw_limiter import DrawLimiter
 
 async def draw(ctx):
     discord_user_id = ctx.author.id
     guild_id = ctx.guild.id
-    today = now_est().date()
-    
+
     try:
         supabase = get_connection()
-        
-        # 查询用户信息
-        user_response = supabase.table('users').select('id, points, last_draw_date, paid_draws_today, last_paid_draw_date').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
-        
-        if user_response.data:
-            user_data = user_response.data[0]
-            user_id = user_data['id']
-            points = user_data['points'] or 0
-            last_draw_date = datetime.datetime.strptime(user_data['last_draw_date'], '%Y-%m-%d').date() if user_data['last_draw_date'] else datetime.date(1970, 1, 1)
-            paid_draws_today = user_data['paid_draws_today'] or 0
-            last_paid_draw_date = datetime.datetime.strptime(user_data['last_paid_draw_date'], '%Y-%m-%d').date() if user_data['last_paid_draw_date'] else datetime.date(1970, 1, 1)
-        else:
+
+        # 使用Redis缓存获取用户ID
+        user_id = await UserCache.get_user_id(guild_id, discord_user_id)
+
+        if user_id is None:
             # 创建新用户 - 优先使用缺失的ID（1-6）
             missing_id = get_missing_user_id()
-            
+
             if missing_id is not None:
-                # 使用缺失的ID创建用户
                 create_response = create_user_with_specific_id(missing_id, ctx.guild.id, ctx.author.id)
                 if create_response:
                     user_id = create_response['id']
-                    points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
                 else:
                     await ctx.send("创建用户时出错，请稍后重试。")
                     return
             else:
-                # 1-6都已存在，使用正常的自增长ID
                 create_response = supabase.table('users').insert({
                     'guild_id': ctx.guild.id,
                     'discord_user_id': ctx.author.id,
@@ -48,22 +39,24 @@ async def draw(ctx):
                     'last_paid_draw_date': '1970-01-01'
                 }).execute()
                 user_id = create_response.data[0]['id']
-                points, last_draw_date, paid_draws_today, last_paid_draw_date = 0, datetime.date(1970, 1, 1), 0, datetime.date(1970, 1, 1)
-            
+
+        # 使用Redis检查免费抽奖
+        first_draw = DrawLimiter.check_free_draw_available(guild_id, discord_user_id)
+
+        # 使用Redis获取用户积分
+        points = await UserCache.get_points(guild_id, discord_user_id)
+
     except Exception as e:
         await ctx.send(f"查询用户数据时出错：{str(e)}")
         return
-
-    first_draw = last_draw_date != today
-    
-    # 如果是新的一天，重置付费抽奖计数器
-    if last_paid_draw_date != today:
-        paid_draws_today = 0
 
     if first_draw:
         # 当天第一次抽奖 - 免费！
         await ctx.send(f"🎉 {ctx.author.mention} 开始今天的抽奖吧！")
     else:
+        # 使用Redis获取付费抽奖次数
+        paid_draws_today = DrawLimiter.get_paid_draw_count(guild_id, discord_user_id)
+
         # 检查用户是否已达到每日付费抽奖上限
         if paid_draws_today >= MAX_PAID_DRAWS_PER_DAY:
             embed = discord.Embed(
@@ -73,7 +66,7 @@ async def draw(ctx):
             )
             await ctx.send(embed=embed)
             return
-        
+
         if points < WHEEL_COST:
             embed = discord.Embed(
                 title="❌ 积分不足",
@@ -104,36 +97,55 @@ async def draw(ctx):
             await ctx.send("❌ 已取消抽奖。")
             return
 
-        # 扣除积分
+        # 先尝试增加付费抽奖计数 (使用Lua脚本原子性检查)
+        increment_success = DrawLimiter.increment_paid_draw(guild_id, discord_user_id, MAX_PAID_DRAWS_PER_DAY)
+        if not increment_success:
+            # 虽然前面检查通过了，但在用户确认期间可能其他地方也在抽奖，导致超限
+            await ctx.send("❌ 抽奖失败：已达到每日付费抽奖上限（可能有其他操作占用了名额）")
+            return
+
+        # 扣除积分 (使用UserCache更新)
         try:
-            supabase.table('users').update({
-                'points': points - WHEEL_COST
-            }).eq('id', user_id).execute()
+            await UserCache.update_points(guild_id, discord_user_id, user_id, -WHEEL_COST)
         except Exception as e:
+            # 扣除积分失败，需要回滚计数
+            from src.db.redis_client import redis_client
+            today_str = now_est().date()
+            paid_key = f'draw:paid:{guild_id}:{discord_user_id}:{today_str}'
+            redis_client.decr(paid_key)  # 回滚计数
             await ctx.send(f"扣除积分时出错：{str(e)}")
             return
 
     reward = get_weighted_reward()
-    
+    today = now_est().date()
+
     if first_draw:
-        # 免费抽奖 - 只更新积分和最后抽奖日期
+        # 免费抽奖 - 更新积分并标记今日免费抽奖已使用
         try:
+            # 更新积分到数据库和缓存
+            await UserCache.update_points(guild_id, discord_user_id, user_id, reward["points"])
+
+            # 更新数据库中的last_draw_date
             supabase.table('users').update({
-                'points': points + reward["points"],
                 'last_draw_date': str(today)
             }).eq('id', user_id).execute()
+
+            # 标记免费抽奖已使用 (Redis自动过期)
+            DrawLimiter.mark_free_draw_used(guild_id, discord_user_id)
         except Exception as e:
             await ctx.send(f"更新用户数据时出错：{str(e)}")
             return
     else:
-        # 付费抽奖 - 更新积分、最后抽奖日期、今日付费抽奖次数和最后付费抽奖日期
-        new_paid_draws = paid_draws_today + 1
-        new_points = points - WHEEL_COST + reward["points"]
+        # 付费抽奖 - 增加积分
         try:
+            # 更新积分 (已经扣除了WHEEL_COST，现在加上奖励积分)
+            await UserCache.update_points(guild_id, discord_user_id, user_id, reward["points"])
+
+            # 更新数据库中的抽奖记录 (计数已在Redis中增加)
+            paid_draws_today = DrawLimiter.get_paid_draw_count(guild_id, discord_user_id)
             supabase.table('users').update({
-                'points': new_points,
                 'last_draw_date': str(today),
-                'paid_draws_today': new_paid_draws,
+                'paid_draws_today': paid_draws_today,  # 使用Redis中的当前值
                 'last_paid_draw_date': str(today)
             }).eq('id', user_id).execute()
         except Exception as e:
@@ -170,63 +182,49 @@ async def check(ctx, member=None):
     target_user = member if member else ctx.author
     discord_user_id = target_user.id
     guild_id = ctx.guild.id
-    
+
     try:
-        supabase = get_connection()
-        
-        # 查询用户信息
-        user_response = supabase.table('users').select('points, last_draw_date, paid_draws_today, last_paid_draw_date').eq('discord_user_id', discord_user_id).eq('guild_id', guild_id).execute()
-        
-        if user_response.data:
-            user_data = user_response.data[0]
-            points = user_data['points']
-            last_draw = user_data['last_draw_date']
-            paid_draws_today = user_data['paid_draws_today'] or 0
-            last_paid_draw_date = user_data['last_paid_draw_date']
-            
+        # 使用Redis缓存获取用户ID
+        user_id = await UserCache.get_user_id(guild_id, discord_user_id)
+
+        if user_id is None:
+            # 用户不存在
+            embed = discord.Embed(
+                title="❌ 用户信息",
+                description=f"{target_user.mention} 还没有参与过抽奖~",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # 使用Redis获取积分
+        points = await UserCache.get_points(guild_id, discord_user_id)
+
+        # 使用Redis检查今日是否已抽奖
+        free_draw_available = DrawLimiter.check_free_draw_available(guild_id, discord_user_id)
+
+        # 使用Redis获取付费抽奖次数
+        paid_draws_today = DrawLimiter.get_paid_draw_count(guild_id, discord_user_id)
+
     except Exception as e:
         await ctx.send(f"查询用户数据时出错：{str(e)}")
         return
 
-    if user_response.data: 
+    # 显示用户积分信息
+    embed = discord.Embed(
+        title=f"💰 {member.display_name if member else ctx.author.display_name} 的积分信息",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="当前积分", value=f"**{points}** 分", inline=True)
 
-        embed = discord.Embed(
-            title=f"💰 {member.display_name if member else ctx.author.display_name} 的积分信息",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="当前积分", value=f"**{points}** 分", inline=True)
-        
-        if last_draw and last_draw != "1970-01-01":
-            if isinstance(last_draw, str):
-                last_draw_date = datetime.datetime.strptime(last_draw, "%Y-%m-%d").date()
-            else:
-                last_draw_date = last_draw.date() if hasattr(last_draw, 'date') else last_draw
-            
-            today = now_est().date()
-            if last_draw_date == today:
-                embed.add_field(name="今日抽奖", value="✅ 已完成", inline=True)
-            else:
-                embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
-        else:
-            embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
-        
-        today = now_est().date()
-        # 只有在确实是新的一天且需要显示重置值时才重置
-        # 出于显示目的，我们将显示实际的数据库值
-        display_paid_draws = paid_draws_today
-        if str(last_paid_draw_date) != str(today):
-            # 这只是用于显示计算，不修改实际值
-            display_paid_draws = 0
-        
-        remaining_draws = MAX_PAID_DRAWS_PER_DAY - display_paid_draws
-        embed.add_field(name="付费抽奖", value=f"**{display_paid_draws}/{MAX_PAID_DRAWS_PER_DAY}** 次\n剩余: **{remaining_draws}** 次", inline=True)
-        
-        await ctx.send(embed=embed)
+    # 显示今日免费抽奖状态
+    if free_draw_available:
+        embed.add_field(name="今日抽奖", value="❌ 未完成", inline=True)
     else:
-        target_user = member if member else ctx.author
-        embed = discord.Embed(
-            title="❌ 用户信息",
-            description=f"{target_user.mention} 还没有参与过抽奖~",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
+        embed.add_field(name="今日抽奖", value="✅ 已完成", inline=True)
+
+    # 显示付费抽奖次数
+    remaining_draws = MAX_PAID_DRAWS_PER_DAY - paid_draws_today
+    embed.add_field(name="付费抽奖", value=f"**{paid_draws_today}/{MAX_PAID_DRAWS_PER_DAY}** 次\n剩余: **{remaining_draws}** 次", inline=True)
+
+    await ctx.send(embed=embed)

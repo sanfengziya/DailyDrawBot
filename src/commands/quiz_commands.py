@@ -2,7 +2,7 @@ import discord
 import asyncio
 import random
 from src.db.database import get_connection
-from src.utils.helpers import get_user_internal_id
+from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
 
 async def quizlist(ctx):
     supabase = get_connection()
@@ -186,7 +186,7 @@ async def quiz(ctx, category, number):
                 
                 try:
                     # 获取用户内部ID
-                    user_internal_id = get_user_internal_id(ctx.guild.id, reply.author.id)
+                    user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, reply.author.id)
                     if not user_internal_id:
                         print(f"获取用户内部ID失败: {reply.author.id}")
                         continue
@@ -203,8 +203,12 @@ async def quiz(ctx, category, number):
                     else:
                         # 用户不存在，创建新记录
                         supabase.table("users").insert({
+                            "guild_id": ctx.guild.id,
+                            "discord_user_id": reply.author.id,
                             "points": 10,
-                            "last_draw_date": "1970-01-01"
+                            "last_draw_date": "1970-01-01",
+                            "paid_draws_today": 0,
+                            "last_paid_draw_date": "1970-01-01"
                         }).execute()
                         
                 except Exception as e:

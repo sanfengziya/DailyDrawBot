@@ -6,8 +6,8 @@
 import asyncio
 import datetime
 from typing import Optional
-import pytz
 from src.utils.feeding_system import FoodShopManager
+from src.utils.helpers import now_est
 
 class FeedingScheduler:
     """喂食系统定时任务调度器"""
@@ -45,12 +45,11 @@ class FeedingScheduler:
         while self.running:
             try:
                 # 获取当前美东时间
-                est = pytz.timezone('US/Eastern')
-                now_est = datetime.datetime.now(est)
+                current_est = now_est()
 
                 # 检查是否到达重置时间点
-                await self._check_satiety_reset(now_est)
-                await self._check_shop_refresh(now_est)
+                await self._check_satiety_reset(current_est)
+                await self._check_shop_refresh(current_est)
 
                 # 等待1分钟再次检查
                 await asyncio.sleep(60)
@@ -169,24 +168,23 @@ async def admin_refresh_shop():
 
 def get_next_reset_times():
     """获取下次重置时间信息"""
-    est = pytz.timezone('US/Eastern')
-    now_est = datetime.datetime.now(est)
+    current_est = now_est()
 
     # 计算下次饱食度重置时间
-    today = now_est.replace(hour=0, minute=0, second=0, microsecond=0)
-    noon_today = now_est.replace(hour=12, minute=0, second=0, microsecond=0)
+    today = current_est.replace(hour=0, minute=0, second=0, microsecond=0)
+    noon_today = current_est.replace(hour=12, minute=0, second=0, microsecond=0)
     midnight_tomorrow = today + datetime.timedelta(days=1)
 
     next_satiety_reset = None
-    if now_est < noon_today:
+    if current_est < noon_today:
         next_satiety_reset = noon_today
-    elif now_est < midnight_tomorrow:
+    elif current_est < midnight_tomorrow:
         next_satiety_reset = midnight_tomorrow
     else:
         next_satiety_reset = midnight_tomorrow
 
     # 计算下次杂货铺刷新时间
-    if now_est.hour >= 0:
+    if current_est.hour >= 0:
         next_shop_refresh = today + datetime.timedelta(days=1)
     else:
         next_shop_refresh = today
@@ -194,5 +192,5 @@ def get_next_reset_times():
     return {
         'next_satiety_reset': next_satiety_reset,
         'next_shop_refresh': next_shop_refresh,
-        'current_est_time': now_est
+        'current_est_time': current_est
     }

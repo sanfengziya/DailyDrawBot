@@ -247,3 +247,9 @@ test_resetshop_command.py
 data.md
 KOFI_SETUP.md
 test_pity_system.py
+docs/Redis_Migration_Plan.md
+src/commands/draw_commands.py
+migrate_to_redis.py
+test_redis_integration.py
+docs/Redis_Migration_Completed.md
+docs/redis_supabase_audit.md

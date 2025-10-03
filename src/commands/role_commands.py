@@ -3,6 +3,7 @@ import asyncio
 from src.db.database import get_connection
 from src.utils.ui import RolePageView
 from src.utils.helpers import get_user_internal_id, get_user_internal_id_with_guild_and_discord_id
+from src.utils.cache import UserCache
 
 async def addtag(ctx, price, role):
     supabase = get_connection()
@@ -53,15 +54,14 @@ async def buytag(ctx, role_name):
             return
         price = tag_result.data[0]["price"]
 
-        # 获取用户内部ID
-        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, ctx.author.id)
+        # 获取用户内部ID和积分
+        user_internal_id = await UserCache.get_user_id(ctx.guild.id, ctx.author.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
-            
-        # 获取用户积分
-        user_result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
-        if not user_result.data or user_result.data[0]["points"] < price:
+
+        current_points = await UserCache.get_points(ctx.guild.id, ctx.author.id)
+        if current_points < price:
             await ctx.send("你的分数不足。")
             return
 
@@ -80,10 +80,7 @@ async def buytag(ctx, role_name):
             return
 
         # 扣除积分
-        current_points = user_result.data[0]["points"]
-        supabase.table("users").update({
-            "points": current_points - price
-        }).eq("id", user_internal_id).execute()
+        await UserCache.update_points(ctx.guild.id, ctx.author.id, user_internal_id, -price)
 
         await ctx.author.add_roles(role)
         await ctx.send(f"✅ 你已购买并获得 `{role.name}` 身份组。")
@@ -107,21 +104,15 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
     supabase = get_connection()
     
     try:
-        # 获取赠送者内部ID
-        sender_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, ctx.author.id)
+        # 获取赠送者内部ID和积分
+        sender_internal_id = await UserCache.get_user_id(ctx.guild.id, ctx.author.id)
         if not sender_internal_id:
             await ctx.send("❌ 用户信息获取失败，请稍后重试。")
             return
-            
+
         # 检查赠送者是否有足够积分
-        sender_result = supabase.table("users").select("points").eq("id", sender_internal_id).execute()
-        
-        if not sender_result.data:
-            await ctx.send("❌ 你还没有积分记录，无法赠送积分。")
-            return
-            
-        sender_points = sender_result.data[0]["points"]
-        
+        sender_points = await UserCache.get_points(ctx.guild.id, ctx.author.id)
+
         if sender_points < amount:
             await ctx.send(f"❌ 你的积分不足！当前积分: {sender_points}")
             return
@@ -147,30 +138,14 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
             return
         
         # 获取接收者内部ID
-        receiver_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
+        receiver_internal_id = await UserCache.get_user_id(ctx.guild.id, member.id)
         if not receiver_internal_id:
             await ctx.send("❌ 接收者信息获取失败，请稍后重试。")
             return
-        
+
         # 执行积分转移
-        supabase.table("users").update({
-            "points": sender_points - amount
-        }).eq("id", sender_internal_id).execute()
-        
-        # 为接收者添加积分
-        receiver_result = supabase.table("users").select("points").eq("id", receiver_internal_id).execute()
-        if receiver_result.data:
-            # 用户存在，更新积分
-            current_points = receiver_result.data[0]["points"]
-            supabase.table("users").update({
-                "points": current_points + amount
-            }).eq("id", receiver_internal_id).execute()
-        else:
-            # 用户不存在，创建新记录
-            supabase.table("users").insert({
-                "points": amount,
-                "last_draw_date": "1970-01-01"
-            }).execute()
+        await UserCache.update_points(ctx.guild.id, ctx.author.id, sender_internal_id, -amount)
+        await UserCache.update_points(ctx.guild.id, member.id, receiver_internal_id, amount)
         
         # 发送成功消息
         embed = discord.Embed(
@@ -185,65 +160,40 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
         await ctx.send("积分赠送失败，请稍后重试。")
 
 async def givepoints(ctx, member: discord.Member, amount: int):
-    supabase = get_connection()
-    
     try:
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
+        user_internal_id = await UserCache.get_user_id(ctx.guild.id, member.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
-            
-        # 获取用户当前积分
-        user_result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
-        
-        if user_result.data:
-            # 用户存在，更新积分
-            current_points = user_result.data[0]["points"]
-            supabase.table("users").update({
-                "points": current_points + amount
-            }).eq("id", user_internal_id).execute()
-        else:
-            # 用户不存在，创建新记录
-            supabase.table("users").insert({
-                "points": amount,
-                "last_draw_date": "1970-01-01"
-            }).execute()
-        
+
+        # 增加用户积分
+        await UserCache.update_points(ctx.guild.id, member.id, user_internal_id, amount)
+
         await ctx.send(f"{ctx.author.mention} 已给予 {member.mention} {amount} 分。")
-        
+
     except Exception as e:
         print(f"给予积分失败: {e}")
         await ctx.send("给予积分失败，请稍后重试。")
 
 async def setpoints(ctx, member: discord.Member, points: int):
     """将成员的积分精确设置为指定值。"""
-    supabase = get_connection()
-    
     try:
         # 获取用户内部ID
-        user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, member.id)
+        user_internal_id = await UserCache.get_user_id(ctx.guild.id, member.id)
         if not user_internal_id:
             await ctx.send("用户信息获取失败，请稍后重试。")
             return
-            
-        # 为用户设置积分
-        user_result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
-        
-        if user_result.data:
-            # 用户存在，更新积分
-            supabase.table("users").update({
-                "points": points
-            }).eq("id", user_internal_id).execute()
-        else:
-            # 用户不存在，创建新记录
-            supabase.table("users").insert({
-                "points": points,
-                "last_draw_date": "1970-01-01"
-            }).execute()
-        
+
+        # 获取当前积分并计算差值
+        current_points = await UserCache.get_points(ctx.guild.id, member.id)
+        delta = points - current_points
+
+        # 使用差值更新积分
+        await UserCache.update_points(ctx.guild.id, member.id, user_internal_id, delta)
+
         await ctx.send(f"{ctx.author.mention} 已将 {member.mention} 的分数设为 {points} 分。")
-        
+
     except Exception as e:
         print(f"设置积分失败: {e}")
         await ctx.send("设置积分失败，请稍后重试。")

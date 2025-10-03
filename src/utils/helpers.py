@@ -1,14 +1,21 @@
 import datetime
-import pytz
 import random
+from zoneinfo import ZoneInfo
 from src.config.config import REWARD_SYSTEM
 from src.db.database import get_connection
 
-# 转换 UTC 到 UTC-4 时间
+# 统一使用的美东时区, zoneinfo 会根据DST自动调整
+EASTERN_TZ = ZoneInfo("America/New_York")
+
+
 def now_est():
-    utc_now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
-    est = pytz.timezone("Etc/GMT+4")
-    return utc_now.astimezone(est)
+    """
+    获取当前美东时间
+    使用US/Eastern时区,自动处理夏令时(DST)
+    - 夏令时 (3月-11月): UTC-4
+    - 标准时间 (11月-3月): UTC-5
+    """
+    return datetime.datetime.now(datetime.timezone.utc).astimezone(EASTERN_TZ)
 
 def get_weighted_reward():
     """根据加权概率获取随机奖励"""

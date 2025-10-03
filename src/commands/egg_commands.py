@@ -6,6 +6,8 @@ import datetime
 from src.db.database import get_connection
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id, get_user_data_sync
+from src.utils.draw_limiter import DrawLimiter
+from src.utils.cache import UserCache
 
 class EggCommands(commands.Cog):
     def __init__(self, bot):
@@ -129,13 +131,14 @@ async def handle_egg_draw(interaction: discord.Interaction):
 
     try:
         user_internal_id = get_user_internal_id(interaction)
-        result = supabase.table("users").select("points, egg_pity_counter").eq("id", user_internal_id).execute()
+        guild_id = interaction.guild.id
+        discord_user_id = interaction.user.id
 
-        if not result.data:
-            raise Exception("用户积分不存在")
-        else:
-            points = result.data[0]["points"]
-            pity_counter = result.data[0].get("egg_pity_counter", 0)
+        # 使用Redis缓存获取用户积分
+        points = await UserCache.get_points(guild_id, discord_user_id)
+
+        # 使用Redis获取保底计数
+        pity_counter = DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
 
         # 获取实际的抽蛋概率
         draw_probabilities = EggCommands.get_draw_probabilities()
@@ -558,35 +561,49 @@ class EggDrawView(discord.ui.View):
         """执行抽蛋"""
         try:
             supabase = get_connection()
+            guild_id = interaction.guild.id
+            discord_user_id = interaction.user.id
 
-            # 获取用户数据并检查积分和保底计数
-            user_data, success, error_msg = get_user_data_sync(interaction, 'id, points, egg_pity_counter')
-
-            if not success:
-                await interaction.response.send_message(error_msg, ephemeral=True)
+            # 获取用户ID
+            user_id = await UserCache.get_user_id(guild_id, discord_user_id)
+            if not user_id:
+                await interaction.response.send_message("用户数据不存在", ephemeral=True)
                 return
 
-            if user_data['points'] < cost:
+            # 使用Redis获取积分
+            points = await UserCache.get_points(guild_id, discord_user_id)
+
+            if points < cost:
                 await interaction.response.send_message(
-                    f"积分不足！需要 {cost} 积分，你只有 {user_data['points']} 积分。",
+                    f"积分不足！需要 {cost} 积分，你只有 {points} 积分。",
                     ephemeral=True
                 )
                 return
 
-            user_id = user_data['id']
-            current_pity = user_data.get('egg_pity_counter', 0)
+            # 使用Redis获取保底计数
+            current_pity = DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
 
             # 先发送初始响应，避免交互超时
             await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
 
-            # 扣除积分
-            supabase.table('users').update({'points': user_data['points'] - cost}).eq('id', user_id).execute()
+            # 扣除积分 (使用UserCache更新缓存)
+            await UserCache.update_points(guild_id, discord_user_id, user_id, -cost)
 
             # 带保底机制的抽蛋
             results, new_pity = self.draw_eggs_with_pity(count, current_pity)
 
-            # 更新保底计数
+            # 更新数据库中的保底计数
             supabase.table('users').update({'egg_pity_counter': new_pity}).eq('id', user_id).execute()
+
+            # 更新Redis中的保底计数
+            if new_pity == 0:
+                # 触发保底，重置计数
+                DrawLimiter.reset_egg_pity(guild_id, discord_user_id)
+            else:
+                # 直接设置新的保底计数
+                from src.db.redis_client import redis_client
+                key = f'egg:pity:{guild_id}:{discord_user_id}'
+                redis_client.set(key, new_pity)
 
             # 添加蛋到玩家库存
             eggs_to_insert = []
