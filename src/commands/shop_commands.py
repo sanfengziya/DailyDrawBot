@@ -54,6 +54,7 @@ async def get_today_shop_items() -> List[Dict]:
 
     supabase = get_supabase_client()
     today = date.today()
+    print(today)
 
     # 获取今日商品目录
     catalog_response = supabase.table('daily_shop_catalog').select('''
