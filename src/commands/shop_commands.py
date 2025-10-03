@@ -2,7 +2,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from typing import List, Dict
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id, get_user_internal_id_with_guild_and_discord_id
 
@@ -53,8 +54,7 @@ async def get_today_shop_items() -> List[Dict]:
     from src.db.database import get_supabase_client
 
     supabase = get_supabase_client()
-    today = date.today()
-    print(today)
+    today = datetime.now(ZoneInfo("America/New_York")).date()
 
     # 获取今日商品目录
     catalog_response = supabase.table('daily_shop_catalog').select('''
@@ -190,7 +190,7 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
         supabase = get_supabase_client()
         user_points = 0
         food_purchased_today = 0
-        today = date.today()
+        today = datetime.now(ZoneInfo("America/New_York")).date()
 
         try:
             user_resp = supabase.table('users').select(
