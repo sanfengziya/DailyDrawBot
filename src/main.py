@@ -23,7 +23,8 @@ async def on_ready():
         ('egg_commands', egg_commands.setup),
         ('pet_commands', pet_commands.setup),
         ('shop_commands', shop_commands.setup),
-        ('forge_commands', forge_commands.setup)
+        ('forge_commands', forge_commands.setup),
+        ('role_commands', role_commands.setup)
     ]
 
     for module_name, setup_func in setup_functions:
@@ -195,13 +196,20 @@ async def scheduler_status(ctx):
 async def addtag(ctx, price: int, role: discord.Role):
     await role_commands.addtag(ctx, price, role)
 
-@bot.command(name="roleshop")
-async def roleshop(ctx):
-    await role_commands.roleshop(ctx)
+@bot.command(name="removetag")
+@commands.has_permissions(administrator=True)
+async def removetag(ctx, role: discord.Role):
+    await role_commands.removetag(ctx, role)
 
-@bot.command(name="buytag")
-async def buytag(ctx, *, role_name: str):
-    await role_commands.buytag(ctx, role_name)
+@bot.command(name="updatetagprice")
+@commands.has_permissions(administrator=True)
+async def updatetagprice(ctx, role: discord.Role, new_price: int):
+    await role_commands.updatetagprice(ctx, role, new_price)
+
+@bot.command(name="listtags")
+@commands.has_permissions(administrator=True)
+async def listtags(ctx):
+    await role_commands.listtags(ctx)
 
 @bot.command(name="giftpoints")
 async def giftpoints(ctx, member: discord.Member, amount: int):
