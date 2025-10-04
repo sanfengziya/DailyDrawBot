@@ -7,12 +7,66 @@ import os
 
 from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
 from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands, shop_commands, forge_commands
+from src.db.database import is_guild_subscribed
 
 # 设置机器人
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
+
+@bot.check
+async def check_guild_subscription(ctx):
+    """
+    全局检查：验证服务器是否有有效订阅
+    如果没有订阅或订阅已失效，拒绝执行命令
+    """
+    # 检查订阅状态的命令不受限制
+    if ctx.command and ctx.command.name == 'checksubscription':
+        return True
+
+    # 如果是DM（私信）中的命令，直接拒绝
+    if ctx.guild is None:
+        await ctx.send("❌ 此机器人只能在服务器中使用")
+        return False
+
+    # 检查服务器订阅状态
+    if not is_guild_subscribed(ctx.guild.id):
+        await ctx.send("❌ 此服务器未订阅或订阅已失效，无法使用机器人功能")
+        return False
+
+    return True
+
+async def check_interaction_guild_subscription(interaction: discord.Interaction) -> bool:
+    """
+    检查交互命令的服务器订阅状态
+    """
+    # 如果不在服务器中，拒绝
+    if interaction.guild is None:
+        await interaction.response.send_message("❌ 此机器人只能在服务器中使用", ephemeral=True)
+        return False
+
+    # 检查服务器订阅状态
+    if not is_guild_subscribed(interaction.guild.id):
+        await interaction.response.send_message("❌ 此服务器未订阅或订阅已失效，无法使用机器人功能", ephemeral=True)
+        return False
+
+    return True
+
+# 为所有斜杠命令添加全局检查
+bot.tree.interaction_check = check_interaction_guild_subscription
+
+@bot.event
+async def on_command_error(ctx, error):
+    """
+    处理命令错误，特别是订阅检查失败的情况
+    """
+    if isinstance(error, commands.CheckFailure):
+        # 订阅检查已经在check函数中发送了消息，这里不需要额外处理
+        pass
+    else:
+        # 处理其他错误
+        print(f"命令错误: {error}")
 
 @bot.event
 async def on_ready():
@@ -98,6 +152,11 @@ async def rewardinfo(ctx):
 @commands.has_permissions(administrator=True)
 async def testdraw(ctx, times: int = 100):
     await debug_commands.testdraw(ctx, times)
+
+@bot.command(name="checksubscription")
+@commands.has_permissions(administrator=True)
+async def check_subscription(ctx):
+    await debug_commands.check_subscription(ctx)
 
 # 添加喂食系统管理命令
 @bot.command(name="resetsatiety")

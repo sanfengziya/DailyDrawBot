@@ -272,7 +272,7 @@ def create_user_with_specific_id(user_id: int, guild_id: str, discord_user_id: s
     """
     try:
         supabase = get_connection()
-        
+
         result = supabase.table('users').insert({
             'id': user_id,
             'guild_id': guild_id,
@@ -284,8 +284,37 @@ def create_user_with_specific_id(user_id: int, guild_id: str, discord_user_id: s
             'equipped_pet_id': None,
             'last_pet_points_update': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
         }).execute()
-        
+
         return result.data[0] if result.data else None
     except Exception as e:
         print(f"创建指定ID用户错误: {e}")
         return None
+
+def is_guild_subscribed(guild_id: int) -> bool:
+    """
+    检查服务器是否有有效订阅
+    如果guild_subscriptions表中没有该服务器记录，或is_active=false，都返回False
+
+    Args:
+        guild_id: Discord服务器ID
+
+    Returns:
+        bool: True表示有有效订阅，False表示未订阅或订阅已失效
+    """
+    try:
+        supabase = get_connection()
+
+        # 查询guild_subscriptions表
+        response = supabase.table('guild_subscriptions').select('is_active').eq('guild_id', guild_id).execute()
+
+        # 如果没有找到记录，返回False
+        if not response.data:
+            return False
+
+        # 检查is_active字段
+        subscription = response.data[0]
+        return subscription.get('is_active', False)
+
+    except Exception as e:
+        print(f"检查服务器订阅状态错误: {e}")
+        return False
