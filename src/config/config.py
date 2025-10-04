@@ -9,9 +9,6 @@ TOKEN = os.getenv("TOKEN")
 if TOKEN is None:
     raise RuntimeError("TOKEN environment variable not set")
     
-YOUR_GUILD_ID = int(os.getenv("YOUR_GUILD_ID", "0"))
-if YOUR_GUILD_ID == 0:
-    raise RuntimeError("YOUR_GUILD_ID environment variable not set")
 PREFIX = os.getenv("PREFIX", "!")
 
 # 抽奖配置

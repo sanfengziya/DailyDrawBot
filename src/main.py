@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 import os
 
-from src.config.config import TOKEN, PREFIX, YOUR_GUILD_ID
+from src.config.config import TOKEN, PREFIX
 from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands, shop_commands, forge_commands
 from src.db.database import is_guild_subscribed
 
@@ -108,10 +108,6 @@ async def on_ready():
     except Exception as e:
         print(f"启动定时任务时出错: {e}")
 
-@bot.event
-async def on_guild_join(guild):
-    if guild.id != YOUR_GUILD_ID:
-        await guild.leave()
 
 # 注册抽奖命令
 @bot.command(name="draw")
