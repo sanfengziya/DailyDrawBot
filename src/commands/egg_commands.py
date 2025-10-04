@@ -15,7 +15,7 @@ class EggCommands(commands.Cog):
 
     # 抽蛋成本配置
     SINGLE_DRAW_COST = 250
-    TEN_DRAW_COST = 2500
+    TEN_DRAW_COST = 2250
 
     # 星级配置
     MAX_STARS = {

@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import datetime
-from src.db.database import get_connection, get_missing_user_id, create_user_with_specific_id
+from src.db.database import get_connection
 from src.utils.helpers import now_est, get_weighted_reward, get_user_id_with_validation_ctx
 from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
 from src.utils.cache import UserCache
@@ -19,26 +19,18 @@ async def draw(ctx):
         user_id = await UserCache.get_user_id(guild_id, discord_user_id)
 
         if user_id is None:
-            # 创建新用户 - 优先使用缺失的ID（1-6）
-            missing_id = get_missing_user_id()
-
-            if missing_id is not None:
-                create_response = create_user_with_specific_id(missing_id, ctx.guild.id, ctx.author.id)
-                if create_response:
-                    user_id = create_response['id']
-                else:
-                    await ctx.send("创建用户时出错，请稍后重试。")
-                    return
-            else:
-                create_response = supabase.table('users').insert({
-                    'guild_id': ctx.guild.id,
-                    'discord_user_id': ctx.author.id,
-                    'points': 0,
-                    'last_draw_date': '1970-01-01',
-                    'paid_draws_today': 0,
-                    'last_paid_draw_date': '1970-01-01'
-                }).execute()
-                user_id = create_response.data[0]['id']
+            # 创建新用户
+            create_response = supabase.table('users').insert({
+                'guild_id': ctx.guild.id,
+                'discord_user_id': ctx.author.id,
+                'points': 0,
+                'last_draw_date': None,
+                'paid_draws_today': 0,
+                'last_paid_draw_date': '1970-01-01',
+                'equipped_pet_id': None,
+                'last_pet_points_update': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+            }).execute()
+            user_id = create_response.data[0]['id']
 
         # 使用Redis检查免费抽奖
         first_draw = DrawLimiter.check_free_draw_available(guild_id, discord_user_id)
