@@ -122,26 +122,6 @@ async def check(ctx, member: discord.Member = None):
     await draw_commands.check(ctx, member)
 
 # 注册调试命令
-@bot.command(name="debuguser")
-@commands.has_permissions(administrator=True)
-async def debug_user(ctx, member: discord.Member):
-    await debug_commands.debug_user(ctx, member)
-
-@bot.command(name="testupdate")
-@commands.has_permissions(administrator=True)
-async def test_update(ctx, member: discord.Member):
-    await debug_commands.test_update(ctx, member)
-
-@bot.command(name="checkdb")
-@commands.has_permissions(administrator=True)
-async def check_database(ctx):
-    await debug_commands.check_database(ctx)
-
-@bot.command(name="detailedebug")
-@commands.has_permissions(administrator=True)
-async def detailed_debug(ctx, member: discord.Member):
-    await debug_commands.detailed_debug(ctx, member)
-
 @bot.command(name="rewardinfo")
 @commands.has_permissions(administrator=True)
 async def rewardinfo(ctx):
@@ -156,58 +136,6 @@ async def testdraw(ctx, times: int = 100):
 @commands.has_permissions(administrator=True)
 async def check_subscription(ctx):
     await debug_commands.check_subscription(ctx)
-
-# 添加喂食系统管理命令
-@bot.command(name="resetsatiety")
-@commands.has_permissions(administrator=True)
-async def reset_satiety(ctx):
-    """手动重置所有宠物饱食度"""
-    try:
-        from src.utils.scheduler import admin_reset_satiety
-        await admin_reset_satiety()
-        await ctx.send("✅ 已手动重置所有宠物饱食度！")
-    except Exception as e:
-        await ctx.send(f"❌ 重置饱食度时出错: {e}")
-
-@bot.command(name="refreshshop")
-@commands.has_permissions(administrator=True)
-async def refresh_shop(ctx):
-    """手动刷新杂货铺"""
-    try:
-        from src.utils.scheduler import admin_refresh_shop
-        await admin_refresh_shop()
-        await ctx.send("✅ 已手动刷新杂货铺商品！")
-    except Exception as e:
-        await ctx.send(f"❌ 刷新杂货铺时出错: {e}")
-
-@bot.command(name="resetshop")
-@commands.has_permissions(administrator=True)
-async def reset_shop(ctx):
-    """重置杂货铺商品（refreshshop的别名）"""
-    try:
-        from src.utils.scheduler import admin_refresh_shop
-        await admin_refresh_shop()
-        await ctx.send("🏪 已重置杂货铺商品！今日商品已更新。")
-    except Exception as e:
-        await ctx.send(f"❌ 重置杂货铺时出错: {e}")
-
-@bot.command(name="testshop")
-@commands.has_permissions(administrator=True)
-async def test_shop(ctx):
-    """测试杂货铺刷新功能（调试用）"""
-    try:
-        from src.utils.feeding_system import FoodShopManager
-
-        # 运行测试
-        test_result = FoodShopManager.test_shop_refresh()
-
-        if test_result:
-            await ctx.send("✅ 杂货铺刷新功能测试通过！所有功能正常。")
-        else:
-            await ctx.send("⚠️ 杂货铺刷新功能测试未完全通过，请检查日志。")
-
-    except Exception as e:
-        await ctx.send(f"❌ 测试杂货铺功能时出错: {e}")
 
 @bot.command(name="schedulerstatus")
 @commands.has_permissions(administrator=True)
@@ -287,16 +215,6 @@ async def setpoints(ctx, member: discord.Member, points: int):
 @bot.command(name="quizlist")
 async def quizlist(ctx):
     await quiz_commands.quizlist(ctx)
-
-@bot.command(name="importquiz")
-@commands.has_permissions(administrator=True)
-async def importquiz(ctx):
-    await quiz_commands.importquiz(ctx)
-
-@bot.command(name="deletequiz")
-@commands.has_permissions(administrator=True)
-async def deletequiz(ctx, category: str):
-    await quiz_commands.deletequiz(ctx, category)
 
 @bot.command(name="quiz")
 @commands.has_permissions(administrator=True)
