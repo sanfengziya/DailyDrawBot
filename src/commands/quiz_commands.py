@@ -1,6 +1,7 @@
 import discord
 import asyncio
 import random
+import datetime
 from src.db.database import get_connection
 from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
 from src.utils.cache import UserCache
@@ -182,13 +183,26 @@ async def quiz(ctx, category, number):
 
             if choice_letter == ans:
                 await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {ans}，奖励 10 分")
-                
+
                 try:
+                    supabase = get_connection()
+
                     # 获取用户内部ID
                     user_internal_id = get_user_internal_id_with_guild_and_discord_id(ctx.guild.id, reply.author.id)
+
+                    # 如果用户不存在，自动创建
                     if not user_internal_id:
-                        print(f"获取用户内部ID失败: {reply.author.id}")
-                        continue
+                        create_response = supabase.table('users').insert({
+                            'guild_id': ctx.guild.id,
+                            'discord_user_id': reply.author.id,
+                            'points': 0,
+                            'last_draw_date': None,
+                            'paid_draws_today': 0,
+                            'last_paid_draw_date': '1970-01-01',
+                            'equipped_pet_id': None,
+                            'last_pet_points_update': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+                        }).execute()
+                        user_internal_id = create_response.data[0]['id']
 
                     # 使用UserCache更新积分（与draw系统保持一致）
                     await UserCache.update_points(ctx.guild.id, reply.author.id, user_internal_id, 10)

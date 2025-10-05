@@ -64,6 +64,9 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
         # 订阅检查已经在check函数中发送了消息，这里不需要额外处理
         pass
+    elif isinstance(error, commands.MemberNotFound):
+        # 处理成员未找到错误
+        await ctx.send(f"❌ 找不到成员：{error.argument}\n请使用 @mention 提及用户，或确保输入正确的用户名。")
     else:
         # 处理其他错误
         print(f"命令错误: {error}")
