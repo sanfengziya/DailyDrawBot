@@ -549,7 +549,7 @@ class EggDrawView(discord.ui.View):
 
         await self.perform_draw(interaction, 1, EggCommands.SINGLE_DRAW_COST)
 
-    @discord.ui.button(label="十连抽 (2500积分)", style=discord.ButtonStyle.success, emoji="🎰")
+    @discord.ui.button(label="十连抽 (2250积分)", style=discord.ButtonStyle.success, emoji="🎰")
     async def ten_draw(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
             await interaction.response.send_message("你无法使用别人的抽蛋界面！", ephemeral=True)
