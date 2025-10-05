@@ -3,6 +3,7 @@ import asyncio
 import random
 from src.db.database import get_connection
 from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
+from src.utils.cache import UserCache
 
 async def quizlist(ctx):
     supabase = get_connection()
@@ -44,16 +45,15 @@ async def importquiz(ctx):
         ans = ans.upper()
         if ans not in ["A", "B", "C", "D"]:
             continue
-        ans_idx = ["A", "B", "C", "D"].index(ans) + 1
-        
+
         questions_to_insert.append({
             "category": category,
             "question": question,
-            "option1": o1,
-            "option2": o2,
-            "option3": o3,
-            "option4": o4,
-            "answer": ans_idx
+            "option_a": o1,
+            "option_b": o2,
+            "option_c": o3,
+            "option_d": o4,
+            "answer": ans
         })
         count += 1
     
@@ -123,8 +123,8 @@ async def quiz(ctx, category, number):
     supabase = get_connection()
     
     try:
-        result = supabase.table("quiz_questions").select("question, option1, option2, option3, option4, answer").eq("category", category).execute()
-        rows = [(row["question"], row["option1"], row["option2"], row["option3"], row["option4"], row["answer"]) for row in result.data]
+        result = supabase.table("quiz_questions").select("question, option_a, option_b, option_c, option_d, answer").eq("category", category).execute()
+        rows = [(row["question"], row["option_a"], row["option_b"], row["option_c"], row["option_d"], row["answer"]) for row in result.data]
 
         if not rows:
             await ctx.send("该类别没有题目。")
@@ -176,13 +176,12 @@ async def quiz(ctx, category, number):
             attempted_users.add(str(reply.author.id))
             txt = reply.content.upper()
             if txt in ["1", "2", "3", "4"]:
-                choice = int(txt)
+                choice_letter = ["A", "B", "C", "D"][int(txt) - 1]
             else:
-                choice = ["A", "B", "C", "D"].index(txt) + 1
+                choice_letter = txt
 
-            if choice == ans:
-                letter = ["A", "B", "C", "D"][ans - 1]
-                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {letter}，奖励 10 分")
+            if choice_letter == ans:
+                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {ans}，奖励 10 分")
                 
                 try:
                     # 获取用户内部ID
@@ -190,27 +189,10 @@ async def quiz(ctx, category, number):
                     if not user_internal_id:
                         print(f"获取用户内部ID失败: {reply.author.id}")
                         continue
-                        
-                    # 获取用户当前积分
-                    user_result = supabase.table("users").select("points").eq("id", user_internal_id).execute()
-                    
-                    if user_result.data:
-                        # 用户存在，更新积分
-                        current_points = user_result.data[0]["points"]
-                        supabase.table("users").update({
-                            "points": current_points + 10
-                        }).eq("id", user_internal_id).execute()
-                    else:
-                        # 用户不存在，创建新记录
-                        supabase.table("users").insert({
-                            "guild_id": ctx.guild.id,
-                            "discord_user_id": reply.author.id,
-                            "points": 10,
-                            "last_draw_date": "1970-01-01",
-                            "paid_draws_today": 0,
-                            "last_paid_draw_date": "1970-01-01"
-                        }).execute()
-                        
+
+                    # 使用UserCache更新积分（与draw系统保持一致）
+                    await UserCache.update_points(ctx.guild.id, reply.author.id, user_internal_id, 10)
+
                 except Exception as e:
                     print(f"奖励积分失败: {e}")
                     
@@ -223,7 +205,6 @@ async def quiz(ctx, category, number):
             warning_task.cancel()
 
         if not answered:
-            letter = ["A", "B", "C", "D"][ans - 1]
-            await ctx.send(f"⏰ 时间到，正确答案是 {letter}")
+            await ctx.send(f"⏰ 时间到，正确答案是 {ans}")
 
     await ctx.send("答题结束！")
