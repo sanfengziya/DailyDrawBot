@@ -173,10 +173,11 @@ class FeedingSystem:
             tuple: (success, message)
         """
         from src.db.database import get_supabase_client
-        from datetime import date
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
 
         supabase = get_supabase_client()
-        today = date.today()
+        today = datetime.now(ZoneInfo("America/New_York")).date()
 
         try:
             # 1. 获取食物信息
@@ -423,10 +424,11 @@ class FoodShopManager:
     def refresh_daily_shop():
         """刷新每日杂货铺目录（原子性操作，避免商店清空）"""
         from src.db.database import get_supabase_client
-        from datetime import date
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
 
         supabase = get_supabase_client()
-        today = date.today()
+        today = datetime.now(ZoneInfo("America/New_York")).date()
         today_str = today.isoformat()
 
         try:
