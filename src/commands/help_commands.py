@@ -148,8 +148,9 @@ def create_help_embed(interaction: discord.Interaction):
 
 **答题管理:**
 `!quiz "<类别>" <题目数>` - 开始答题游戏
-  • 如果类别含空格，必须用双引号包裹
-  • 例：`!quiz "study:us history" 5`
+  • 支持完全匹配：`!quiz 动漫 5`
+  • 支持模糊匹配：`!quiz study 5` (匹配所有 study:xxx)
+  • 类别含空格用双引号：`!quiz "study:us history" 5`
   • 答对每题奖励10积分
 
 **积分管理:**

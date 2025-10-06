@@ -53,13 +53,24 @@ async def quizlist(ctx, language: str = "all"):
 
 async def quiz(ctx, category, number):
     supabase = get_connection()
-    
+
     try:
-        result = supabase.table("quiz_questions").select("question, option_a, option_b, option_c, option_d, answer").eq("category", category).execute()
+        # 先尝试完全匹配
+        result = supabase.table("quiz_questions").select("question, option_a, option_b, option_c, option_d, answer, category").eq("category", category).execute()
+
+        # 如果没有完全匹配，尝试模糊匹配（category:xxx）
+        if not result.data:
+            result = supabase.table("quiz_questions").select("question, option_a, option_b, option_c, option_d, answer, category").like("category", f"{category}:%").execute()
+
+            if result.data:
+                # 获取所有匹配的子类别
+                matched_categories = list(set([row["category"] for row in result.data]))
+                await ctx.send(f"✨ 找到匹配类别：{', '.join(matched_categories)}")
+
         rows = [(row["question"], row["option_a"], row["option_b"], row["option_c"], row["option_d"], row["answer"]) for row in result.data]
 
         if not rows:
-            await ctx.send("该类别没有题目。")
+            await ctx.send(f"❌ 没有找到类别 `{category}` 的题目。\n💡 使用 `!quizlist` 查看所有可用类别。")
             return
             
     except Exception as e:
