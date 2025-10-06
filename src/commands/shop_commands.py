@@ -262,7 +262,7 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
         if success:
             embed = create_embed(
                 "✅ 购买成功",
-                f"成功购买 {purchase_info[0]} 个 {RARITY_COLORS.get(target_item['rarity'])} **{target_item['name']}** {FLAVOR_EMOJIS.get(target_item['flavor'])}！\n花费 {purchase_info[1]} 积分，剩余 {purchase_info[2]} 积分。\n今日已购买 {purchase_info[3]}/{FeedingSystem.MAX_DAILY_FOOD_PURCHASES} 份食粮。",
+                f"{interaction.user.mention} 成功购买 {purchase_info[0]} 个 {RARITY_COLORS.get(target_item['rarity'])} **{target_item['name']}** {FLAVOR_EMOJIS.get(target_item['flavor'])}！\n花费 {purchase_info[1]} 积分，剩余 {purchase_info[2]} 积分。\n今日已购买 {purchase_info[3]}/{FeedingSystem.MAX_DAILY_FOOD_PURCHASES} 份食粮。",
                 discord.Color.green()
             )
         else:

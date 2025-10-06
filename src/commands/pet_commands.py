@@ -524,7 +524,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     dislike_flavor_display = flavor_emojis.get(dislike_flavor, '无')
     
     # 构建描述内容
-    description = f"{rarity_colors[rarity]} **{pet_name}**\n\n"
+    description = f"{interaction.user.mention} 的 {rarity_colors[rarity]} **{pet_name}**\n\n"
     
     # 基本信息
     description += f"🆔 **宠物ID：** {pet_id}\n"
@@ -1578,7 +1578,7 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
             supabase.table('user_food_inventory').delete().eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
 
         # 创建成功消息
-        description = f"🍽️ **{result['pet_name']}** 吃了 **{result['food_name']}**！\n\n"
+        description = f"{interaction.user.mention} 的 **{result['pet_name']}** 吃了 **{result['food_name']}**！\n\n"
 
         # 经验获得
         description += f"✨ **获得经验：** +{result['xp_gained']}\n"
@@ -1765,7 +1765,7 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
 
         if not result['success']:
             embed = create_embed("❌ 喂食失败", result['message'], discord.Color.red())
-            await interaction.edit_original_response(content="", embed=embed)
+            await interaction.edit_original_response(content="", embed=embed, ephemeral=True)
             return
 
         # 构建成功结果显示
@@ -1810,7 +1810,7 @@ def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str)
 
     mode_name = mode_names.get(mode, mode)
 
-    description = f"🍽️ {user_mention} 一键喂食完成！\n\n"
+    description = f"{user_mention} 一键喂食完成！\n\n"
 
     # 基础统计信息
     description += f"**📊 喂食统计：**\n"
