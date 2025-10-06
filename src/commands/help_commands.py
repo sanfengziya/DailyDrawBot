@@ -144,7 +144,7 @@ def create_help_embed(interaction: discord.Interaction):
 `!listtags` - 查看所有已添加的身份组
 
 **quiz管理:**
-`!quiz <类别> <题目数>` - 开始答题游戏（答对获得10积分）
+`!quiz “<类别>” <题目数>` - 开始答题游戏（答对获得10积分） 用双引号包裹类别以防止错误
 
 **积分管理:**
 `!givepoints <用户> <积分>` - 给予用户积分
