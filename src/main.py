@@ -213,8 +213,8 @@ async def setpoints(ctx, member: discord.Member, points: int):
 
 # 注册答题命令
 @bot.command(name="quizlist")
-async def quizlist(ctx):
-    await quiz_commands.quizlist(ctx)
+async def quizlist(ctx, language: str = "all"):
+    await quiz_commands.quizlist(ctx, language)
 
 @bot.command(name="quiz")
 @commands.has_permissions(administrator=True)

@@ -6,18 +6,47 @@ from src.db.database import get_connection
 from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
 from src.utils.cache import UserCache
 
-async def quizlist(ctx):
+async def quizlist(ctx, language: str = "all"):
     supabase = get_connection()
-    
+
     try:
-        result = supabase.table("quiz_questions").select("category").execute()
-        categories = list(set([row["category"] for row in result.data]))
-        
-        if categories:
-            await ctx.send("📋 题库类别：" + ", ".join(categories))
+        # 根据语言参数筛选
+        if language.lower() == "all":
+            result = supabase.table("quiz_questions").select("category, language").execute()
+        elif language.lower() in ["chinese", "english"]:
+            result = supabase.table("quiz_questions").select("category, language").eq("language", language.lower()).execute()
         else:
+            await ctx.send("❌ 无效的语言参数！请使用：`chinese`、`english` 或 `all`")
+            return
+
+        if not result.data:
             await ctx.send("暂无题库。")
-            
+            return
+
+        # 按语言分组类别
+        chinese_categories = set()
+        english_categories = set()
+
+        for row in result.data:
+            if row["language"] == "chinese":
+                chinese_categories.add(row["category"])
+            else:
+                english_categories.add(row["category"])
+
+        # 构建消息
+        message_parts = ["📋 **题库类别**\n"]
+
+        if language.lower() in ["all", "chinese"] and chinese_categories:
+            message_parts.append(f"🇨🇳 **中文题库：**\n{', '.join(sorted(chinese_categories))}\n")
+
+        if language.lower() in ["all", "english"] and english_categories:
+            message_parts.append(f"🇺🇸 **英文题库：**\n{', '.join(sorted(english_categories))}")
+
+        if len(message_parts) == 1:
+            await ctx.send(f"暂无 {language} 题库。")
+        else:
+            await ctx.send("\n".join(message_parts))
+
     except Exception as e:
         print(f"获取题库类别失败: {e}")
         await ctx.send("获取题库类别失败，请稍后重试。")
