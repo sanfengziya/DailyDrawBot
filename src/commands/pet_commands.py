@@ -770,8 +770,17 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         f"**注意：分解后无法恢复！**",
         discord.Color.orange()
     )
-    
-    view = DismantleConfirmView(str(interaction.user.id), user_internal_id, pet_id, pet_name, rarity, total_fragments, total_points)
+
+    view = DismantleConfirmView(
+        interaction.guild.id,
+        interaction.user.id,
+        user_internal_id,
+        pet_id,
+        pet_name,
+        rarity,
+        total_fragments,
+        total_points
+    )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def handle_pet_fragments(interaction: discord.Interaction):
@@ -838,9 +847,10 @@ async def handle_pet_fragments(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 class DismantleConfirmView(discord.ui.View):
-    def __init__(self, discord_user_id, user_internal_id, pet_id, pet_name, rarity, fragments, points):
+    def __init__(self, guild_id, discord_user_id, user_internal_id, pet_id, pet_name, rarity, fragments, points):
         super().__init__(timeout=30)
-        self.discord_user_id = discord_user_id  # 用于验证用户身份
+        self.guild_id = guild_id  # 服务器ID，用于 UserCache
+        self.discord_user_id = discord_user_id  # 用于验证用户身份（int 类型）
         self.user_internal_id = user_internal_id  # 用于数据库操作
         self.pet_id = pet_id
         self.pet_name = pet_name
@@ -850,7 +860,7 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='确认分解', style=discord.ButtonStyle.danger, emoji='💥')
     async def confirm_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if str(interaction.user.id) != self.discord_user_id:
+        if interaction.user.id != self.discord_user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
@@ -886,13 +896,15 @@ class DismantleConfirmView(discord.ui.View):
                     'amount': self.fragments
                 }).execute()
             
-            # 添加积分
+            # 添加积分（使用 UserCache 保证缓存一致性）
             if self.points > 0:
-                user_response = supabase.table('users').select('points').eq('id', self.user_internal_id).execute()
-                if user_response.data:
-                    current_points = user_response.data[0]['points']
-                    new_points = current_points + self.points
-                    supabase.table('users').update({'points': new_points}).eq('id', self.user_internal_id).execute()
+                from src.utils.cache import UserCache
+                await UserCache.update_points(
+                    self.guild_id,
+                    self.discord_user_id,
+                    self.user_internal_id,
+                    self.points  # 增加积分
+                )
                     
         except Exception as e:
             embed = create_embed(
@@ -915,7 +927,7 @@ class DismantleConfirmView(discord.ui.View):
 
     @discord.ui.button(label='取消', style=discord.ButtonStyle.secondary, emoji='❌')
     async def cancel_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if str(interaction.user.id) != self.discord_user_id:
+        if interaction.user.id != self.discord_user_id:
             await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
             return
         
