@@ -33,8 +33,8 @@ class UserCache:
         cache_key = f'user:id:{guild_id}:{discord_user_id}'
 
         try:
-            # 1. 尝试从Redis获取
-            cached_id = redis_client.get(cache_key)
+            # 1. 尝试从Redis获取（异步）
+            cached_id = await redis_client.get(cache_key)
             if cached_id is not None:
                 return int(cached_id)
         except Exception as e:
@@ -51,7 +51,7 @@ class UserCache:
 
         # 3. 写入缓存(24小时有效)
         try:
-            redis_client.setex(cache_key, 86400, user_id)
+            await redis_client.setex(cache_key, 86400, user_id)
         except Exception as e:
             logger.error(f"Redis写入失败: {e}")
 
@@ -72,8 +72,8 @@ class UserCache:
         cache_key = f'user:points:{guild_id}:{discord_user_id}'
 
         try:
-            # 1. 尝试从Redis获取
-            cached_points = redis_client.get(cache_key)
+            # 1. 尝试从Redis获取（异步）
+            cached_points = await redis_client.get(cache_key)
             if cached_points is not None:
                 return int(cached_points)
         except Exception as e:
@@ -90,7 +90,7 @@ class UserCache:
 
         # 3. 写入缓存(1小时有效)
         try:
-            redis_client.setex(cache_key, 3600, points)
+            await redis_client.setex(cache_key, 3600, points)
         except Exception as e:
             logger.error(f"Redis写入失败: {e}")
 
@@ -160,10 +160,10 @@ class UserCache:
                 # 等待片刻再尝试,让其他事务完成
                 await asyncio.sleep(0.05)
 
-        # 2. 更新缓存
+        # 2. 更新缓存（异步）
         cache_key = f'user:points:{guild_id}:{discord_user_id}'
         try:
-            redis_client.setex(cache_key, 3600, new_points)
+            await redis_client.setex(cache_key, 3600, new_points)
         except Exception as e:
             logger.error(f"Redis更新失败: {e}")
             # 缓存失败不影响业务,记录日志即可
@@ -171,7 +171,7 @@ class UserCache:
         # 3. 更新排行榜(如果已实现)
         try:
             ranking_key = f'ranking:{guild_id}'
-            redis_client.zadd(ranking_key, {str(discord_user_id): new_points})
+            await redis_client.zadd(ranking_key, {str(discord_user_id): new_points})
         except Exception as e:
             logger.error(f"排行榜更新失败: {e}")
 
@@ -188,7 +188,7 @@ class UserCache:
         """
         cache_key = f'user:points:{guild_id}:{discord_user_id}'
         try:
-            redis_client.delete(cache_key)
+            await redis_client.delete(cache_key)
         except Exception as e:
             logger.error(f"删除缓存失败: {e}")
 
@@ -203,6 +203,6 @@ class UserCache:
         """
         cache_key = f'user:id:{guild_id}:{discord_user_id}'
         try:
-            redis_client.delete(cache_key)
+            await redis_client.delete(cache_key)
         except Exception as e:
             logger.error(f"删除缓存失败: {e}")

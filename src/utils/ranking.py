@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class RankingManager:
-    """排行榜管理器"""
+    """排行榜管理器（异步版本）"""
 
     @staticmethod
     async def initialize_ranking(guild_id: int):
@@ -26,10 +26,10 @@ class RankingManager:
 
             ranking_key = f'ranking:{guild_id}'
 
-            # 批量写入Sorted Set
+            # 批量写入Sorted Set（异步）
             if result.data:
                 mapping = {str(row['discord_user_id']): row['points'] for row in result.data}
-                redis_client.zadd(ranking_key, mapping)
+                await redis_client.zadd(ranking_key, mapping)
                 logger.info(f"初始化排行榜成功: guild_id={guild_id}, 用户数={len(mapping)}")
                 return True
             return False
@@ -38,7 +38,7 @@ class RankingManager:
             return False
 
     @staticmethod
-    def get_top_rankings(guild_id: int, limit: int = 10) -> list:
+    async def get_top_rankings(guild_id: int, limit: int = 10) -> list:
         """
         获取Top N排行榜
 
@@ -52,8 +52,8 @@ class RankingManager:
         try:
             ranking_key = f'ranking:{guild_id}'
 
-            # ZREVRANGE: 按分数从高到低
-            rankings = redis_client.zrevrange(ranking_key, 0, limit - 1, withscores=True)
+            # ZREVRANGE: 按分数从高到低（异步）
+            rankings = await redis_client.zrevrange(ranking_key, 0, limit - 1, withscores=True)
 
             # 返回: [(discord_user_id, points), ...]
             return [(int(user_id), int(score)) for user_id, score in rankings]
@@ -62,7 +62,7 @@ class RankingManager:
             return []
 
     @staticmethod
-    def get_user_rank(guild_id: int, discord_user_id: int) -> int:
+    async def get_user_rank(guild_id: int, discord_user_id: int) -> int:
         """
         获取用户排名(1-based)
 
@@ -76,8 +76,8 @@ class RankingManager:
         try:
             ranking_key = f'ranking:{guild_id}'
 
-            # ZREVRANK: 获取排名(0-based)
-            rank = redis_client.zrevrank(ranking_key, str(discord_user_id))
+            # ZREVRANK: 获取排名(0-based)（异步）
+            rank = await redis_client.zrevrank(ranking_key, str(discord_user_id))
 
             return rank + 1 if rank is not None else -1  # 不在榜单返回-1
         except Exception as e:
@@ -85,7 +85,7 @@ class RankingManager:
             return -1
 
     @staticmethod
-    def update_user_score(guild_id: int, discord_user_id: int, points: int):
+    async def update_user_score(guild_id: int, discord_user_id: int, points: int):
         """
         更新用户积分到排行榜
 
@@ -96,12 +96,12 @@ class RankingManager:
         """
         try:
             ranking_key = f'ranking:{guild_id}'
-            redis_client.zadd(ranking_key, {str(discord_user_id): points})
+            await redis_client.zadd(ranking_key, {str(discord_user_id): points})
         except Exception as e:
             logger.error(f"更新排行榜失败: {e}")
 
     @staticmethod
-    def get_user_score(guild_id: int, discord_user_id: int) -> int:
+    async def get_user_score(guild_id: int, discord_user_id: int) -> int:
         """
         从排行榜获取用户积分
 
@@ -114,7 +114,7 @@ class RankingManager:
         """
         try:
             ranking_key = f'ranking:{guild_id}'
-            score = redis_client.zscore(ranking_key, str(discord_user_id))
+            score = await redis_client.zscore(ranking_key, str(discord_user_id))
             return int(score) if score is not None else 0
         except Exception as e:
             logger.error(f"获取排行榜积分失败: {e}")

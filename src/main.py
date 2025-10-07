@@ -114,8 +114,8 @@ async def on_ready():
 
 # 注册抽奖命令
 @bot.command(name="draw")
-async def draw(ctx):
-    await draw_commands.draw(ctx)
+async def draw(ctx, count: int = 1):
+    await draw_commands.draw(ctx, count)
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member = None):

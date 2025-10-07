@@ -29,7 +29,7 @@ def create_help_embed(interaction: discord.Interaction):
     embed.add_field(
         name="🎲 抽奖系统",
         value="""**传统指令:**
-`!draw` - 每日抽奖（免费1次，付费最多20次/天，每次100积分）
+`!draw <次数>` - 每日抽奖（免费1次，付费最多20次/天，每次100积分）（次数不填默认为1次）
 `!check [用户]` - 查看积分和抽奖状态
 
 **抽奖规则:**

@@ -10,13 +10,13 @@ async def ranking(ctx):
         # 获取当前服务器ID
         guild_id = ctx.guild.id
 
-        # 使用Redis获取排行榜数据
-        rows = RankingManager.get_top_rankings(guild_id, limit=10)
+        # 使用Redis获取排行榜数据（异步）
+        rows = await RankingManager.get_top_rankings(guild_id, limit=10)
 
         if not rows:
             # 如果Redis没有数据,从数据库初始化
             await RankingManager.initialize_ranking(guild_id)
-            rows = RankingManager.get_top_rankings(guild_id, limit=10)
+            rows = await RankingManager.get_top_rankings(guild_id, limit=10)
 
             if not rows:
                 await ctx.send("当前服务器还没有排名数据。")

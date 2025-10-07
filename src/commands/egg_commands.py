@@ -137,8 +137,8 @@ async def handle_egg_draw(interaction: discord.Interaction):
         # 使用Redis缓存获取用户积分
         points = await UserCache.get_points(guild_id, discord_user_id)
 
-        # 使用Redis获取保底计数
-        pity_counter = DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
+        # 使用Redis获取保底计数（异步）
+        pity_counter = await DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
 
         # 获取实际的抽蛋概率
         draw_probabilities = EggCommands.get_draw_probabilities()
@@ -580,8 +580,8 @@ class EggDrawView(discord.ui.View):
                 )
                 return
 
-            # 使用Redis获取保底计数
-            current_pity = DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
+            # 使用Redis获取保底计数（异步）
+            current_pity = await DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
 
             # 先发送初始响应，避免交互超时
             await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
@@ -595,15 +595,15 @@ class EggDrawView(discord.ui.View):
             # 更新数据库中的保底计数
             supabase.table('users').update({'egg_pity_counter': new_pity}).eq('id', user_id).execute()
 
-            # 更新Redis中的保底计数
+            # 更新Redis中的保底计数（异步）
             if new_pity == 0:
                 # 触发保底，重置计数
-                DrawLimiter.reset_egg_pity(guild_id, discord_user_id)
+                await DrawLimiter.reset_egg_pity(guild_id, discord_user_id)
             else:
                 # 直接设置新的保底计数
                 from src.db.redis_client import redis_client
                 key = f'egg:pity:{guild_id}:{discord_user_id}'
-                redis_client.set(key, new_pity)
+                await redis_client.set(key, new_pity)
 
             # 添加蛋到玩家库存
             eggs_to_insert = []

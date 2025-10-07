@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class DrawLimiter:
-    """抽奖限流控制器"""
+    """抽奖限流控制器（异步版本）"""
 
     @staticmethod
     def get_ttl_to_midnight_est() -> int:
@@ -32,7 +32,7 @@ class DrawLimiter:
         return max(1, int((tomorrow_midnight - now).total_seconds()))
 
     @staticmethod
-    def check_free_draw_available(guild_id: int, discord_user_id: int) -> bool:
+    async def check_free_draw_available(guild_id: int, discord_user_id: int) -> bool:
         """
         检查今日免费抽奖是否可用
 
@@ -47,15 +47,15 @@ class DrawLimiter:
             today = now_est().date()
             key = f'draw:free:{guild_id}:{discord_user_id}:{today}'
 
-            # 如果key存在,说明今天已抽过
-            return redis_client.exists(key) == 0
+            # 如果key存在,说明今天已抽过（异步）
+            return await redis_client.exists(key) == 0
         except Exception as e:
             logger.error(f"检查免费抽奖失败: {e}")
             # Redis失败时,返回True允许抽奖(降级策略)
             return True
 
     @staticmethod
-    def mark_free_draw_used(guild_id: int, discord_user_id: int) -> bool:
+    async def mark_free_draw_used(guild_id: int, discord_user_id: int) -> bool:
         """
         标记今日免费抽奖已使用
 
@@ -73,15 +73,15 @@ class DrawLimiter:
             # 计算到次日0点的秒数
             ttl = DrawLimiter.get_ttl_to_midnight_est()
 
-            # 设置标记,自动过期
-            redis_client.setex(key, ttl, '1')
+            # 设置标记,自动过期（异步）
+            await redis_client.setex(key, ttl, '1')
             return True
         except Exception as e:
             logger.error(f"标记免费抽奖失败: {e}")
             return False
 
     @staticmethod
-    def get_paid_draw_count(guild_id: int, discord_user_id: int) -> int:
+    async def get_paid_draw_count(guild_id: int, discord_user_id: int) -> int:
         """
         获取今日付费抽奖次数
 
@@ -96,14 +96,14 @@ class DrawLimiter:
             today = now_est().date()
             key = f'draw:paid:{guild_id}:{discord_user_id}:{today}'
 
-            count = redis_client.get(key)
+            count = await redis_client.get(key)
             return int(count) if count else 0
         except Exception as e:
             logger.error(f"获取付费抽奖次数失败: {e}")
             return 0
 
     @staticmethod
-    def increment_paid_draw(guild_id: int, discord_user_id: int, max_draws: int = 20) -> bool:
+    async def increment_paid_draw(guild_id: int, discord_user_id: int, max_draws: int = 20) -> bool:
         """
         增加付费抽奖计数,返回是否成功(是否已达上限)
 
@@ -144,8 +144,8 @@ class DrawLimiter:
             # 计算TTL
             ttl = DrawLimiter.get_ttl_to_midnight_est()
 
-            # 执行脚本
-            result = redis_client.eval(lua_script, 1, key, max_draws, ttl)
+            # 执行脚本（异步）
+            result = await redis_client.eval(lua_script, 1, key, max_draws, ttl)
 
             return result != -1  # -1表示失败,其他表示成功
         except Exception as e:
@@ -154,7 +154,7 @@ class DrawLimiter:
             return True
 
     @staticmethod
-    def get_egg_pity_count(guild_id: int, discord_user_id: int) -> int:
+    async def get_egg_pity_count(guild_id: int, discord_user_id: int) -> int:
         """
         获取蛋抽取保底计数
 
@@ -167,14 +167,14 @@ class DrawLimiter:
         """
         try:
             key = f'egg:pity:{guild_id}:{discord_user_id}'
-            count = redis_client.get(key)
+            count = await redis_client.get(key)
             return int(count) if count else 0
         except Exception as e:
             logger.error(f"获取蛋保底计数失败: {e}")
             return 0
 
     @staticmethod
-    def increment_egg_pity(guild_id: int, discord_user_id: int) -> int:
+    async def increment_egg_pity(guild_id: int, discord_user_id: int) -> int:
         """
         增加蛋抽取保底计数
 
@@ -187,14 +187,14 @@ class DrawLimiter:
         """
         try:
             key = f'egg:pity:{guild_id}:{discord_user_id}'
-            new_count = redis_client.incr(key)
+            new_count = await redis_client.incr(key)
             return new_count
         except Exception as e:
             logger.error(f"增加蛋保底计数失败: {e}")
             return 0
 
     @staticmethod
-    def reset_egg_pity(guild_id: int, discord_user_id: int):
+    async def reset_egg_pity(guild_id: int, discord_user_id: int):
         """
         重置蛋抽取保底计数
 
@@ -204,6 +204,6 @@ class DrawLimiter:
         """
         try:
             key = f'egg:pity:{guild_id}:{discord_user_id}'
-            redis_client.delete(key)
+            await redis_client.delete(key)
         except Exception as e:
             logger.error(f"重置蛋保底计数失败: {e}")
