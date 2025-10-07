@@ -83,9 +83,8 @@ async def quiz(ctx, category, number):
         number = len(rows)
     rows = rows[:number]
 
-    for q, o1, o2, o3, o4, ans in rows:
-        await ctx.send(f"**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}")
-        await ctx.send("🎮 游戏开始，你只有 60 秒的时间作答！")
+    for idx, (q, o1, o2, o3, o4, ans) in enumerate(rows, 1):
+        await ctx.send(f"**第 {idx}/{len(rows)} 题:**\n\n**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}\n🎮 游戏开始，你只有 60 秒的时间作答！")
 
         start = asyncio.get_event_loop().time()
         answered = False
