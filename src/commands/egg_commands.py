@@ -431,7 +431,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         result_text = ""
         for pet in claimed_pets:
             stars_text = "⭐" * pet['stars']
-            result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} 来自 (**{pet['egg_rarity']}** 蛋)\n"
+            result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} 来自 ({pet['egg_rarity']}蛋)\n"
         
         embed = create_embed(
             "🎉 宠物领取成功！",
