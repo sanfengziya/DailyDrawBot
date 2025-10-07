@@ -5,76 +5,63 @@ from src.utils.helpers import now_est, get_user_internal_id_with_guild_and_disco
 
 async def rewardinfo(ctx):
     """显示奖品信息"""
-    supabase = get_connection()
-    
+    from src.config.config import REWARD_SYSTEM
+
     try:
-        # 获取所有奖品信息
-        result = supabase.table("rewards").select("name, rarity, probability").order("rarity", "name").execute()
-        
-        if not result.data:
-            await ctx.send("❌ 没有找到任何奖品信息。")
-            return
-        
-        # 按稀有度分组
-        rarity_groups = {}
-        for reward in result.data:
-            name = reward["name"]
-            rarity = reward["rarity"]
-            probability = reward["probability"]
-            
-            if rarity not in rarity_groups:
-                rarity_groups[rarity] = []
-            rarity_groups[rarity].append((name, probability))
-        
         embed = discord.Embed(title="🎁 奖品信息", color=0x00ff00)
-        
-        for rarity in sorted(rarity_groups.keys()):
-            items = rarity_groups[rarity]
-            item_list = "\n".join([f"{name} ({probability}%)" for name, probability in items])
-            embed.add_field(name=f"{rarity}级奖品", value=item_list, inline=False)
-        
+
+        # 按积分排序并显示
+        sorted_rewards = sorted(REWARD_SYSTEM, key=lambda x: x["points"], reverse=True)
+
+        reward_list = []
+        for reward in sorted_rewards:
+            reward_list.append(
+                f"{reward['emoji']} **{reward['points']}分** - {reward['message']} ({reward['probability']}%)"
+            )
+
+        embed.description = "\n".join(reward_list)
+        embed.set_footer(text=f"共 {len(REWARD_SYSTEM)} 种奖励")
+
         await ctx.send(embed=embed)
-        
+
     except Exception as e:
         print(f"获取奖品信息失败: {e}")
         await ctx.send("获取奖品信息失败，请稍后重试。")
 
 async def testdraw(ctx, times=100):
     """测试抽奖概率分布"""
-    import random
-    supabase = get_connection()
-    
+    from src.utils.helpers import get_weighted_reward
+    from src.config.config import REWARD_SYSTEM
+
     try:
-        # 获取所有奖品及其概率
-        result = supabase.table("rewards").select("name, probability").execute()
-        
-        if not result.data:
-            await ctx.send("❌ 没有找到任何奖品。")
-            return
-        
-        rewards = [(reward["name"], reward["probability"]) for reward in result.data]
-        
-        # 模拟抽奖
+        # 模拟抽奖，使用与实际抽奖相同的逻辑
         results = {}
         for _ in range(times):
-            # 简单的概率模拟
-            rand = random.random() * 100
-            cumulative = 0
-            for name, probability in rewards:
-                cumulative += probability
-                if rand <= cumulative:
-                    results[name] = results.get(name, 0) + 1
-                    break
-        
+            reward = get_weighted_reward()
+            points = reward["points"]
+            results[points] = results.get(points, 0) + 1
+
         # 生成结果
         embed = discord.Embed(title=f"🎲 抽奖测试结果 ({times}次)", color=0x00ff00)
-        
-        for name, count in sorted(results.items(), key=lambda x: x[1], reverse=True):
+
+        # 按积分从高到低排序
+        for points in sorted(results.keys(), reverse=True):
+            count = results[points]
             percentage = (count / times) * 100
-            embed.add_field(name=name, value=f"{count}次 ({percentage:.1f}%)", inline=True)
-        
+
+            # 查找对应的奖励信息
+            reward_info = next((r for r in REWARD_SYSTEM if r["points"] == points), None)
+            if reward_info:
+                name = f"{reward_info['emoji']} {points}分 ({reward_info['message']})"
+                expected_prob = reward_info["probability"]
+                embed.add_field(
+                    name=name,
+                    value=f"实际: {count}次 ({percentage:.1f}%)\n预期: {expected_prob}%",
+                    inline=True
+                )
+
         await ctx.send(embed=embed)
-        
+
     except Exception as e:
         print(f"测试抽奖失败: {e}")
         await ctx.send("测试抽奖失败，请稍后重试。")
