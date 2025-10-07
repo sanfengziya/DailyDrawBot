@@ -137,45 +137,6 @@ async def testdraw(ctx, times: int = 100):
 async def check_subscription(ctx):
     await debug_commands.check_subscription(ctx)
 
-@bot.command(name="schedulerstatus")
-@commands.has_permissions(administrator=True)
-async def scheduler_status(ctx):
-    """查看定时任务状态"""
-    try:
-        from src.utils.scheduler import get_scheduler, get_next_reset_times
-        scheduler = get_scheduler()
-        reset_times = get_next_reset_times()
-
-        status = "🟢 运行中" if scheduler.running else "🔴 已停止"
-
-        embed = discord.Embed(
-            title="🕐 定时任务状态",
-            description=f"**状态：** {status}",
-            color=discord.Color.green() if scheduler.running else discord.Color.red()
-        )
-
-        embed.add_field(
-            name="⏰ 下次饱食度重置",
-            value=reset_times['next_satiety_reset'].strftime('%Y-%m-%d %H:%M EST'),
-            inline=False
-        )
-
-        embed.add_field(
-            name="🏪 下次杂货铺刷新",
-            value=reset_times['next_shop_refresh'].strftime('%Y-%m-%d %H:%M EST'),
-            inline=False
-        )
-
-        embed.add_field(
-            name="🌍 当前美东时间",
-            value=reset_times['current_est_time'].strftime('%Y-%m-%d %H:%M:%S EST'),
-            inline=False
-        )
-
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ 获取定时任务状态时出错: {e}")
-
 # 注册角色和积分管理命令
 @bot.command(name="addtag")
 @commands.has_permissions(administrator=True)
