@@ -119,7 +119,7 @@ def create_help_embed(interaction: discord.Interaction):
   • `!quizlist english` - 只显示英文题库
 
 **提示:**
-- 答对每题可获得10积分
+- 答对每题可获得20积分
 - 等待管理员开启答题！""",
         inline=False
     )
@@ -151,7 +151,7 @@ def create_help_embed(interaction: discord.Interaction):
   • 支持完全匹配：`!quiz 动漫 5`
   • 支持模糊匹配：`!quiz study 5` (匹配所有 study:xxx)
   • 类别含空格用双引号：`!quiz "study:us history" 5`
-  • 答对每题奖励10积分
+  • 答对每题奖励20积分
 
 **积分管理:**
 `!givepoints <用户> <积分>` - 给予用户积分

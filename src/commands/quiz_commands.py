@@ -124,7 +124,7 @@ async def quiz(ctx, category, number):
                 choice_letter = txt
 
             if choice_letter == ans:
-                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {ans}，奖励 10 分")
+                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {ans}，奖励 20 分")
 
                 try:
                     supabase = get_connection()
@@ -147,7 +147,7 @@ async def quiz(ctx, category, number):
                         user_internal_id = create_response.data[0]['id']
 
                     # 使用UserCache更新积分（与draw系统保持一致）
-                    await UserCache.update_points(ctx.guild.id, reply.author.id, user_internal_id, 10)
+                    await UserCache.update_points(ctx.guild.id, reply.author.id, user_internal_id, 20)
 
                 except Exception as e:
                     print(f"奖励积分失败: {e}")
