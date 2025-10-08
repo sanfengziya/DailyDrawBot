@@ -256,7 +256,9 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
         success, purchase_info = await FeedingSystem.purchase_food(
             user_internal_id,
             target_item['food_template_id'],
-            quantity
+            quantity,
+            guild_id=interaction.guild.id,
+            discord_user_id=interaction.user.id
         )
 
         if success:

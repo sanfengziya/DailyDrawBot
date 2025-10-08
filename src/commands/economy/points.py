@@ -14,8 +14,6 @@ async def giftpoints(ctx, member: discord.Member, amount: int):
         await ctx.send("❌ 赠送的积分必须是正数！")
         return
 
-    supabase = get_connection()
-
     try:
         # 获取赠送者内部ID和积分
         sender_internal_id = await UserCache.get_user_id(ctx.guild.id, ctx.author.id)

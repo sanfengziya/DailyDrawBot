@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id
+from src.utils.cache import UserCache
 
 class ForgeCommands(commands.Cog):
     def __init__(self, bot):
@@ -327,6 +328,12 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
 
         # 执行合成
         success, message = forge_commands.execute_forge(user_internal_id, from_rarity, to_rarity, quantity)
+
+        # 清除积分缓存，确保check命令显示最新数据
+        if success:
+            guild_id = interaction.guild.id
+            discord_user_id = interaction.user.id
+            await UserCache.invalidate_points_cache(guild_id, discord_user_id)
 
         if success:
             # 获取合成信息用于显示

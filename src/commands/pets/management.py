@@ -4,6 +4,7 @@ from discord import app_commands
 import datetime
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id
+from src.utils.cache import UserCache
 
 class PetCommands(commands.Cog):
     def __init__(self, bot):
@@ -658,7 +659,12 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         # 执行升星
         # 扣除积分
         supabase.table('users').update({'points': points - required_points}).eq('id', user_internal_id).execute()
-        
+
+        # 清除积分缓存，确保check命令显示最新数据
+        guild_id = interaction.guild.id
+        discord_user_id = interaction.user.id
+        await UserCache.invalidate_points_cache(guild_id, discord_user_id)
+
         # 扣除碎片
         supabase.table('user_pet_fragments').update({'amount': fragments - required_fragments}).eq('user_id', user_internal_id).eq('rarity', rarity).execute()
         
@@ -1319,11 +1325,16 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         # 领取积分
         new_total_points = current_points + pending_points
         now = datetime.datetime.now(datetime.timezone.utc)
-        
+
         supabase.table('users').update({
             'points': new_total_points,
             'last_pet_points_update': now.isoformat(timespec='seconds')
         }).eq('id', user_internal_id).execute()
+
+        # 清除积分缓存，确保check命令显示最新数据
+        guild_id = interaction.guild.id
+        discord_user_id = interaction.user.id
+        await UserCache.invalidate_points_cache(guild_id, discord_user_id)
         
         star_display = '⭐' * stars if stars > 0 else '⚪'
         rarity_colors = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}

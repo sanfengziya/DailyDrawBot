@@ -160,7 +160,7 @@ class FeedingSystem:
         return min(current_satiety + satiety_gain, FeedingSystem.SATIETY_MAX)
 
     @staticmethod
-    async def purchase_food(user_id: int, food_template_id: int, quantity: int = 1) -> tuple[bool, list]:
+    async def purchase_food(user_id: int, food_template_id: int, quantity: int = 1, guild_id: int = None, discord_user_id: int = None) -> tuple[bool, list]:
         """
         购买食物
 
@@ -168,6 +168,8 @@ class FeedingSystem:
             user_id: 用户内部ID
             food_template_id: 食物模板ID
             quantity: 购买数量
+            guild_id: 服务器ID（用于缓存清除）
+            discord_user_id: Discord用户ID（用于缓存清除）
 
         Returns:
             tuple: (success, message)
@@ -228,6 +230,11 @@ class FeedingSystem:
                 'food_purchased_today': food_purchased_today + quantity,
                 'last_food_purchase_date': today.isoformat()
             }).eq('id', user_id).execute()
+
+            # 清除积分缓存，确保check命令显示最新数据
+            if guild_id and discord_user_id:
+                from src.utils.cache import UserCache
+                await UserCache.invalidate_points_cache(guild_id, discord_user_id)
 
             # 添加到用户库存
             # 检查用户是否已有此食物
