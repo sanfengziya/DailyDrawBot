@@ -154,7 +154,7 @@ class PetSelectView(discord.ui.View):
             supabase = get_supabase_client()
             
             # 查询用户的宠物
-            pets_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('user_id', self.user_id).order('stars', desc=True).limit(25).execute()
+            pets_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('user_id', self.user_id).limit(25).execute()
             
             if not pets_response.data:
                 return False
@@ -172,9 +172,9 @@ class PetSelectView(discord.ui.View):
                 if template:
                     pets.append((pet['id'], template['name'], template['rarity'], pet['stars']))
             
-            # 按稀有度和星级排序
-            rarity_order = {'SSR': 4, 'SR': 3, 'R': 2, 'C': 1}
-            pets.sort(key=lambda x: (rarity_order.get(x[2], 0), x[3], x[1]), reverse=True)
+            # 按稀有度和星级排序（稀有度优先，SSR > SR > R > C；同稀有度按星级从高到低）
+            rarity_order = {'SSR': 1, 'SR': 2, 'R': 3, 'C': 4}
+            pets.sort(key=lambda x: (rarity_order.get(x[2], 5), -x[3]))
             
         except Exception as e:
             print(f"设置宠物选择菜单时出错：{str(e)}")
@@ -318,18 +318,12 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
-        # 分页查询
-        per_page = 10
-        offset = (page - 1) * per_page
-        
-        # 查询宠物列表 - 先获取用户宠物，然后获取模板和稀有度配置
-        pets_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at').eq('user_id', user_internal_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
-        
-        # 获取总数
-        count_response = supabase.table('user_pets').select('id', count='exact').eq('user_id', user_internal_id).execute()
-        total_pets = count_response.count
-        
-        if not pets_response.data:
+        # 先获取所有宠物（不分页）
+        all_pets_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at').eq('user_id', user_internal_id).execute()
+
+        total_pets = len(all_pets_response.data) if all_pets_response.data else 0
+
+        if not all_pets_response.data:
             embed = create_embed(
                 "🐾 我的宠物",
                 f"{interaction.user.mention} 你还没有任何宠物呢！快去抽蛋孵化吧！",
@@ -337,20 +331,20 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
             )
             await interaction.response.send_message(embed=embed)
             return
-        
+
         # 获取所有相关的宠物模板
-        template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
+        template_ids = list(set([pet['pet_template_id'] for pet in all_pets_response.data]))
         templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
         templates_dict = {template['id']: template for template in templates_response.data}
-        
+
         # 获取稀有度配置
         rarities = list(set([template['rarity'] for template in templates_response.data]))
         rarity_configs_response = supabase.table('pet_rarity_configs').select('rarity, max_stars').in_('rarity', rarities).execute()
         rarity_configs_dict = {config['rarity']: config for config in rarity_configs_response.data}
-        
-        # 组合数据并按稀有度和星级排序
+
+        # 组合所有宠物数据
         pets_data = []
-        for pet in pets_response.data:
+        for pet in all_pets_response.data:
             template = templates_dict.get(pet['pet_template_id'])
             if template:
                 rarity_config = rarity_configs_dict.get(template['rarity'])
@@ -363,10 +357,16 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
                     'max_stars': max_stars,
                     'created_at': pet['created_at']
                 })
-        
-        # 按稀有度和星级排序
+
+        # 按稀有度、星级、创建时间排序（稀有度优先）
         rarity_order = {'SSR': 1, 'SR': 2, 'R': 3, 'C': 4}
-        pets_data.sort(key=lambda x: (rarity_order.get(x['rarity'], 5), -x['stars'], x['created_at']), reverse=False)
+        pets_data.sort(key=lambda x: (rarity_order.get(x['rarity'], 5), -x['stars'], x['created_at']))
+
+        # 分页处理
+        per_page = 10
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        pets_data = pets_data[start_idx:end_idx]
         
         pets = [(pet['id'], pet['name'], pet['rarity'], pet['stars'], pet['max_stars'], pet['created_at']) for pet in pets_data]
         

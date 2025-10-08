@@ -255,7 +255,7 @@ async def handle_egg_hatch(interaction: discord.Interaction):
 
     try:
         # 查询用户的待孵化蛋
-        result = supabase.table("user_eggs").select("id, rarity, created_at").eq("user_id", user_id).eq("status", "pending").order("created_at", desc=True).limit(25).execute()
+        result = supabase.table("user_eggs").select("id, rarity, created_at").eq("user_id", user_id).eq("status", "pending").order("rarity", desc=True).order("created_at", desc=True).limit(25).execute()
 
         eggs = result.data
 
