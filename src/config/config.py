@@ -12,11 +12,10 @@ if TOKEN is None:
 PREFIX = os.getenv("PREFIX", "!")
 
 # 抽奖配置
-WHEEL_COST = int(os.getenv("WHEEL_COST", "100"))
-MAX_PAID_DRAWS_PER_DAY = int(os.getenv("MAX_PAID_DRAWS_PER_DAY", "20"))
-
+WHEEL_COST = 100  # 每次抽奖的费用
+MAX_PAID_DRAWS_PER_DAY = 30 # 每天允许的最大付费抽奖次数
 # Supabase数据库配置
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://vorirblervetghvqmych.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if SUPABASE_KEY is None:
     raise RuntimeError("SUPABASE_KEY environment variable not set")
