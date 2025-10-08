@@ -6,7 +6,12 @@ from discord.ext import commands
 import os
 
 from src.config.config import TOKEN, PREFIX
-from src.commands import draw_commands, debug_commands, role_commands, quiz_commands, ranking_commands, help_commands, egg_commands, pet_commands, shop_commands, forge_commands
+from src.commands.economy import draw, check, giftpoints, givepoints, setpoints
+from src.commands.pets import eggs as egg_commands, management as pet_commands, forge as forge_commands
+from src.commands.shop import roles as shop_roles, items as shop_commands
+from src.commands.games import quiz as quiz_commands
+from src.commands.rankings import leaderboard as ranking_commands
+from src.commands.system import help_module as help_commands, admin as debug_commands
 from src.db.database import is_guild_subscribed
 
 # 设置机器人
@@ -81,7 +86,7 @@ async def on_ready():
         ('pet_commands', pet_commands.setup),
         ('shop_commands', shop_commands.setup),
         ('forge_commands', forge_commands.setup),
-        ('role_commands', role_commands.setup)
+        ('role_commands', shop_roles.setup)
     ]
 
     for module_name, setup_func in setup_functions:
@@ -114,12 +119,12 @@ async def on_ready():
 
 # 注册抽奖命令
 @bot.command(name="draw")
-async def draw(ctx, count: int = 1):
-    await draw_commands.draw(ctx, count)
+async def draw_command(ctx, count: int = 1):
+    await draw(ctx, count)
 
 @bot.command(name="check")
-async def check(ctx, member: discord.Member = None):
-    await draw_commands.check(ctx, member)
+async def check_command(ctx, member: discord.Member = None):
+    await check(ctx, member)
 
 # 注册调试命令
 @bot.command(name="rewardinfo")
@@ -141,36 +146,36 @@ async def check_subscription(ctx):
 @bot.command(name="addtag")
 @commands.has_permissions(administrator=True)
 async def addtag(ctx, price: int, role: discord.Role):
-    await role_commands.addtag(ctx, price, role)
+    await shop_roles.addtag(ctx, price, role)
 
 @bot.command(name="removetag")
 @commands.has_permissions(administrator=True)
 async def removetag(ctx, role: discord.Role):
-    await role_commands.removetag(ctx, role)
+    await shop_roles.removetag(ctx, role)
 
 @bot.command(name="updatetagprice")
 @commands.has_permissions(administrator=True)
 async def updatetagprice(ctx, role: discord.Role, new_price: int):
-    await role_commands.updatetagprice(ctx, role, new_price)
+    await shop_roles.updatetagprice(ctx, role, new_price)
 
 @bot.command(name="listtags")
 @commands.has_permissions(administrator=True)
 async def listtags(ctx):
-    await role_commands.listtags(ctx)
+    await shop_roles.listtags(ctx)
 
 @bot.command(name="giftpoints")
-async def giftpoints(ctx, member: discord.Member, amount: int):
-    await role_commands.giftpoints(ctx, member, amount)
+async def giftpoints_command(ctx, member: discord.Member, amount: int):
+    await giftpoints(ctx, member, amount)
 
 @bot.command(name="givepoints")
 @commands.has_permissions(administrator=True)
-async def givepoints(ctx, member: discord.Member, amount: int):
-    await role_commands.givepoints(ctx, member, amount)
+async def givepoints_command(ctx, member: discord.Member, amount: int):
+    await givepoints(ctx, member, amount)
 
 @bot.command(name="setpoints")
 @commands.has_permissions(administrator=True)
-async def setpoints(ctx, member: discord.Member, points: int):
-    await role_commands.setpoints(ctx, member, points)
+async def setpoints_command(ctx, member: discord.Member, points: int):
+    await setpoints(ctx, member, points)
 
 # 注册答题命令
 @bot.command(name="quizlist")

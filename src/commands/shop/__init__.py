@@ -2,3 +2,8 @@
 
 包含身份组商店和道具商店功能
 """
+
+from . import roles
+from . import items
+
+__all__ = ['roles', 'items']
