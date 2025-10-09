@@ -295,7 +295,14 @@ async def handle_egg_claim(interaction: discord.Interaction):
 
         # 查询已完成孵化的蛋
         current_time = datetime.datetime.now(datetime.timezone.utc)
-        result = supabase.table("user_eggs").select("id, rarity, hatch_completed_at").eq("user_id", user_id).eq("status", "hatching").execute()
+
+        result = supabase.table("user_eggs") \
+        .select("id, rarity, hatch_completed_at") \
+        .eq("user_id", user_id) \
+        .eq("status", "hatching") \
+        .lte("hatch_completed_at", current_time.isoformat()) \
+        .execute()
+
 
         ready_eggs = result.data
 
