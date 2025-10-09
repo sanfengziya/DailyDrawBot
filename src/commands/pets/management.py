@@ -920,7 +920,11 @@ class DismantleConfirmView(discord.ui.View):
             )
             await interaction.response.edit_message(embed=embed, view=None)
             return
-        
+
+        # 先编辑原消息（移除按钮）
+        await interaction.response.edit_message(content="✅ 分解确认...", embed=None, view=None)
+
+        # 发送公开的成功消息
         embed = create_embed(
             "💥 分解成功",
             f"{interaction.user.mention} 你的 **{self.pet_name}** 已被分解！\n\n"
@@ -929,7 +933,7 @@ class DismantleConfirmView(discord.ui.View):
             f"💰 {self.points} 积分",
             discord.Color.green()
         )
-        await interaction.response.edit_message(embed=embed, view=None)
+        await interaction.followup.send(embed=embed)
 
     @discord.ui.button(label='取消', style=discord.ButtonStyle.secondary, emoji='❌')
     async def cancel_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
