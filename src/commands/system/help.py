@@ -120,6 +120,30 @@ def create_help_embed(interaction: discord.Interaction):
         inline=False
     )
 
+    # 二十一点游戏
+    embed.add_field(
+        name="🎰 二十一点游戏",
+        value="""**斜杠命令:**
+`/blackjack <bet>` - 开始二十一点游戏
+  • `bet`: 下注金额（数字或 `all`）
+  • 示例：`/blackjack 100` 或 `/blackjack all`
+`/blackjack_stats` - 查看游戏统计数据
+
+**游戏功能:**
+- 🎴✋ **基础操作**：要牌、停牌
+- 🎲 **加倍下注**：首次发牌后加倍（Double Down）
+- ✂️ **分牌**：对子可以分成两手牌（Split）
+- 🎲✂️ **DAS规则**：分牌后可以加倍（降低庄家优势0.14%）
+- 🛡️ **保险**：庄家明牌A时可购买保险
+- 🏳️ **投降**：手牌极差时止损
+
+**特色:**
+- ✅ 标准赌场规则（庄家17点停牌）
+- ✅ BlackJack特殊奖励（2.5倍赔率）
+- ✅ 完整游戏记录和统计""",
+        inline=False
+    )
+
     # 排行榜系统
     embed.add_field(
         name="🏆 排行榜系统",
