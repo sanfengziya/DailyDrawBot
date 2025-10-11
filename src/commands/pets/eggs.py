@@ -310,6 +310,10 @@ async def handle_egg_claim(interaction: discord.Interaction):
             await interaction.response.send_message("没有可以领取的宠物！请先孵化一些蛋，或者等待孵化完成。", ephemeral=True)
             return
 
+        # 获取用户的传说蛋保底计数器
+        user_data = supabase.table("users").select("legendary_egg_pity_counter").eq("id", user_id).execute()
+        legendary_pity_counter = user_data.data[0].get("legendary_egg_pity_counter", 0) if user_data.data else 0
+
     except Exception as e:
         print(f"查询已完成孵化的蛋错误: {e}")
         embed = discord.Embed(
@@ -322,6 +326,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
 
     # 批量领取所有完成的蛋
     claimed_pets = []
+    pity_triggered = False  # 标记是否触发了保底
 
     try:
         # 获取宠物名称数据
@@ -339,18 +344,33 @@ async def handle_egg_claim(interaction: discord.Interaction):
                     continue  # 跳过未完成的蛋
 
             # 根据蛋的稀有度和孵化概率决定宠物稀有度
-            hatch_probabilities = EggCommands.get_hatch_probabilities(rarity)
+            # 传说蛋保底机制:第一次未出SSR则第二次必出SSR
+            if rarity == 'SSR' and legendary_pity_counter >= 1:
+                # 触发保底,必出SSR
+                pet_rarity = 'SSR'
+                pity_triggered = True
+                legendary_pity_counter = 0  # 重置计数器
+            else:
+                # 正常概率孵化
+                hatch_probabilities = EggCommands.get_hatch_probabilities(rarity)
 
-            # 使用概率决定宠物稀有度
-            rand = random.random() * 100
-            cumulative_prob = 0
-            pet_rarity = rarity  # 默认值，如果没有配置概率就使用蛋的稀有度
+                # 使用概率决定宠物稀有度
+                rand = random.random() * 100
+                cumulative_prob = 0
+                pet_rarity = rarity  # 默认值，如果没有配置概率就使用蛋的稀有度
 
-            for rarity_option, probability in hatch_probabilities:
-                cumulative_prob += float(probability)
-                if rand < cumulative_prob:
-                    pet_rarity = rarity_option
-                    break
+                for rarity_option, probability in hatch_probabilities:
+                    cumulative_prob += float(probability)
+                    if rand < cumulative_prob:
+                        pet_rarity = rarity_option
+                        break
+
+                # 如果是传说蛋,根据是否出SSR更新计数器
+                if rarity == 'SSR':
+                    if pet_rarity == 'SSR':
+                        legendary_pity_counter = 0  # 出了SSR,重置计数器
+                    else:
+                        legendary_pity_counter += 1  # 没出SSR,计数器+1
 
             # 生成宠物
             pet_names_for_rarity = pet_names.get(pet_rarity, [])
@@ -410,6 +430,9 @@ async def handle_egg_claim(interaction: discord.Interaction):
                 'egg_rarity': rarity_names[rarity]  # 记录原始蛋的稀有度
             })
 
+        # 更新数据库中的传说蛋保底计数器
+        supabase.table("users").update({"legendary_egg_pity_counter": legendary_pity_counter}).eq("id", user_id).execute()
+
     except Exception as e:
         print(f"领取宠物错误: {e}")
         embed = discord.Embed(
@@ -426,10 +449,22 @@ async def handle_egg_claim(interaction: discord.Interaction):
         stars_text = "⭐" * pet['stars']
         result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} 来自 ({pet['egg_rarity']}蛋)\n"
 
+    # 添加保底触发信息
+    pity_info = ""
+    if pity_triggered:
+        pity_info = "\n\n🎯 **恭喜！触发传说蛋保底，获得SSR宠物！**"
+
+    # 显示当前保底进度
+    pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/2"
+    if legendary_pity_counter == 1:
+        pity_status += " ⚠️ 下次开传说蛋必出SSR！"
+
     embed = create_embed(
         "🎉 宠物领取成功！",
         f"恭喜 {interaction.user.mention} 获得了以下宠物：\n\n{result_text}\n"
-        f"总共领取了 **{len(claimed_pets)}** 只宠物！",
+        f"总共领取了 **{len(claimed_pets)}** 只宠物！"
+        f"{pity_info}"
+        f"{pity_status}",
         discord.Color.gold()
     )
 
