@@ -455,7 +455,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         pity_info = "\n\n🎯 **恭喜！触发传说蛋保底，获得SSR宠物！**"
 
     # 显示当前保底进度
-    pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/2"
+    pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/1"
     if legendary_pity_counter == 1:
         pity_status += " ⚠️ 下次开传说蛋必出SSR！"
 
