@@ -327,6 +327,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
     # 批量领取所有完成的蛋
     claimed_pets = []
     pity_triggered = False  # 标记是否触发了保底
+    has_legendary_egg = False  # 标记是否领取了传说蛋
 
     try:
         # 获取宠物名称数据
@@ -342,6 +343,10 @@ async def handle_egg_claim(interaction: discord.Interaction):
                 end_dt = datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00'))
                 if current_time < end_dt:
                     continue  # 跳过未完成的蛋
+
+            # 标记是否领取了传说蛋
+            if rarity == 'SSR':
+                has_legendary_egg = True
 
             # 根据蛋的稀有度和孵化概率决定宠物稀有度
             # 传说蛋保底机制:第一次未出SSR则第二次必出SSR
@@ -454,10 +459,12 @@ async def handle_egg_claim(interaction: discord.Interaction):
     if pity_triggered:
         pity_info = "\n\n🎯 **恭喜！触发传说蛋保底，获得SSR宠物！**"
 
-    # 显示当前保底进度
-    pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/1"
-    if legendary_pity_counter == 1:
-        pity_status += " ⚠️ 下次开传说蛋必出SSR！"
+    # 只在领取了传说蛋时才显示保底进度
+    pity_status = ""
+    if has_legendary_egg:
+        pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/1"
+        if legendary_pity_counter == 1:
+            pity_status += " ⚠️ 下次开传说蛋必出SSR！"
 
     embed = create_embed(
         "🎉 宠物领取成功！",
