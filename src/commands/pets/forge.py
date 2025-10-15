@@ -11,9 +11,9 @@ class ForgeCommands(commands.Cog):
 
     # 锻造配方配置
     FORGE_RECIPES = {
-        'C_TO_R': {'ratio': 10, 'points': 100},
-        'R_TO_SR': {'ratio': 8, 'points': 200},
-        'SR_TO_SSR': {'ratio': 5, 'points': 500}
+        'C_TO_R': {'ratio': 10, 'points': 50},
+        'R_TO_SR': {'ratio': 5, 'points': 80},
+        'SR_TO_SSR': {'ratio': 3, 'points': 100}
     }
 
     # 稀有度映射
