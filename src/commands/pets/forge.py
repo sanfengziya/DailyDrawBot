@@ -226,9 +226,9 @@ async def handle_forge_view(interaction: discord.Interaction):
 
         # 显示合成规则
         description += "**🔨 合成规则：**\n"
-        description += "• C碎片 → R碎片：10:1 + 100积分\n"
-        description += "• R碎片 → SR碎片：8:1 + 200积分\n"
-        description += "• SR碎片 → SSR碎片：5:1 + 500积分\n\n"
+        description += "• C碎片 → R碎片：10:1 + 50积分\n"
+        description += "• R碎片 → SR碎片：5:1 + 80积分\n"
+        description += "• SR碎片 → SSR碎片：3:1 + 100积分\n\n"
 
         # 显示使用说明
         description += "**📋 使用方法：**\n"

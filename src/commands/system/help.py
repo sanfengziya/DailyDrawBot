@@ -90,9 +90,9 @@ def create_help_embed(interaction: discord.Interaction):
 `/forge action:合成碎片 from_rarity:<源稀有度> to_rarity:<目标稀有度> quantity:<数量>` - 合成宠物碎片
 
 **合成规则:**
-- C碎片 → R碎片：10:1 + 100积分
-- R碎片 → SR碎片：8:1 + 200积分
-- SR碎片 → SSR碎片：5:1 + 500积分""",
+- C碎片 → R碎片：10:1 + 50积分
+- R碎片 → SR碎片：5:1 + 80积分
+- SR碎片 → SSR碎片：3:1 + 100积分""",
         inline=False
     )
 
