@@ -10,13 +10,13 @@ async def ranking(ctx):
         # 获取当前服务器ID
         guild_id = ctx.guild.id
 
-        # 使用Redis获取排行榜数据（异步）
-        rows = await RankingManager.get_top_rankings(guild_id, limit=10)
+        # 获取更多排名数据以应对部分用户已离开服务器的情况
+        rows = await RankingManager.get_top_rankings(guild_id, limit=30)
 
         if not rows:
             # 如果Redis没有数据,从数据库初始化
             await RankingManager.initialize_ranking(guild_id)
-            rows = await RankingManager.get_top_rankings(guild_id, limit=10)
+            rows = await RankingManager.get_top_rankings(guild_id, limit=30)
 
             if not rows:
                 await ctx.send("当前服务器还没有排名数据。")
@@ -27,11 +27,30 @@ async def ranking(ctx):
         return
 
     entries = []
-    for i, (user_id, points) in enumerate(rows, start=1):
-        user = await ctx.bot.fetch_user(user_id)
-        avatar_bytes = await user.display_avatar.replace(size=64).read()
-        avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((64, 64))
-        entries.append((avatar, f"{i}. {user.name}: {points} points"))
+    rank = 1
+    for user_id, points in rows:
+        # 检查用户是否仍在服务器中
+        try:
+            member = await ctx.guild.fetch_member(user_id)
+            if member:
+                avatar_bytes = await member.display_avatar.replace(size=64).read()
+                avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((64, 64))
+                entries.append((avatar, f"{rank}. {member.name}: {points} points"))
+                rank += 1
+
+                # 已经收集够10个在服务器中的成员，停止
+                if len(entries) >= 10:
+                    break
+        except discord.NotFound:
+            # 用户不在服务器中，跳过
+            continue
+        except Exception:
+            # 其他错误也跳过该用户
+            continue
+
+    if not entries:
+        await ctx.send("当前服务器中没有符合条件的成员数据。")
+        return
 
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     
