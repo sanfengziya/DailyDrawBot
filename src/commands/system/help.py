@@ -147,8 +147,20 @@ def create_help_embed(interaction: discord.Interaction):
     # 排行榜系统
     embed.add_field(
         name="🏆 排行榜系统",
-        value="""**传统指令:**
-`!ranking` - 查看积分排行榜（显示前10名，生成图片）""",
+        value="""**斜杠命令:**
+`/leaderboard [type]` - 查看服务器排行榜（显示前10名）
+
+**排行榜类型:**
+- `points` - 积分排行榜（默认）
+- `pets` - 宠物数量排行榜
+- `hatched eggs` - 已孵化蛋数量排行榜
+- `blackjack wins` - 21点胜场排行榜
+
+**示例:**
+• `/leaderboard` - 查看积分排行榜
+• `/leaderboard type:pets` - 查看宠物排行榜
+• `/leaderboard type:hatched eggs` - 查看已孵化蛋排行榜
+• `/leaderboard type:blackjack wins` - 查看21点胜场排行榜""",
         inline=False
     )
     

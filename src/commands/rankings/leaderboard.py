@@ -84,6 +84,17 @@ async def get_ranking_data(guild_id: int, type: str, limit: int = 30):
                 return [(int(row['discord_user_id']), row['pet_count']) for row in result.data]
             return []
 
+        elif type == "hatched_eggs":
+            # 已孵化蛋数量排行榜
+            result = supabase.rpc('get_hatched_eggs_ranking', {
+                'p_guild_id': guild_id,
+                'p_limit': limit
+            }).execute()
+
+            if result.data:
+                return [(int(row['discord_user_id']), row['hatched_count']) for row in result.data]
+            return []
+
         elif type == "blackjack_wins":
             # 21点胜场排行榜
             result = supabase.rpc('get_blackjack_wins_ranking', {
@@ -93,17 +104,6 @@ async def get_ranking_data(guild_id: int, type: str, limit: int = 30):
 
             if result.data:
                 return [(int(row['discord_user_id']), row['total_wins']) for row in result.data]
-            return []
-
-        elif type == "blackjack_profit":
-            # 21点总盈利排行榜
-            result = supabase.rpc('get_blackjack_profit_ranking', {
-                'p_guild_id': guild_id,
-                'p_limit': limit
-            }).execute()
-
-            if result.data:
-                return [(int(row['discord_user_id']), row['total_profit']) for row in result.data]
             return []
 
         return []
@@ -130,15 +130,15 @@ def get_ranking_config(type: str):
             "value_label": "pets",
             "value_format": lambda x: f"{x} pets"
         },
+        "hatched_eggs": {
+            "title": "HATCHED EGGS LEADERBOARD",
+            "value_label": "hatched eggs",
+            "value_format": lambda x: f"{x} eggs"
+        },
         "blackjack_wins": {
             "title": "BLACKJACK WINS",
             "value_label": "wins",
             "value_format": lambda x: f"{x} wins"
-        },
-        "blackjack_profit": {
-            "title": "BLACKJACK PROFIT",
-            "value_label": "profit",
-            "value_format": lambda x: f"{x:+,} pts"
         }
     }
 
@@ -304,8 +304,8 @@ def setup(bot):
     @app_commands.choices(type=[
         app_commands.Choice(name="points", value="points"),
         app_commands.Choice(name="pets", value="pets"),
-        app_commands.Choice(name="blackjack wins", value="blackjack_wins"),
-        app_commands.Choice(name="blackjack profit", value="blackjack_profit")
+        app_commands.Choice(name="hatched eggs", value="hatched_eggs"),
+        app_commands.Choice(name="blackjack wins", value="blackjack_wins")
     ])
     async def leaderboard_command(interaction: discord.Interaction, type: str = "points"):
         await leaderboard(interaction, type)
