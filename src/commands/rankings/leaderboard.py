@@ -1,9 +1,10 @@
 import discord
-from discord import File
+from discord import File, app_commands
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import os
 from src.utils.ranking import RankingManager
+from src.db.database import get_connection
 
 def create_circle_avatar(avatar_img, size=80):
     """将头像裁剪为圆形"""
@@ -49,33 +50,128 @@ def draw_rounded_rectangle(draw, xy, radius, fill, outline=None, width=1):
     draw.rectangle([x1 + radius, y1, x2 - radius, y2], fill=fill, outline=outline, width=width)
     draw.rectangle([x1, y1 + radius, x2, y2 - radius], fill=fill, outline=outline, width=width)
 
-async def ranking(ctx):
+async def get_ranking_data(guild_id: int, type: str, limit: int = 30):
+    """
+    获取不同类型的排行榜数据
+
+    Args:
+        guild_id: 服务器ID
+        type: 排行榜类型
+        limit: 返回数量限制
+
+    Returns:
+        list: [(user_id, value), ...] 格式的排行榜数据
+    """
+    supabase = get_connection()
+
     try:
-        # 获取当前服务器ID
-        guild_id = ctx.guild.id
-
-        # 获取更多排名数据以应对部分用户已离开服务器的情况
-        rows = await RankingManager.get_top_rankings(guild_id, limit=30)
-
-        if not rows:
-            # 如果Redis没有数据,从数据库初始化
-            await RankingManager.initialize_ranking(guild_id)
-            rows = await RankingManager.get_top_rankings(guild_id, limit=30)
-
+        if type == "points":
+            # 积分排行榜（使用Redis缓存）
+            rows = await RankingManager.get_top_rankings(guild_id, limit=limit)
             if not rows:
-                await ctx.send("当前服务器还没有排名数据。")
-                return
+                await RankingManager.initialize_ranking(guild_id)
+                rows = await RankingManager.get_top_rankings(guild_id, limit=limit)
+            return rows
+
+        elif type == "pets":
+            # 宠物数量排行榜
+            result = supabase.rpc('get_pet_count_ranking', {
+                'p_guild_id': guild_id,
+                'p_limit': limit
+            }).execute()
+
+            if result.data:
+                return [(int(row['discord_user_id']), row['pet_count']) for row in result.data]
+            return []
+
+        elif type == "blackjack_wins":
+            # 21点胜场排行榜
+            result = supabase.rpc('get_blackjack_wins_ranking', {
+                'p_guild_id': guild_id,
+                'p_limit': limit
+            }).execute()
+
+            if result.data:
+                return [(int(row['discord_user_id']), row['total_wins']) for row in result.data]
+            return []
+
+        elif type == "blackjack_profit":
+            # 21点总盈利排行榜
+            result = supabase.rpc('get_blackjack_profit_ranking', {
+                'p_guild_id': guild_id,
+                'p_limit': limit
+            }).execute()
+
+            if result.data:
+                return [(int(row['discord_user_id']), row['total_profit']) for row in result.data]
+            return []
+
+        return []
 
     except Exception as e:
-        await ctx.send(f"查询排名数据时出错：{str(e)}")
+        print(f"获取排行榜数据出错：{str(e)}")
+        return []
+
+def get_ranking_config(type: str):
+    """
+    获取排行榜配置信息
+
+    Returns:
+        dict: {'title': 标题, 'value_label': 数值标签, 'value_format': 格式化函数}
+    """
+    configs = {
+        "points": {
+            "title": "POINTS LEADERBOARD",
+            "value_label": "points",
+            "value_format": lambda x: f"{x:,} points"
+        },
+        "pets": {
+            "title": "PETS LEADERBOARD",
+            "value_label": "pets",
+            "value_format": lambda x: f"{x} pets"
+        },
+        "blackjack_wins": {
+            "title": "BLACKJACK WINS",
+            "value_label": "wins",
+            "value_format": lambda x: f"{x} wins"
+        },
+        "blackjack_profit": {
+            "title": "BLACKJACK PROFIT",
+            "value_label": "profit",
+            "value_format": lambda x: f"{x:+,} pts"
+        }
+    }
+
+    return configs.get(type, configs["points"])
+
+async def leaderboard(interaction: discord.Interaction, type: str = "points"):
+    # 延迟响应，因为生成图片可能需要时间
+    await interaction.response.defer()
+
+    try:
+        # 获取当前服务器ID
+        guild_id = interaction.guild.id
+
+        # 获取排行榜配置
+        config = get_ranking_config(type)
+
+        # 获取更多排名数据以应对部分用户已离开服务器的情况
+        rows = await get_ranking_data(guild_id, type, limit=30)
+
+        if not rows:
+            await interaction.followup.send(f"当前服务器还没有{config['value_label']}排名数据。")
+            return
+
+    except Exception as e:
+        await interaction.followup.send(f"查询排名数据时出错：{str(e)}")
         return
 
     entries = []
     rank = 1
-    for user_id, points in rows:
+    for user_id, value in rows:
         # 检查用户是否仍在服务器中
         try:
-            member = await ctx.guild.fetch_member(user_id)
+            member = await interaction.guild.fetch_member(user_id)
             if member:
                 avatar_bytes = await member.display_avatar.replace(size=128).read()
                 avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((80, 80))
@@ -83,7 +179,7 @@ async def ranking(ctx):
                     'rank': rank,
                     'avatar': avatar,
                     'name': member.name,
-                    'points': points
+                    'value': value
                 })
                 rank += 1
 
@@ -98,7 +194,7 @@ async def ranking(ctx):
             continue
 
     if not entries:
-        await ctx.send("当前服务器中没有符合条件的成员数据。")
+        await interaction.followup.send("当前服务器中没有符合条件的成员数据。")
         return
 
     # 字体设置
@@ -125,14 +221,11 @@ async def ranking(ctx):
     draw = ImageDraw.Draw(img)
 
     # 绘制标题
-    title = "LEADERBOARD"
+    title = config['title']
     title_bbox = draw.textbbox((0, 0), title, font=title_font)
     title_width = title_bbox[2] - title_bbox[0]
     title_x = (width - title_width) // 2
     draw.text((title_x, padding), title, fill='#FFD700', font=title_font)
-
-    # 排名文字格式
-    rank_suffix = {1: 'st', 2: 'nd', 3: 'rd'}
 
     # 绘制每个排名卡片
     y = padding + title_height
@@ -140,7 +233,7 @@ async def ranking(ctx):
         rank = entry['rank']
         avatar = entry['avatar']
         name = entry['name']
-        points = entry['points']
+        value = entry['value']
 
         # 前三名使用特殊颜色
         if rank == 1:
@@ -189,15 +282,30 @@ async def ranking(ctx):
             name = name[:15] + '...'
         draw.text((name_x, name_y), name, fill=text_color, font=name_font)
 
-        # 绘制积分
-        points_text = f"{points:,} points"
-        points_x = name_x
-        points_y = card_y1 + 55
-        draw.text((points_x, points_y), points_text, fill='#88C0D0', font=points_font)
+        # 绘制数值（积分/宠物数量/战力等）
+        value_text = config['value_format'](value)
+        value_x = name_x
+        value_y = card_y1 + 60
+        draw.text((value_x, value_y), value_text, fill='#88C0D0', font=points_font)
 
         y += card_height + card_spacing
 
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
-    await ctx.send(file=File(fp=buffer, filename="ranking.png"))
+    await interaction.followup.send(file=File(fp=buffer, filename="ranking.png"))
+
+def setup(bot):
+    """注册斜杠命令"""
+    @bot.tree.command(name="leaderboard", description="查看服务器排行榜")
+    @app_commands.describe(
+        type="选择排行榜类型"
+    )
+    @app_commands.choices(type=[
+        app_commands.Choice(name="points", value="points"),
+        app_commands.Choice(name="pets", value="pets"),
+        app_commands.Choice(name="blackjack wins", value="blackjack_wins"),
+        app_commands.Choice(name="blackjack profit", value="blackjack_profit")
+    ])
+    async def leaderboard_command(interaction: discord.Interaction, type: str = "points"):
+        await leaderboard(interaction, type)

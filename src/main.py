@@ -87,7 +87,8 @@ async def on_ready():
         ('shop_commands', shop_commands.setup),
         ('forge_commands', forge_commands.setup),
         ('role_commands', shop_roles.setup),
-        ('blackjack_commands', blackjack_commands.setup)
+        ('blackjack_commands', blackjack_commands.setup),
+        ('ranking_commands', ranking_commands.setup)
     ]
 
     for module_name, setup_func in setup_functions:
@@ -188,10 +189,7 @@ async def quizlist(ctx, language: str = "all"):
 async def quiz(ctx, category: str, number: int):
     await quiz_commands.quiz(ctx, category, number)
 
-# 注册排行榜命令
-@bot.command(name="ranking")
-async def ranking(ctx):
-    await ranking_commands.ranking(ctx)
+# 排行榜命令已改为斜杠命令 /leaderboard
 
 # 注册帮助命令
 @bot.tree.command(name="help", description="显示所有可用命令的帮助信息")
