@@ -198,13 +198,19 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
         return
 
     # 字体设置
-    font_path = "src/res/Comic Sans MS.ttf"
-    if os.path.exists(font_path):
-        title_font = ImageFont.truetype(font_path, 32)
-        name_font = ImageFont.truetype(font_path, 18)
-        points_font = ImageFont.truetype(font_path, 14)
-        rank_font = ImageFont.truetype(font_path, 16)
-    else:
+    font_paths = {
+        'title': "src/res/Comic Sans MS.ttf",
+        'name': "src/res/SnellRoundhand.ttc",
+        'points': "src/res/Arial Rounded Bold.ttf"
+    }
+
+    # 尝试加载自定义字体，如果失败则使用默认字体
+    try:
+        title_font = ImageFont.truetype(font_paths['title'], 32) if os.path.exists(font_paths['title']) else ImageFont.load_default()
+        name_font = ImageFont.truetype(font_paths['name'], 18) if os.path.exists(font_paths['name']) else ImageFont.load_default()
+        points_font = ImageFont.truetype(font_paths['points'], 14) if os.path.exists(font_paths['points']) else ImageFont.load_default()
+        rank_font = ImageFont.truetype(font_paths['title'], 16) if os.path.exists(font_paths['name']) else ImageFont.load_default()
+    except Exception:
         title_font = name_font = points_font = rank_font = ImageFont.load_default()
 
     # 图片尺寸
@@ -275,7 +281,7 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
         img.paste(circle_avatar, (avatar_x, avatar_y), circle_avatar)
 
         # 绘制用户名
-        name_x = avatar_x + 90
+        name_x = avatar_x + 100
         name_y = card_y1 + 20
         # 限制用户名长度
         if len(name) > 15:
