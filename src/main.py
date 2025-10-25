@@ -11,8 +11,9 @@ from src.commands.pets import eggs as egg_commands, management as pet_commands, 
 from src.commands.shop import roles as shop_roles, items as shop_commands
 from src.commands.games import quiz as quiz_commands, blackjack as blackjack_commands
 from src.commands.rankings import leaderboard as ranking_commands
-from src.commands.system import help_module as help_commands, admin as debug_commands
+from src.commands.system import help_module as help_commands, admin as debug_commands, language as language_commands
 from src.db.database import is_guild_subscribed
+from src.utils.i18n import get_guild_locale, t
 
 # 设置机器人
 intents = discord.Intents.default()
@@ -26,18 +27,19 @@ async def check_guild_subscription(ctx):
     全局检查：验证服务器是否有有效订阅
     如果没有订阅或订阅已失效，拒绝执行命令
     """
-    # 检查订阅状态的命令不受限制
-    if ctx.command and ctx.command.name == 'checksubscription':
+    # 检查订阅状态与语言设置命令不受限制
+    if ctx.command and ctx.command.name in {'checksubscription', 'setlanguage'}:
         return True
 
     # 如果是DM（私信）中的命令，直接拒绝
     if ctx.guild is None:
-        await ctx.send("❌ 此机器人只能在服务器中使用")
+        await ctx.send(t("common.guild_only"))
         return False
 
     # 检查服务器订阅状态
+    locale = get_guild_locale(ctx.guild.id)
     if not is_guild_subscribed(ctx.guild.id):
-        await ctx.send("❌ 此服务器未订阅或订阅已失效，无法使用机器人功能")
+        await ctx.send(t("common.subscription_required", locale=locale))
         return False
 
     return True
@@ -46,14 +48,22 @@ async def check_interaction_guild_subscription(interaction: discord.Interaction)
     """
     检查交互命令的服务器订阅状态
     """
-    # 如果不在服务器中，拒绝
+    # 允许设置语言命令绕过订阅检查
+    command_name = None
+    if interaction.command:
+        command_name = getattr(interaction.command, "qualified_name", interaction.command.name)
+
     if interaction.guild is None:
-        await interaction.response.send_message("❌ 此机器人只能在服务器中使用", ephemeral=True)
+        await interaction.response.send_message(t("common.guild_only"), ephemeral=True)
         return False
 
     # 检查服务器订阅状态
+    if command_name in {"settings language"}:
+        return True
+
     if not is_guild_subscribed(interaction.guild.id):
-        await interaction.response.send_message("❌ 此服务器未订阅或订阅已失效，无法使用机器人功能", ephemeral=True)
+        locale = get_guild_locale(interaction.guild.id)
+        await interaction.response.send_message(t("common.subscription_required", locale=locale), ephemeral=True)
         return False
 
     return True
@@ -88,7 +98,8 @@ async def on_ready():
         ('forge_commands', forge_commands.setup),
         ('role_commands', shop_roles.setup),
         ('blackjack_commands', blackjack_commands.setup),
-        ('ranking_commands', ranking_commands.setup)
+        ('ranking_commands', ranking_commands.setup),
+        ('language_commands', language_commands.setup)
     ]
 
     for module_name, setup_func in setup_functions:
@@ -191,8 +202,13 @@ async def quiz(ctx, category: str, number: int):
 
 # 排行榜命令已改为斜杠命令 /leaderboard
 
+
+@bot.command(name="setlanguage")
+async def setlanguage_command(ctx, locale: str = None):
+    await language_commands.set_language_prefix(ctx, locale)
+
 # 注册帮助命令
-@bot.tree.command(name="help", description="显示所有可用命令的帮助信息")
+@bot.tree.command(name="help", description="Display help information for all available commands")
 async def help_command(interaction: discord.Interaction):
     await help_commands.help_command(interaction)
 

@@ -1,0 +1,1183 @@
+{
+  "common": {
+    "guild_only": "❌ This bot can only be used in servers.",
+    "subscription_required": "❌ This server is not subscribed or the subscription has expired.",
+    "unknown_error": "System error. Please try again later.",
+    "system_error_title": "❌ System Error",
+    "unknown": "Unknown",
+    "egg_suffix": " Egg",
+    "points": "points"
+  },
+  "language": {
+    "prompt_supported": "Supported locales: {codes}",
+    "updated": "✅ Server language updated to **{language}**",
+    "unchanged": "ℹ️ Server language is already **{language}**",
+    "unsupported": "❌ Unsupported locale: {locale}",
+    "current": "Current server language: **{language}**",
+    "missing_permissions": "❌ Only administrators can change the server language.",
+    "guild_only": "❌ Language can only be configured in a server."
+  },
+  "commands": {
+    "settings": {
+      "name": {
+        "en-US": "settings"
+      },
+      "description": {
+        "en-US": "Configure server settings"
+      }
+    },
+    "language": {
+      "name": {
+        "en-US": "language"
+      },
+      "description": {
+        "en-US": "Set the server language"
+      }
+    }
+  },
+  "subscription": {
+    "check_failed": "Failed to check subscription status: {error}"
+  },
+  "rewards": {
+    "small_gift": "Small Treat",
+    "regular_reward": "Standard Reward",
+    "nice_reward": "Nice Surprise",
+    "good_luck": "Good Fortune",
+    "happy": "Feeling Happy",
+    "rare": "Rare Find",
+    "very_rare": "Epic Reward",
+    "legendary": "Legendary Luck",
+    "ultimate": "Ultra-Rare Jackpot",
+    "super": "Super Prize",
+    "devil": "Devilish Reward",
+    "lucky": "Blessing of Luck",
+    "final": "Ultimate Grand Prize"
+  },
+  "admin": {
+    "rewardinfo": {
+      "title": "🎁 Reward Breakdown",
+      "footer": "{count} rewards available",
+      "line": "{emoji} **{points} pts** - {message} ({probability}%)"
+    },
+    "testdraw": {
+      "title": "🎲 Draw Simulation ({times} pulls)",
+      "field_name": "{emoji} {points} pts ({message})",
+      "field_value": "Actual: {count} ({percentage}%)\\nExpected: {expected}%"
+    },
+    "subscription": {
+      "title": "📋 Server Subscription Status",
+      "server_id": "Server ID",
+      "server_name": "Server Name",
+      "status": "Status",
+      "status_active": "✅ Active",
+      "status_inactive": "❌ Inactive",
+      "status_missing": "❌ No subscription record",
+      "note_title": "Note",
+      "note_missing": "This server is not in the subscription list.",
+      "start": "Start Date",
+      "end": "End Date",
+      "type": "Plan Type",
+      "auto_renew": "Auto-renew",
+      "auto_renew_yes": "Yes",
+      "auto_renew_no": "No",
+      "error": "❌ Failed to check subscription status: {error}"
+    }
+  },
+  "economy": {
+    "common": {
+      "query_failed": "Error fetching user data: {error}",
+      "generic_error": "Operation failed. Please try again later."
+    },
+    "check": {
+      "user_info_title": "❌ User Info",
+      "user_info_description": "{mention} has not joined any draws yet.",
+      "title": "💰 {display_name}'s Balance",
+      "current_points_name": "Current Points",
+      "current_points_value": "**{points}** pts",
+      "free_draw_name": "Daily Free Draw",
+      "free_draw_incomplete": "❌ Pending",
+      "free_draw_complete": "✅ Completed",
+      "paid_draw_name": "Paid Draws",
+      "paid_draw_value": "**{used}/{limit}** draws\\nRemaining: **{remaining}**"
+    },
+    "gift": {
+      "self_transfer": "❌ You can't gift points to yourself!",
+      "positive_only": "❌ Gifted points must be a positive number.",
+      "sender_missing": "❌ Unable to load your profile. Please try again later.",
+      "insufficient": "❌ Not enough points. Current balance: {points}",
+      "confirm_title": "🎁 Point Gift Confirmation",
+      "confirm_desc": "Send **{amount}** points to {mention}?\\n\\nReply with `Y` to confirm or anything else to cancel.",
+      "cancelled": "❌ Gift cancelled.",
+      "timeout": "⏰ Confirmation timed out. Gift cancelled.",
+      "receiver_missing": "❌ Unable to load the recipient. Please try again later.",
+      "success_title": "✅ Points Gifted",
+      "success_desc": "{sender} gifted **{amount}** points to {receiver}.",
+      "failure": "Failed to gift points. Please try again later."
+    },
+    "give": {
+      "user_missing": "Unable to load user profile. Please try again later.",
+      "success": "{staff} granted {amount} points to {member}.",
+      "failure": "Failed to grant points. Please try again later."
+    },
+    "set": {
+      "user_missing": "Unable to load user profile. Please try again later.",
+      "success": "{staff} set {member}'s balance to {points} points.",
+      "failure": "Failed to set points. Please try again later."
+    },
+    "draw": {
+      "validation": {
+        "count_positive": "❌ Draw count must be greater than zero.",
+        "count_max": "❌ You can draw at most 50 times per request.",
+        "complete_free_first": "❌ Complete today's free draw before using multi-draw."
+      },
+      "free_start": "🎉 {mention} time for today's draw!",
+      "paid_limit": {
+        "title": "❌ Paid draw limit reached",
+        "description": "You have already drawn **{used}** times today.\\nRemaining paid draws: **{remaining}**\\nRequested draws: **{requested}**\\n\\nReduce the count or try again tomorrow."
+      },
+      "insufficient": {
+        "title": "❌ Not enough points",
+        "description": "Drawing **{count}** times costs **{cost}** points.\\nBalance: **{points}**\\nNeed: **{missing}** more points."
+      },
+      "confirm": {
+        "title": "🎰 Paid Draw Confirmation",
+        "description": "Draws: **{count}**\\nCost: **{cost}**\\nBalance: **{points}**\\nPaid draws today: **{used}**\\nRemaining paid draws: **{remaining}**\\n\\nReply with `Y` to confirm."
+      },
+      "cancel_timeout": "⏰ Draw cancelled.",
+      "cancel_manual": "❌ Draw cancelled.",
+      "limit_hit": "❌ Draw {index} failed: daily paid draw limit reached.",
+      "deduct_error": "Error deducting points on draw {index}: {error}",
+      "update_error": "Error updating points on draw {index}: {error}",
+      "persist_error": "Failed to update user data: {error}",
+      "single": {
+        "title": "{emoji} Draw Result",
+        "description": "**{message}**\\nYou gained **{points}** points!",
+        "ultimate": "\\n\\n🏆 **Ultimate Jackpot!** 🏆",
+        "lucky": "\\n\\n🎉 **Blessing of Luck!** 🎉",
+        "devil": "\\n\\n😈 **Devilish Reward!** 😈",
+        "super": "\\n\\n🔥 **Super Prize!** 🔥",
+        "rare": "\\n\\n⭐ **Rare Find!** ⭐"
+      },
+      "multi": {
+        "title": "🎰 {count} Draw Summary",
+        "line": "{entry} x{count} ({points_label})",
+        "line_points_label": "each worth {points} pts",
+        "summary": "\\n\\n**Total earned: {total} pts**",
+        "best_reward": "\\n\\n🎉 **Top reward: {emoji} {message} ({points} pts)**"
+      }
+    }
+  },
+  "egg": {
+    "command": {
+      "choices": {
+        "draw": "Draw",
+        "list": "List",
+        "hatch": "Hatch",
+        "claim": "Claim"
+      }
+    },
+    "rarity_names": {
+      "C": "Common",
+      "R": "Rare",
+      "SR": "Epic",
+      "SSR": "Legendary"
+    },
+    "probability_display": "**Egg Rarity Probability:**\\n",
+    "from_egg": "from ({rarity} egg)",
+    "rarity_display": {
+      "SSR": "💛 Legendary Egg",
+      "SR": "💜 Epic Egg",
+      "R": "💙 Rare Egg",
+      "C": "🤍 Common Egg"
+    },
+    "pity": {
+      "progress_title": "Pity Progress",
+      "warning_legendary_soon": " ⚠️ **{remaining_draws}** more draws until guaranteed legendary egg!",
+      "distance_to_pity": " 📊 {remaining_draws} draws to pity"
+    },
+    "ui": {
+      "draw_interface": {
+        "title": "🎰 Egg Draw Interface",
+        "points_info": "You currently have **{points}** points\\n\\n**Single Draw:** {single_cost} points\\n**10x Draw:** {ten_cost} points (10% discount!)\\n\\n"
+      },
+      "buttons": {
+        "single_draw": "single (250 pts)",
+        "ten_draw": "10x (2250 pts)"
+      },
+      "placeholders": {
+        "select_egg": "select egg to hatch..."
+      },
+      "description": {
+        "got": "got: {time}"
+      }
+    },
+    "hatch": {
+      "already_hatching": {
+        "title": "🚫 Cannot Start New Hatching",
+        "description": "You already have an egg incubating!\\n\\n{emoji} **{rarity_name} Egg**\\nStatus: {status_text}\\n\\n{action_text}"
+      },
+      "no_eggs_available": "You don't have any eggs to hatch! Go draw some eggs first!",
+      "select_egg": {
+        "title": "🐣 Select Egg to Hatch",
+        "description": "You have {count} eggs waiting to hatch, please select one:"
+      },
+      "start": {
+        "title": "🐣 Starting Hatching!",
+        "description": "**{user}**'s **{rarity_name} Egg** has started hatching!\\n\\n⏰ Hatch time: {hours} hours\\n\\nPlease wait patiently, use `/egg claim` to claim your pet when it's ready!",
+        "confirmation": "✅ Hatching started!"
+      }
+    },
+    "claim": {
+      "no_ready_pets": "No pets ready to claim! Please hatch some eggs first, or wait for incubation to complete.",
+      "success": {
+        "title": "🎉 Pet Claim Successful!",
+        "description": "Congratulations {user} obtained the following pets:\\n\\n{result_text}\\nTotal claimed: **{count}** pets!"
+      },
+      "pity_triggered": {
+        "legendary": "\\n\\n🎯 **Congratulations! Legendary egg pity triggered, obtained SSR pet!**"
+      },
+      "pity_status": {
+        "legendary": "\\n\\n**Legendary Egg Pity Progress:** {counter}/1",
+        "legendary_next": " ⚠️ Next legendary egg guaranteed SSR!"
+      }
+    },
+    "inventory": {
+      "title": "📋 My Egg Inventory",
+      "no_eggs": "You don't have any eggs yet!\\nUse `/egg draw` to draw your first egg!",
+      "ready_pets_notification": "🎉 **You have {count} pets ready to claim!**\\nUse `/egg claim` to claim them!\\n\\n",
+      "sections": {
+        "hatching": "**🔥 Incubating:**\\n",
+        "inventory": "**📦 In Inventory:**\\n"
+      },
+      "status": {
+        "ready": "✅ Ready to claim",
+        "completed": "✅ Completed, ready to claim!",
+        "action_claim": "Use `/egg claim` to claim your pet!",
+        "waiting": "Please wait for incubation to complete!",
+        "incubating": "⏰ Incubating",
+        "time_remaining": "⏰ {time} remaining",
+        "time_format_hours": "{hours}h {minutes}m",
+        "time_format_minutes": "{minutes}m"
+      }
+    },
+    "forge": {
+      "no_available_crafts": "**❌ No available crafts**\\nNeed more fragments to craft!",
+      "no_fragments": "**❌ No fragments**\\nDismantle pets to get fragments!"
+    },
+    "errors": {
+      "user_not_found": "User data not found",
+      "insufficient_points": "Insufficient points! Need {cost} points, you only have {points}.",
+      "egg_not_found": "Egg not found!",
+      "not_your_interface": "You cannot use someone else's draw interface!",
+      "draw_function_unavailable": "Egg draw function temporarily unavailable, please try again later.",
+      "hatch_function_unavailable": "Egg hatch function temporarily unavailable, please try again later.",
+      "query_eggs_failed": "Failed to query egg list, please try again later.",
+      "query_completed_eggs_failed": "Failed to query completed eggs, please try again later.",
+      "claim_pet_failed": "Failed to claim pet, please try again later.",
+      "draw_error": "Error during egg draw: {error}",
+      "start_hatch_error": "Error starting hatch: {error}",
+      "query_list_error": "Error querying egg list: {error}"
+    },
+    "drawing": {
+      "in_progress": "🎰 Drawing eggs...",
+      "pity_triggered_legendary": "\\n\\n🎯 **Congratulations! 50-draw pity triggered, obtained legendary egg!**",
+      "pity_progress": "\\n**Pity Progress:** {current}/50 ({remaining} draws to pity)",
+      "result": {
+        "title": "🎉 Egg Draw Result - {count} draws",
+        "completed": "✅ Egg draw completed!",
+        "obtained": "Obtained",
+        "cost": "Cost"
+      }
+    }
+  },
+  "pet": {
+    "rarity_descriptions": {
+      "C": "Common Pet",
+      "R": "Rare Pet",
+      "SR": "Epic Pet",
+      "SSR": "Legendary Pet"
+    },
+    "stars": {
+      "no_stars": "No stars"
+    },
+    "flavor_descriptions": {
+      "SWEET": "🍯 Sweet",
+      "SALTY": "🧂 Salty",
+      "SOUR": "🍋 Sour",
+      "SPICY": "🌶️ Spicy",
+      "UMAMI": "🍄 Umami"
+    },
+    "no_preference": "No preference",
+    "none": "None",
+    "info_labels": {
+      "pet_id": "Pet ID",
+      "rarity": "Rarity",
+      "stars": "Stars",
+      "level": "Level",
+      "experience": "Experience",
+      "satiety": "Satiety",
+      "favorite": "Favorite",
+      "dislike": "Dislike",
+      "total_experience": "Total Experience",
+      "acquisition_date": "Acquisition Date"
+    },
+    "flavor_descriptions": {
+      "SWEET": "🍯 Sweet",
+      "SALTY": "🧂 Salty",
+      "SOUR": "🍋 Sour",
+      "SPICY": "🌶️ Spicy",
+      "UMAMI": "🍄 Umami",
+      "no_preference": "No preference",
+      "none": "None"
+    },
+    "upgrade_cost": {
+      "title": "Upgrade Cost:",
+      "format": "{count} {rarity} fragments + {points} points"
+    },
+    "upgrade": {
+      "success": {
+        "title": "🌟 Upgrade Successful!",
+        "description": "{user} Your **{pet_name}** has been successfully upgraded!\nStars: {stars} ({current}/{max})\nCost: {fragments} {rarity} fragments + {points} points"
+      },
+      "errors": {
+        "pet_not_found": {
+          "title": "❌ Error",
+          "description": "{user} Pet not found or does not belong to you!"
+        },
+        "template_not_found": {
+          "title": "❌ Error",
+          "description": "Pet template does not exist!"
+        },
+        "rarity_config_not_found": {
+          "title": "❌ Error",
+          "description": "Rarity configuration does not exist!"
+        },
+        "max_stars_reached": {
+          "title": "⭐ Max Stars Reached",
+          "description": "{user} Your {pet_name} has already reached maximum stars!"
+        },
+        "cannot_get_resources": {
+          "title": "❌ Error",
+          "description": "{user} Unable to retrieve your resource information!"
+        },
+        "insufficient_points": {
+          "title": "💰 Insufficient Points",
+          "description": "{user} Upgrade requires {required_points} points, you only have {points} points!"
+        },
+        "insufficient_fragments": {
+          "title": "🧩 Insufficient Fragments",
+          "description": "{user} Upgrade requires {required_fragments} {rarity} fragments, you only have {fragments} fragments!"
+        },
+        "system_error": {
+          "title": "❌ Error",
+          "description": "An error occurred while upgrading pet: {error}"
+        }
+      }
+    },
+    "action_names": {
+      "info": "View Pet Details",
+      "upgrade": "Upgrade Pet Stars",
+      "dismantle": "Dismantle Pet",
+      "equip": "Equip Pet",
+      "feed": "Feed Pet"
+    },
+    "command": {
+      "choices": {
+        "list": "View List",
+        "info": "View Details",
+        "upgrade": "Upgrade Stars",
+        "dismantle": "Dismantle",
+        "fragments": "View Fragments",
+        "equip": "Equip",
+        "unequip": "Unequip",
+        "status": "Equipment Status",
+        "claim": "Claim Points",
+        "feed": "Feed"
+      }
+    },
+    "select_pet": {
+      "description": "Please select a pet to operate on from below:"
+    },
+    "ui": {
+      "title": "Pet Details",
+      "list_title": "Pet Query",
+      "possessive": "'s pets",
+      "total_pets": "Total",
+      "pets_count": "pets",
+      "placeholders": {
+        "select_info": "select pet to view details...",
+        "select_upgrade": "select pet to upgrade stars...",
+        "select_dismantle": "select pet to dismantle...",
+        "select_equip": "select pet to equip...",
+        "select_feed": "select pet to feed...",
+        "select_food": "select food to feed..."
+      },
+      "buttons": {
+        "confirm_dismantle": "confirm dismantle",
+        "cancel": "cancel",
+        "confirm": "Confirm",
+        "ok": "OK"
+      },
+      "actions": {
+        "info": "view",
+        "upgrade": "upgrade",
+        "dismantle": "dismantle",
+        "equip": "equip",
+        "feed": "feed",
+        "operate": "operate"
+      }
+    },
+    "errors": {
+      "user_not_found": {
+        "title": "❌ Error",
+        "message": "User not found, please use draw function first to register!"
+      },
+      "user_not_found_check": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_info": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_upgrade": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_dismantle": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_fragments": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_equip": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_unequip": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_status": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_claim": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_not_found_feed": "❌ Error\\nUser not found, please use draw function first to register!",
+      "user_data_malformed": "❌ Error\\nUser information is abnormal!",
+      "user_data_malformed_claim": "❌ Error\\nUser data is abnormal!",
+      "no_pets": {
+        "title": "❌ No pets",
+        "message": "You don't have any pets yet! Use `/egg claim` to claim pets!"
+      },
+      "pet_not_found_or_unauthorized": "❌ Error\\n{user} cannot find this pet or it doesn't belong to you!",
+      "template_not_found": "❌ Error\\nPet template not found!",
+      "rarity_config_not_found": "❌ Error\\nRarity configuration not found!",
+      "cannot_get_resources": "❌ Error\\n{user} cannot get your resource information!",
+      "max_stars_reached": {
+        "title": "⭐ Max stars reached",
+        "message": "{user} your {pet_name} has already reached maximum stars!"
+      },
+      "insufficient_points": {
+        "title": "💰 Insufficient points",
+        "message": "{user} upgrade requires {required_points} points, you only have {points}!"
+      },
+      "insufficient_fragments": {
+        "title": "🧩 Insufficient fragments",
+        "message": "{user} upgrade requires {required_fragments} {rarity} fragments, you only have {fragments}!"
+      },
+      "cannot_dismantle_equipped": {
+        "title": "❌ Error",
+        "message": "{user} cannot dismantle equipped pets! Please unequip pets before dismantling."
+      },
+      "user_data_error": "User information is abnormal!",
+      "pet_not_found_dismantle": "❌ Error\\n{user} cannot find this pet or it doesn't belong to you!",
+      "pet_template_not_found_dismantle": "❌ Error\\nPet template not found!",
+      "pet_not_or_deleted": "❌ Error\\n{user} pet not found or has been dismantled!",
+      "dismantle_failed": "❌ Error\\n{user} failed to dismantle pet!",
+      "pet_not_found_equip": "❌ Error\\n{user} cannot find this pet or it doesn't belong to you!",
+      "pet_template_not_found_equip": "❌ Error\\nPet template not found!",
+      "already_equipped": {
+        "title": "⚠️ Already equipped",
+        "message": "{user} you have already equipped **{pet_name}**!"
+      },
+      "equip_failed": "❌ Error\\n{user} failed to equip pet!",
+      "equipped_pet_info_malformed": "❌ Error\\n{user} equipped pet information is abnormal!",
+      "no_equipped_pet": {
+        "title": "❌ No equipped pet",
+        "message": "{user} you currently don't have any pets equipped!"
+      },
+      "unequip_failed": "❌ Error\\n{user} failed to unequip pet!",
+      "equipped_pet_not_found": "❌ Pet not found\\n{user} equipped pet not found!",
+      "pet_template_not_found_status": "❌ Error\\nPet template not found!",
+      "pet_not_found_or_unauthorized_feed": "❌ Error\\nPet not found or doesn't belong to you!",
+      "pet_not_owned": "❌ Error\\nThis pet doesn't belong to you!",
+      "feed_failed": "❌ Error\\n{user} failed to feed pet!",
+      "not_your_interface": "This is not your pet management interface!"
+    },
+    "list": {
+      "title": "🐾 My Pets",
+      "no_pets": "{user} you don't have any pets yet! Go draw and hatch some eggs!",
+      "query_error": "{user} error querying pet list: {error}",
+      "star_display_none": "No stars",
+      "star_label": "Stars",
+      "query": {
+        "title": "Pet Query"
+      },
+      "footer": {
+        "total_pets": "Total {total} pets"
+      }
+    },
+    "info": {
+      "title": "🐾 Pet Details",
+      "query_error": "{user} error querying pet information: {error}",
+      "star_display_none": "No stars",
+      "flavor_fallback_none": "None",
+      "flavor_fallback_no_preference": "No preference",
+      "possessive_suffix": "'s",
+      "fields": {
+        "id": "Pet ID: ",
+        "rarity": "Rarity: ",
+        "stars": "Stars: ",
+        "level": "Level: ",
+        "experience": "Experience: ",
+        "satiety": "Satiety: ",
+        "favorite": "Favorite: ",
+        "dislike": "Dislike: ",
+        "total_experience": "Total Experience: ",
+        "obtained_date": "Obtained Date: "
+      },
+      "no_stars": "No stars",
+      "upgrade_cost": "**Upgrade Cost:**\\n{fragments} {rarity} fragments + {points} points",
+      "max_stars_reached": "**Maximum stars reached!**"
+    },
+    "dismantle": {
+      "query_error": "{user} error querying pet information!",
+      "confirm": {
+        "title": "⚠️ Confirm Dismantle",
+        "description": "{user} are you sure you want to dismantle **{pet_name}**?\\n\\n",
+        "benefits": "**Dismantle Benefits:**\\n",
+        "benefits_fragments": "🧩 {fragments} {rarity} fragments\\n",
+        "benefits_points": "💰 {points} points\\n\\n",
+        "warning": "**Note: Cannot be restored after dismantling!**",
+        "processing": "✅ Dismantling confirmation..."
+      },
+      "success": {
+        "title": "💥 Dismantle Successful",
+        "description": "{user} your **{pet_name}** has been dismantled!\\n\\n**Obtained:**\\n🧩 {fragments} {rarity} fragments\\n💰 {points} points"
+      },
+      "cancelled": {
+        "title": "✅ Cancelled",
+        "message": "{user} dismantle operation has been cancelled."
+      },
+      "error_deleting": "{user} pet does not exist or has been dismantled!",
+      "error_executing": "{user} error dismantling pet!"
+    },
+    "equip": {
+      "pet_not_found": {
+        "title": "❌ Error",
+        "message": "{user} cannot find this pet or it doesn't belong to you!"
+      },
+      "query_error": "{user} error equipping pet!",
+      "claim_pending_points": {
+        "title": "⚠️ Please Claim Points First",
+        "description": "{user} you have **{points}** pending pet points!\\n\\nPlease use `/pet claim` to claim points before changing pets."
+      },
+      "success": {
+        "title": "🎒 Equip Successful!",
+        "description": "{user} successfully equipped **{pet_name}**!\\n\\n{rarity_color} **Rarity:** {rarity}\\n{stars} **Stars:** {star_count}\\n💰 **Hourly Points:** {hourly_points}\\n\\nYour pet will now automatically earn points for you!"
+      }
+    },
+    "unequip": {
+      "query_error": "{user} error unequipping pet!",
+      "user_data_error": "User information is abnormal!",
+      "claim_pending_points": {
+        "title": "⚠️ Please Claim Points First",
+        "description": "{user} you have **{points}** pending pet points!\\n\\nPlease use `/pet claim` to claim points before unequipping pets."
+      },
+      "success": {
+        "title": "📤 Unequip Successful!",
+        "description": "{user} successfully unequipped **{pet_name}**!\\n\\nYou can equip other pets to continue earning points."
+      }
+    },
+    "status": {
+      "query_error": "{user} error viewing equipment status!",
+      "user_data_error": "User data is abnormal!",
+      "pet_not_found": {
+        "title": "❌ Pet Not Found",
+        "message": "{user} equipped pet does not exist!"
+      },
+      "no_pet_equipped": {
+        "title": "👀 Equipment Status",
+        "description": "{user} you currently don't have any pets equipped!\\n\\n💰 **Current Points:** {points}\\n\\nUse `/pet equip` to equip a pet and start earning points!"
+      },
+      "title": "👀 Equipment Status",
+      "equipment_info": "{user}'s pet equipment status:\\n\\n🐾 **Equipped Pet:** {pet_name}\\n{rarity_color} **Rarity:** {rarity}\\n{stars} **Stars:** {star_count}\\n🔢 **Level:** {level}\\n💰 **Hourly Points:** {hourly_points}\\n⏰ **Pending Points:** {pending_points}\\n💎 **Current Total Points:** {points}\\n\\n💡 Use `/pet claim` to claim your pet points!"
+    },
+    "claim": {
+      "query_error": "{user} error claiming points!",
+      "user_data_error": "User data is abnormal!",
+      "debug_error": "Error claiming points: {error}",
+      "no_equipped_pet": {
+        "title": "❌ No equipped pet",
+        "description": "{user} you currently don't have any pets equipped!\\n\\n💰 **Current Points:** {points}\\n\\nUse `/pet equip` to equip a pet and start earning points!"
+      },
+      "no_points_to_claim": {
+        "title": "💰 No points to claim",
+        "description": "{user} currently has no points to claim!\\n\\n🐾 **Equipped Pet:** {pet_name}\\n{rarity_color} **Rarity:** {rarity}\\n{stars} **Stars:** {star_count}\\n💎 **Current Points:** {points}\\n\\n💡 Pets will automatically accumulate points over time, please check back later!"
+      },
+      "success": {
+        "title": "💰 Points Claim Successful!",
+        "description": "{user} successfully claimed pet points!\\n\\n🐾 **Equipped Pet:** {pet_name}\\n{rarity_color} **Rarity:** {rarity}\\n{stars} **Stars:** {star_count}\\n✨ **Points Claimed:** +{points}\\n💎 **Current Total Points:** {total}\\n\\n🎉 Continue letting your pet earn more points for you!"
+      }
+    },
+    "feed": {
+      "title": "🍽️ Pet Feeding",
+      "pet_not_found": "Pet does not exist or doesn't belong to you!",
+      "pet_not_owned_feed": "This pet doesn't belong to you!",
+      "preparing_food": "🍽️ Preparing optimal food for your pet...",
+      "already_full": "⚠️ **Pet is already full!**\\nPlease wait for satiety to reset before feeding again.",
+      "instructions": {
+        "title": "🍴 **Select food to feed:**\\n",
+        "match_bonus": "• Matching flavor preferences gives bonus experience\\n",
+        "dislike_penalty": "• Disliked flavors reduce experience gain\\n",
+        "satiety_reset": "• Satiety resets twice daily (0:00 and 12:00 Eastern Time)"
+      },
+      "display": {
+        "level": "📊 **Level:** {level}\\n",
+        "experience": "✨ **Experience:** {current}/{needed}\\n",
+        "experience_bar": "📈 {bar} {percent}%\\n\\n",
+        "satiety": "🍽️ **Satiety:** {satiety}/100\\n",
+        "satiety_bar": "📊 {bar} {satiety}%\\n\\n",
+        "favorite": "💖 **Favorite:** {flavor}\\n",
+        "dislike": "💔 **Dislike:** {flavor}\\n\\n",
+        "ate": "{user}'s **{pet_name}** ate **{food_name}**!\\n\\n"
+      },
+      "select_food": {
+        "placeholder": "select food to feed...",
+        "stock_format": "Stock:{quantity} | {xp}XP | +5-8 satiety"
+      },
+      "no_food_stock": "No food stock",
+      "go_shop_to_buy": "Go to the shop to buy food!",
+      "execution_error": "Error occurred during feeding!",
+      "execution_debug_error": "Feeding execution error: {error}",
+      "satiety_full_notice": "Pet is already full! Satiety resets at 0:00 and 12:00 Eastern Time.",
+      "no_available_food": "❌ No available food! Please go to the shop to buy some.",
+      "insufficient_food_stock": "❌ Insufficient food stock!",
+      "failure": {
+        "title": "❌ Feeding failed"
+      },
+      "success": {
+        "title": "🍴 Feeding Successful!",
+        "description": {
+          "xp_gained": "✨ **Experience Gained:** +{xp}\\n",
+          "flavor_match": "💖 **Flavor Match:** 30% bonus experience!\\n",
+          "dislike_penalty": "💔 **Dislike:** 10% experience reduction\\n",
+          "satiety_increase": "🍽️ **Satiety:** +{gained} → {new}/100\\n",
+          "level_up": "🎉 **Congratulations! Pet leveled up!**\\n",
+          "new_level": "🆙 **New Level:** {level}\\n"
+        }
+      },
+      "error": {
+        "title": "❌ Error",
+        "message": "Error occurred during feeding!"
+      }
+    },
+    "fragments": {
+      "title": "🧩 My Fragments",
+      "no_fragments": "{user} you don't have any fragments yet! Dismantle pets to get fragments!",
+      "display": "{color} **{rarity} Fragments:** {amount}\\n",
+      "description": "{user}'s fragments\\n {description}",
+      "query_error": "{user} error querying fragment inventory!"
+    },
+    "auto_feed": {
+      "error": "❌ Error\\nError occurred during feeding: {error}",
+      "pet_not_exist": "❌ Pet Not Found\\nThe specified pet does not exist or doesn't belong to you!",
+      "no_equipped_pet": "❌ No Equipped Pet\\nYou currently don't have any pets equipped! Please equip a pet first.",
+      "command": {
+        "choices": {
+          "mode": {
+            "optimal_xp": "Optimal XP - Best experience efficiency",
+            "flavor_match": "Flavor Match - Match pet's flavor preference",
+            "economic": "Economic - Use cheapest available food",
+            "clear_inventory": "Clear Inventory - Prioritize abundant food"
+          }
+        }
+      },
+      "mode_names": {
+        "optimal_xp": "🏆 Optimal Experience",
+        "flavor_match": "💖 Flavor Match",
+        "economic": "💰 Economy Mode",
+        "clear_inventory": "📦 Clear Inventory"
+      },
+      "completed": {
+        "title": "🍽️ Auto Feed Complete",
+        "description": "{user} auto feed complete!",
+        "statistics": {
+          "title": "📊 Feeding Statistics:",
+          "mode": "• Feeding mode: {mode}",
+          "feed_count": "• Feed count: {count} times",
+          "xp_gained": "• Experience gained: +{xp} XP",
+          "satiety_change": "• Satiety: {original} → {new}"
+        },
+        "used_food": {
+          "title": "🍯 Food Used:",
+          "flavor_matches": " (flavor match +30% exp x{count})"
+        },
+        "level_up": {
+          "title": "🎉 Level Up!",
+          "description": "⭐ **Level Change:** Lv.{original} → Lv.{new}!"
+        },
+        "pet_status": {
+          "title": "🐾 Pet: **{name}**",
+          "level": "🆙 Current Level: ** Lv.{level}**"
+        },
+        "satiety_full_notice": "💡 **Tip:** Pet is already full! Satiety resets at 0:00 and 12:00 Eastern Time."
+      }
+    }
+  },
+  "forge": {
+    "command": {
+      "description": "🔨 Forge - Craft pet fragments",
+      "params": {
+        "action": "Select action type",
+        "from_rarity": "Source rarity (fragments to consume)",
+        "to_rarity": "Target rarity (fragments to obtain)",
+        "quantity": "Number of crafts (default: 1)"
+      },
+      "choices": {
+        "action": {
+          "view": "View",
+          "craft": "Craft"
+        },
+        "from_rarity": {
+          "C": "Common (C)",
+          "R": "Rare (R)",
+          "SR": "Epic (SR)"
+        },
+        "to_rarity": {
+          "R": "Rare (R)",
+          "SR": "Epic (SR)",
+          "SSR": "Legendary (SSR)"
+        }
+      }
+    },
+    "rarity_mapping": {
+      "C": "Common",
+      "R": "Rare",
+      "SR": "Epic",
+      "SSR": "Legendary"
+    },
+    "actions": {
+      "view": "view",
+      "craft": "craft"
+    },
+    "errors": {
+      "error_title": "❌ Error",
+      "get_user_fragments_failed": "Failed to get user fragment inventory: {error}",
+      "invalid_recipe": "Invalid crafting recipe",
+      "insufficient_fragments": "Insufficient fragments, need {required} {rarity} fragments",
+      "insufficient_points": "Insufficient points, need {required} points",
+      "user_data_not_found": "User data not found",
+      "no_fragments_of_type": "No {rarity} fragments available",
+      "insufficient_fragments_detail": "Insufficient fragments, need {required} but only have {current}",
+      "insufficient_points_detail": "Insufficient points, need {required} but only have {current}",
+      "execute_failed": "Failed to execute crafting operation: {error}",
+      "synthesis_failed": "Crafting failed: {error}",
+      "invalid_action_type": "Invalid action type!",
+      "user_not_registered": "User not found, please use draw function first to register!",
+      "cannot_get_user_data": "Unable to get user data!",
+      "cannot_get_data_craft": "Unable to get user data!",
+      "user_not_found_craft": "User not found, please use draw function first to register!",
+      "missing_rarity_params": "Please specify source rarity and target rarity!",
+      "invalid_quantity": "Crafting quantity must be greater than 0!",
+      "invalid_crafting_path": "Invalid crafting path! Only C→R→SR→SSR sequence allowed.",
+      "cannot_craft": {
+        "title": "❌ Cannot Craft"
+      },
+      "quantity_exceeded": {
+        "title": "❌ Quantity Exceeded",
+        "description": "You can only craft {max} times, but you requested {requested} times!"
+      },
+      "crafting_failed": "❌ Error\nError occurred during crafting: {error}",
+      "forge_unavailable": "❌ Error\nForge is temporarily unavailable, please try again later!"
+    },
+    "success": {
+      "message": "Successfully crafted {quantity} {rarity} fragments"
+    },
+    "view": {
+      "user_forge": {
+        "title": "{user}'s Forge\n\n"
+      },
+      "fragments": {
+        "title": "**📦 Fragment Inventory:**\n",
+        "no_fragments": "**📦 Fragment Inventory:** None\n"
+      },
+      "current_points": "\n💰 **Current Points:** {points}\n\n",
+      "crafting_rules": {
+        "title": "**🔨 Crafting Rules:**\n",
+        "c_to_r": "• C fragments → R fragments: 10:1 + 50 points\n",
+        "r_to_sr": "• R fragments → SR fragments: 5:1 + 80 points\n",
+        "sr_to_ssr": "• SR fragments → SSR fragments: 3:1 + 100 points\n\n"
+      },
+      "usage": {
+        "title": "**📋 Usage:**\n",
+        "example_command": "`/forge action:craft from_rarity:C to_rarity:R quantity:1`\n",
+        "example_description": "For example: Craft 1 R fragment from 10 C fragments\n\n"
+      },
+      "available_crafts": {
+        "title": "**✅ Available Crafts:**\n"
+      },
+      "no_available_crafts": "**❌ No available crafts**\nNeed more fragments to craft!",
+      "no_fragments_tip": "**❌ No fragments**\nDismantle pets to get fragments!",
+      "title": "🔨 Forge"
+    },
+    "craft": {
+      "success": {
+        "title": "🎉 {user} crafting successful!\n\n",
+        "embed_title": "🔨 Forging Successful",
+        "result": {
+          "title": "**Crafting Result:**\n",
+          "description": "{from_color} {from_name} fragments → {to_color} {to_name} fragments\n\n",
+          "consumed": "**Consumed:**\n",
+          "gained": "**Gained:**\n"
+        }
+      },
+      "failure": {
+        "title": "❌ Crafting Failed"
+      }
+    }
+  },
+  "debug": {
+    "shop": {
+      "add_role_failed": "Failed to add role: {error}",
+      "get_role_list_failed": "Failed to get role list: {error}",
+      "add_item_failed": "Failed to add item: {error}"
+    },
+    "pet": {
+      "add_fragment_failed": "Error adding fragment: {error}",
+      "setup_pet_select_failed": "Error setting pet select menu: {error}",
+      "feeding_failed": "Feeding failed: {error}"
+    },
+    "leaderboard": {
+      "fetch_data_failed": "Error fetching leaderboard data: {error}",
+      "generate_image_failed": "Failed to generate leaderboard image: {error}"
+    }
+  },
+  "help": {
+    "title": "🎰 Daily Draw Bot Help",
+    "description": "Welcome to the Daily Draw bot!",
+    "sections": {
+      "system": {
+        "name": "ℹ️ System Tips",
+        "value": "**Slash Commands:**\n`/help` - Display this help menu"
+      },
+      "draw": {
+        "name": "🎲 Draw System",
+        "value": "**Prefix Commands:**\n`!draw <count>` - Run your daily draw (1 free pull, up to {max_paid_draws} paid pulls/day at {wheel_cost} pts each; defaults to 1)\n`!check [member]` - View balance and draw status\n`!giftpoints <member> <points>` - Gift points to another user\n\n**Rules:**\n- 🎉 **Free Draw:** 1 free pull per day\n- 🎰 **Paid Draw:** Up to {max_paid_draws} per day, {wheel_cost} points each\n- ⏰ **Reset:** Resets daily at midnight Eastern Time\n- 💰 **Rewards:** 10–1000 points, average return 103.8%"
+      },
+      "egg": {
+        "name": "🥚 Egg System",
+        "value": "**Slash Commands:**\n`/egg action:draw` - Draw eggs (single 250 pts, ten-draw 2250 pts)\n`/egg action:list` - View your egg inventory\n`/egg action:hatch` - Hatch a selected egg\n`/egg action:claim` - Claim a hatched pet"
+      },
+      "pet": {
+        "name": "🐾 Pet System",
+        "value": "**Slash Commands:**\n`/pet action:list [page]` - List pets (paged)\n`/pet action:info` - Inspect a pet\n`/pet action:upgrade` - Promote pet rarity (requires shards & points)\n`/pet action:dismantle` - Dismantle pets for shards\n`/pet action:fragments` - Check shard inventory\n`/pet action:equip` - Equip a pet for passive income\n`/pet action:unequip` - Unequip the active pet\n`/pet action:status` - Review equipped status and pending rewards\n`/pet action:claim` - Claim passive points\n`/pet action:feed` - Feed pets for XP\n\n**Auto Feed:**\n`/feed auto [pet] [mode] [quantity]` - One-click feeding"
+      },
+      "shop": {
+        "name": "🏪 Grocery Shop",
+        "value": "**Slash Commands:**\n`/shop action:view menu` - View today's items\n`/shop action:buy item:<name> quantity:<amount>` - Purchase food\n`/inventory item_type:food` - Inspect your food inventory"
+      },
+      "forge": {
+        "name": "🔨 Forge",
+        "value": "**Slash Commands:**\n`/forge action:view` - Show shard inventory and recipes\n`/forge action:craft from_rarity:<from> to_rarity:<to> quantity:<amount>` - Craft higher rarity shards\n\n**Recipes:**\n- C → R: 10:1 + 50 pts\n- R → SR: 5:1 + 80 pts\n- SR → SSR: 3:1 + 100 pts"
+      },
+      "roles": {
+        "name": "🏷️ Role Shop",
+        "value": "**Slash Commands:**\n`/tag action:shop` - View purchasable roles\n`/tag action:buy role_name:<role>` - Buy a role"
+      },
+      "quiz": {
+        "name": "🎮 Quiz System",
+        "value": "**Prefix Commands:**\n`!quizlist [language]` - List quiz categories\n  • `!quizlist` or `!quizlist all` - Show every category\n  • `!quizlist chinese` - Only Chinese quizzes\n  • `!quizlist english` - Only English quizzes\n\n**Tips:**\n- Each correct answer rewards 20 points\n- Await staff to start quiz rounds"
+      },
+      "blackjack": {
+        "name": "🎰 Blackjack",
+        "value": "**Slash Commands:**\n`/blackjack play <bet>` - Start a blackjack round\n  • `bet`: numeric amount or `all`\n  • Examples: `/blackjack play 100`, `/blackjack play all`\n`/blackjack stats` - Review your blackjack stats\n\n**Gameplay:**\n- 🎴✋ **Actions:** Hit & Stand\n- 🎲 **Double Down:** Double after first hand\n- ✂️ **Split:** Split pairs\n- 🎲✂️ **DAS:** Double after split (reduces house edge)\n- 🛡️ **Insurance:** Available against dealer Ace\n- 🏳️ **Surrender:** Cut losses on bad hands\n\n**Features:**\n- ✅ Dealer stands on 17\n- ✅ Blackjack pays 2.5×\n- ✅ Full game logging & stats"
+      },
+      "leaderboard": {
+        "name": "🏆 Leaderboards",
+        "value": "**Slash Commands:**\n`/leaderboard [type]` - Show top 10 rankings\n\n**Types:**\n- `points` - Points leaderboard (default)\n- `pets` - Pet count leaderboard\n- `hatched eggs` - Hatched egg leaderboard\n- `blackjack wins` - Blackjack wins leaderboard\n\n**Examples:**\n• `/leaderboard` - Points leaderboard\n• `/leaderboard type:pets` - Pet leaderboard\n• `/leaderboard type:hatched eggs` - Hatched egg leaderboard\n• `/leaderboard type:blackjack wins` - Blackjack leaderboard"
+      },
+      "admin": {
+        "name": "⚙️ Admin Commands",
+        "value": "**System:**\n`/language` - Set server language\n`!rewardinfo` - Show reward probabilities\n`!checksubscription` - Check subscription status\n\n**Role Shop:**\n`!addtag <price> <role>` - Add a purchasable role\n`!removetag <role>` - Remove a role from the shop\n`!updatetagprice <role> <price>` - Update role price\n`!listtags` - List all configured roles\n\n**Quiz:**\n`!quiz \"<category>\" <count>` - Start a quiz\n  • Exact match: `!quiz anime 5`\n  • Fuzzy: `!quiz study 5` (matches study:xxx)\n  • Each correct answer rewards 20 points\n\n**Points:**\n`!givepoints <member> <points>` - Grant points\n`!setpoints <member> <points>` - Set balance"
+      }
+    },
+    "footer": "1 free draw per day; up to {max_paid_draws} paid draws/day at {wheel_cost} points each"
+  },
+  "shop_module": {
+    "roles": {
+      "add": {
+        "success": "Added role `{role}` for {price} points.",
+        "error": "Failed to add the role. Try again later."
+      },
+      "list": {
+        "empty": "❌ No roles have been added for this server yet.",
+        "title": "🏷️ Server Role Shop",
+        "description": "Configured roles available for purchase:",
+        "price": "💰 Price: {price} pts",
+        "price_missing": "💰 Price: {price} pts ⚠️ Role may have been deleted",
+        "error": "Failed to load the role list. Try again later."
+      },
+      "shop": {
+        "empty": "No roles are available for purchase right now.",
+        "title": "🏷️ Role Shop",
+        "description": "Roles you can purchase today:",
+        "price": "💰 {price} pts",
+        "footer": "Use /tag action:buy role_name:<role> to purchase",
+        "error": "Failed to load the role list. Try again later."
+      },
+      "buy": {
+        "not_found": "Role not found.",
+        "not_available": "That role is not available for purchase.",
+        "user_missing": "Unable to load your profile. Please try again later.",
+        "insufficient": "You don't have enough points.",
+        "insufficient_detail": "❌ Not enough points. Need {price}, you currently have {current}.",
+        "confirm_prompt": "Are you sure you want to buy `{role}`? Reply with `Y` within 10 seconds.",
+        "confirm_embed_title": "🛒 Purchase Confirmation",
+        "confirm_embed_desc": "Confirm purchase of `{role}`?\n\n💰 Price: {price} pts\n💳 Balance: {current} pts\n📊 Remaining: {remaining} pts",
+        "cancelled": "Purchase cancelled.",
+        "timeout": "Timed out, purchase cancelled.",
+        "timeout_edit": "⏰ Purchase timed out and was cancelled.",
+        "cancel_edit": "❌ Purchase cancelled.",
+        "not_request": "❌ This isn't your purchase request!",
+        "button_confirm": "confirm",
+        "button_cancel": "cancel",
+        "success": "✅ You bought and received the `{role}` role.",
+        "success_embed_title": "✅ Purchase Complete",
+        "success_embed_desc": "You successfully purchased the `{role}` role!",
+        "error": "Failed to purchase the role. Please try again later."
+      },
+      "remove": {
+        "success": "✅ Removed `{role}` from the shop.",
+        "not_found": "❌ `{role}` was not found in the shop.",
+        "error": "Failed to remove the role. Please try again later."
+      },
+      "update": {
+        "success": "✅ Updated `{role}` price to {price} points.",
+        "not_found": "❌ `{role}` was not found. Use `!addtag` first.",
+        "error": "Failed to update the price. Please try again later."
+      },
+      "slash": {
+        "missing_name": "❌ Provide a role name when purchasing.",
+        "action_description": "Role shop actions",
+        "param_action": "Choose an action",
+        "param_role": "Role name (required for purchase)",
+        "choice_shop": "Shop",
+        "choice_buy": "Buy"
+      },
+      "pagination": {
+        "unknown_role": "(Unknown Role) ID:{role_id}",
+        "description": "Price: {price} pts\\n\\nPage {index} / {total}",
+        "button_prev": "◀️ previous",
+        "button_next": "▶️ next",
+        "no_permission": "You can't control this paginator!"
+      }
+    },
+    "items": {
+      "command": {
+        "description": "Grocery shop actions",
+        "param_action": "Choose an action",
+        "param_item": "Food name (required when buying)",
+        "param_quantity": "Quantity to purchase (defaults to 1)",
+        "choice_menu": "View Menu",
+        "choice_buy": "Buy",
+        "invalid_action_title": "❌ Error",
+        "invalid_action_desc": "Invalid action type."
+      },
+      "inventory_command": {
+        "description": "View your food inventory",
+        "param_item_type": "Item type to view",
+        "choice_food": "Food"
+      },
+      "menu": {
+        "title": "🏪 Grocery Shop",
+        "header": "🎯 Today's Featured Food 🎯\\n\\n💰 Your balance: {points}\\n🛒 Purchased today: {purchased}/{limit}",
+        "empty_notice": "\\n\\n📦 No items today—check back tomorrow!\\n\\n📝 Notes\\n• Food feeds pets for XP\\n• You can buy up to {limit} servings per day\\nOpen 24/7 | Refreshes daily at 00:00 ET",
+        "item_block": "\\n{rarity_icon} {name} {flavor_icon}\\n💫 Rarity: {rarity}\\n🏷️ Price: {price} pts\\n✨ Base XP: {xp} (±{xp_flow})\\n",
+        "item_description": "📖 {description}\\n",
+        "tail": "\\n📝 Notes\\n• Food feeds pets for XP\\n• You can buy up to {limit} servings per day\\n\\nOpen 24/7 | Refreshes daily at 00:00 ET",
+        "footer": "💡 Use /shop buy <food> <quantity> to purchase"
+      },
+      "errors": {
+        "title": "❌ Error",
+        "user_missing": "User profile not found. Use other features first to register!",
+        "require_item": "You must specify a food name to buy.",
+        "quantity_positive": "Quantity must be greater than zero.",
+        "quantity_max": "You can purchase at most 99 items at once.",
+        "unsupported_type": "❌ Only food inventory is supported right now."
+      },
+      "not_found": {
+        "title": "❌ Item Not Found",
+        "description": "Today's shop has no item named **{item}**.\nRun `/shop menu` to view available choices."
+      },
+      "purchase": {
+        "success_title": "✅ Purchase Complete",
+        "success_description": "{mention} bought {quantity} × {rarity_icon} **{name}** {flavor_icon}!\\nCost: {cost} pts, balance: {balance} pts.\\nPurchases today: {purchased}/{limit} servings.",
+        "failure_title": "❌ Purchase Failed"
+      },
+      "inventory": {
+        "title": "🎒 Food Inventory",
+        "empty_description": "{mention}, your food inventory is empty!\\n\\nVisit the shop to stock up for your pets.",
+        "intro": "{mention}'s food inventory:",
+        "entry_line": "\\n{rarity_icon} **{name}** {flavor_icon} × {quantity}",
+        "entry_stats": "\\n   ✨ XP: +{xp}",
+        "entry_description": "\\n   📖 {description}",
+        "footer": "{types} item types, {total} total servings"
+      },
+      "autocomplete": {
+        "entry": "{rarity_icon} {name} {flavor_icon} - {price} pts"
+      }
+    }
+  },
+  "quiz": {
+    "list": {
+      "invalid_language": "❌ Invalid language. Use: {options}",
+      "no_data": "No quiz categories found yet.",
+      "header": "📋 **Quiz Categories**\\n",
+      "section_chinese": "🇨🇳 **Chinese:**\\n{categories}\\n",
+      "section_english": "🇺🇸 **English:**\\n{categories}",
+      "none_for_language": "No categories available for {language}.",
+      "error": "Failed to fetch quiz categories. Try again later.",
+      "language_label": {
+        "all": "all",
+        "chinese": "Chinese",
+        "english": "English"
+      }
+    },
+    "match": {
+      "found": "✨ Matching categories: {categories}",
+      "none": "❌ No questions found for `{category}`.\\n💡 Use `!quizlist` to see all categories.",
+      "error": "Failed to fetch quiz questions. Try again later."
+    },
+    "game": {
+      "question": "**Question {index}/{total}:**\\n\\n**{question}**\\nA. {a}\\nB. {b}\\nC. {c}\\nD. {d}\\n🎮 You have 60 seconds to answer!",
+      "warning": "⏰ 10 seconds remaining!",
+      "correct": "✅ {mention} is correct! Answer: {answer}. +20 points",
+      "wrong": "❌ {mention} is incorrect. No more attempts.",
+      "timeout": "⏰ Time's up! Correct answer: {answer}",
+      "end": "Quiz session complete!"
+    }
+  },
+  "leaderboard": {
+    "command": {
+      "description": "View server leaderboards",
+      "param_type": "Pick a leaderboard type",
+      "choice_points": "Points Ranking",
+      "choice_pets": "Pet Count Ranking",
+      "choice_hatched": "Hatched Egg Ranking",
+      "choice_blackjack": "Blackjack Wins Ranking"
+    },
+    "status": {
+      "no_data_type": "No {label} data yet for this server.",
+      "no_members": "No eligible members found for this server.",
+      "error": "Error while generating rankings: {error}",
+      "fetch_error": "Failed to fetch leaderboard data: {error}"
+    },
+    "types": {
+      "points": {
+        "title": "Points Leaderboard",
+        "label": "points",
+        "format": "{value} pts"
+      },
+      "pets": {
+        "title": "Pet Count Leaderboard",
+        "label": "pets",
+        "format": "{value} pets"
+      },
+      "hatched_eggs": {
+        "title": "Hatched Eggs Leaderboard",
+        "label": "hatched eggs",
+        "format": "{value} eggs"
+      },
+      "blackjack": {
+        "title": "Blackjack Wins",
+        "label": "wins",
+        "format": "{value} wins"
+      }
+    }
+  },
+  "blackjack": {
+    "game_title": "🎰 Blackjack Game",
+    "buttons": {
+      "hit": "Hit",
+      "stand": "Stand",
+      "double_down": "Double",
+      "split": "Split",
+      "insurance": "Insurance",
+      "surrender": "Surrender"
+    },
+    "messages": {
+      "not_your_game": "This is not your game!",
+      "cannot_double_down": "❌ Cannot double down right now!",
+      "cannot_split": "❌ Cannot split right now!",
+      "cannot_buy_insurance": "❌ Cannot buy insurance right now!",
+      "cannot_surrender": "❌ Cannot surrender right now!",
+      "insufficient_points_double": "❌ Insufficient points! Double down requires {amount} additional points.",
+      "insufficient_points_split": "❌ Insufficient points! Split requires {amount} additional points.",
+      "insufficient_points_insurance": "❌ Insufficient points! Insurance costs {amount} points.",
+      "deduct_points_failed": "❌ Failed to deduct points. Please try again later.",
+      "insurance_success": "🛡️ **Insurance Success!**\n\nDealer has Blackjack! Insurance payout: `{amount}` points!",
+      "insurance_bought": "🛡️ **Insurance Purchased**\n\nInsurance cost: `{cost}` points",
+      "surrender_result": "🏳️ **Surrendered!**\n\nReturned `{return_amount}` points\nLost `{loss_amount}` points"
+    },
+    "embed": {
+      "dealer_section": "**🤖 Dealer's Cards**",
+      "player_section": "**👤 Your Cards**",
+      "doubled_status": " **[Doubled]**",
+      "hand_status": " ← Current",
+      "hand_info": "Hand {index}{status}\n\n{cards}\nPoints: `{value}` | Bet: `{bet}` points\n\n",
+      "points": "Points: `{value}`",
+      "total_bet": "**💰 Total Bet:** `{amount}` points",
+      "insurance_info": "\n\n**🛡️ Insurance:** `{amount}` points",
+      "footer": "Choose your action using buttons | 2 minutes timeout",
+      "dealer_turn": "Dealer is drawing cards...",
+      "game_over": "Game Over | Thanks for playing",
+      "split_progress": "Processing hand {current}/{total}"
+    },
+    "results": {
+      "bust": "💥 Bust",
+      "dealer_bust": "🎉 Dealer Bust",
+      "win": "🎉 Win",
+      "lose": "😢 Lose",
+      "tie": "🤝 Tie",
+      "player_bust": "💥 **Busted!**\n\nYou lost `{amount}` points",
+      "dealer_bust_win": "🎉 **Dealer Bust!**\n\nYou won `{amount}` points",
+      "player_win": "🎉 **You Win!**\n\nYou won `{amount}` points",
+      "player_lose": "😢 **You Lose!**\n\nYou lost `{amount}` points",
+      "tie_result": "🤝 **Tie!**\n\nReturned `{amount}` points",
+      "blackjack": "🎰 **BlackJack!**\n\nYou start with 21 points!\n\nYou won `{profit}` points",
+      "dealer_blackjack": "😢 **Dealer BlackJack!**\n\nDealer starts with 21 points!\n\nYou lost `{amount}` points",
+      "both_blackjack": "🤝 **Both BlackJack!**\n\nBoth have 21 points!\n\nReturned `{amount}` points",
+      "split_results": "**📊 Hand Results:**\n\n",
+      "hand_result": "Hand {index}: {cards} (`{value}` points)\n{result}\n\n",
+      "total_profit": "Total won `{amount}` points ✨",
+      "total_loss": "Total lost `{amount}` points",
+      "total_tie": "Total tie",
+      "win_loss_record": "Wins: {wins} | Losses: {losses} | Ties: {ties}",
+      "game_result": "**🎮 Game Result**"
+    },
+    "command": {
+      "description": "🎰 Blackjack Game - Play against AI dealer",
+      "bet_param": "Bet amount (enter number or 'all' to bet all)",
+      "insufficient_points": "❌ You don't have enough points to start the game!",
+      "invalid_bet_amount": "❌ Invalid bet amount! Please enter a number or 'all'",
+      "bet_must_be_positive": "❌ Bet amount must be greater than 0!",
+      "not_enough_points": "❌ Insufficient points! You have {current} points, but need {required} points to start the game.",
+      "deduct_bet_failed": "❌ Failed to place bet. Please try again later.",
+      "user_info_failed": "❌ Failed to get user info. Please try again later."
+    },
+    "stats": {
+      "title": "📊 Blackjack Statistics",
+      "description": "**{user}**'s Game Data",
+      "basic_stats": "🎮 Basic Stats",
+      "total_games": "**Total Games:** `{count}` games",
+      "wins": "**Wins:** `{count}` games ({rate:.1f}%)",
+      "losses": "**Losses:** `{count}` games ({rate:.1f}%)",
+      "ties": "**Ties:** `{count}` games ({rate:.1f}%)",
+      "surrenders": "**Surrenders:** `{count}` games",
+      "blackjack_count": "**BlackJacks:** `{count}` times 🎰",
+      "points_stats": "💰 Points Stats",
+      "total_profit": "**Total Profit:** `{amount}` points {emoji}",
+      "max_win": "**Max Single Win:** `+{amount}` points ✨",
+      "max_loss": "**Max Single Loss:** `{amount}` points 💸",
+      "avg_bet": "**Average Bet:** `{amount:.1f}` points",
+      "advanced_stats": "🎲 Advanced Operations",
+      "double_down_count": "**Double Down Count:** `{count}` times",
+      "split_count": "**Split Count:** `{count}` times",
+      "insurance_count": "**Insurance Used:** `{count}` times",
+      "footer": "Keep playing and improve your skills! 🎰",
+      "no_user_found": "❌ User info not found! Please play a game of blackjack first.",
+      "no_games": "❌ You haven't played any blackjack games yet! Use `/blackjack` to start your first game.",
+      "query_failed": "❌ Error occurred while querying statistics. Please try again later."
+    }
+  }
+}

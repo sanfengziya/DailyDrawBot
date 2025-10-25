@@ -8,6 +8,7 @@ import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
+from src.utils.i18n import get_localized_food_name, get_localized_pet_name, get_default_locale
 
 class FlavorType(Enum):
     """口味类型枚举"""
@@ -350,7 +351,7 @@ class FoodShopManager:
         # 验证食粮模板完整性
         valid_templates = []
         for template in food_templates:
-            if not all(key in template for key in ['id', 'name', 'rarity', 'flavor', 'price', 'base_xp']):
+            if not all(key in template for key in ['id', 'cn_name', 'en_name', 'rarity', 'flavor', 'price', 'base_xp']):
                 print(f"⚠️ 跳过不完整的食粮模板: {template.get('id', 'Unknown')}")
                 continue
             valid_templates.append(template)
@@ -417,7 +418,7 @@ class FoodShopManager:
             })
 
             used_flavors.add(selected_food['flavor'])
-            print(f"✅ 选择了{selected_rarity}级食粮: {selected_food['name']} ({selected_food['flavor']})")
+            print(f"✅ 选择了{selected_rarity}级食粮: {get_localized_food_name(selected_food, get_default_locale())} ({selected_food['flavor']})")
 
         if len(selected_items) != FoodShopManager.DAILY_ITEMS_COUNT:
             print(f"⚠️ 商品生成不完整，期望{FoodShopManager.DAILY_ITEMS_COUNT}个，实际{len(selected_items)}个，尝试次数: {generation_attempts}")
@@ -519,7 +520,7 @@ class FoodShopManager:
             print(f"✅ 商品生成测试通过，生成了{len(items)}个商品")
             for i, item in enumerate(items, 1):
                 food_data = item['food_data']
-                print(f"   {i}. {food_data['rarity']} - {food_data['name']} ({food_data['flavor']}) - {food_data['price']}积分")
+                print(f"   {i}. {food_data['rarity']} - {get_localized_food_name(food_data, get_default_locale())} ({food_data['flavor']}) - {food_data['price']}积分")
         else:
             print("❌ 商品生成测试失败")
             return False
@@ -548,7 +549,7 @@ def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
     response = supabase.table('user_pets').select('''
         id, user_id, level, xp_current, xp_total,
         favorite_flavor, dislike_flavor, satiety, last_feeding,
-        pet_templates(name, rarity)
+        pet_templates(id, en_name, rarity)
     ''').eq('id', pet_id).execute()
 
     if not response.data:
@@ -559,11 +560,16 @@ def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
     # 计算等级信息
     level, current_level_xp, next_level_requirement = FeedingSystem.calculate_current_level_xp(pet_data['xp_total'])
 
+    # 获取本地化的宠物名称
+    locale = get_default_locale()  # 使用默认语言环境
+    pet_template_data = pet_data['pet_templates']
+    pet_name = get_localized_pet_name(pet_template_data, locale)
+
     return {
         'id': pet_data['id'],
         'user_id': pet_data['user_id'],
-        'name': pet_data['pet_templates']['name'],
-        'rarity': pet_data['pet_templates']['rarity'],
+        'name': pet_name,
+        'rarity': pet_template_data['rarity'],
         'level': level,
         'xp_current': current_level_xp,
         'xp_total': pet_data['xp_total'],
@@ -574,10 +580,15 @@ def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
         'last_feeding': pet_data['last_feeding']
     }
 
-def feed_pet(pet_id: int, food_template_id: int) -> Dict:
+def feed_pet(pet_id: int, food_template_id: int, locale: str = None) -> Dict:
     """
     执行宠物喂食
     返回喂食结果信息
+    
+    Args:
+        pet_id: 宠物ID
+        food_template_id: 食粮模板ID
+        locale: 语言环境代码
     """
     from src.db.database import get_supabase_client
 
@@ -638,6 +649,10 @@ def feed_pet(pet_id: int, food_template_id: int) -> Dict:
     elif pet_info['dislike_flavor'] and food_data['flavor'] == pet_info['dislike_flavor']:
         flavor_bonus = "dislike"
 
+    # 使用传入的locale或默认locale
+    if locale is None:
+        locale = get_default_locale()
+    
     return {
         'success': True,
         'xp_gained': xp_gained,
@@ -647,7 +662,7 @@ def feed_pet(pet_id: int, food_template_id: int) -> Dict:
         'new_total_xp': new_total_xp,
         'level_up': level_up,
         'flavor_bonus': flavor_bonus,
-        'food_name': food_data['name'],
+        'food_name': get_localized_food_name(food_data, locale),
         'pet_name': pet_info['name']
     }
 
@@ -783,7 +798,7 @@ class AutoFeedingSystem:
         return feeds_needed
 
     @staticmethod
-    def auto_feed_pet(user_id: int, pet_id: int, mode: str = MODE_OPTIMAL_XP, max_feeds: int = None) -> dict:
+    def auto_feed_pet(user_id: int, pet_id: int, mode: str = MODE_OPTIMAL_XP, max_feeds: int = None, locale: str = None) -> dict:
         """
         一键喂食宠物
 
@@ -792,6 +807,7 @@ class AutoFeedingSystem:
             pet_id: 宠物ID
             mode: 喂食模式
             max_feeds: 最大喂食次数，None表示喂到饱
+            locale: 语言环境代码
 
         Returns:
             dict: 喂食结果
@@ -838,15 +854,18 @@ class AutoFeedingSystem:
         # 执行批量喂食
         try:
             result = AutoFeedingSystem.execute_batch_feeding(
-                user_id, pet_id, selected_foods, pet_info
+                user_id, pet_id, selected_foods, pet_info, locale
             )
             return result
         except Exception as e:
             return {'success': False, 'message': f'喂食过程中出错：{str(e)}'}
 
     @staticmethod
-    def execute_batch_feeding(user_id: int, pet_id: int, selected_foods: list, pet_info: dict) -> dict:
+    def execute_batch_feeding(user_id: int, pet_id: int, selected_foods: list, pet_info: dict, locale: str = None) -> dict:
         """执行批量喂食操作"""
+        # 使用传入的locale或默认locale
+        if locale is None:
+            locale = get_default_locale()
         from src.db.database import get_supabase_client
 
         supabase = get_supabase_client()
@@ -890,7 +909,7 @@ class AutoFeedingSystem:
 
                 # 记录使用的食粮
                 foods_used.append({
-                    'name': food_data['name'],
+                    'name': get_localized_food_name(food_data, locale),
                     'flavor': food_data['flavor'],
                     'rarity': food_data['rarity'],
                     'xp_gained': xp_gained,

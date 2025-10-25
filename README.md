@@ -46,6 +46,7 @@ Daily Draw/
 - `TOKEN`: Discord机器人令牌
 - `SUPABASE_URL`: Supabase项目URL
 - `SUPABASE_KEY`: Supabase匿名密钥
+- `DEFAULT_LOCALE`: 可选，默认界面语言（默认为`zh-CN`）
 
 ## 安装
 
@@ -53,6 +54,13 @@ Daily Draw/
 2. 安装依赖：`pip install -r requirements.txt`
 3. 设置环境变量
 4. 运行：`python bot.py`
+
+## 多语言支持
+
+- 语言包位于 `src/locales/`，当前提供 `zh-CN` 与 `en-US`，可按相同结构新增语言文件。
+- 通过环境变量 `DEFAULT_LOCALE` 设置默认语言。
+- 服务器管理员可以使用 `!setlanguage <locale>` 或斜杠命令 `/settings language` 即时切换语言。
+- 所有与用户交互的文本逐步迁移到翻译文件，请在新增功能时同步更新对应语言。
 
 ## 命令列表
 

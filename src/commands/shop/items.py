@@ -6,6 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id, get_user_internal_id_with_guild_and_discord_id
+from src.utils.i18n import get_default_locale, get_guild_locale, get_all_localizations, t, get_context_locale, get_localized_food_name, get_localized_food_description
 
 # 稀有度颜色映射
 RARITY_COLORS = {
@@ -49,12 +50,15 @@ class ShopCommands(commands.Cog):
         self.bot = bot
 
 
-async def get_today_shop_items() -> List[Dict]:
+async def get_today_shop_items(locale: str = None) -> List[Dict]:
     """获取今日商店商品列表"""
     from src.db.database import get_supabase_client
 
     supabase = get_supabase_client()
     today = datetime.now(ZoneInfo("America/New_York")).date()
+
+    if not locale:
+        locale = get_default_locale()
 
     # 获取今日商品目录
     catalog_response = supabase.table('daily_shop_catalog').select('''
@@ -74,31 +78,44 @@ async def get_today_shop_items() -> List[Dict]:
 
         shop_items.append({
             'food_template_id': row['food_template_id'],
-            'name': ft['name'],
+            'name': get_localized_food_name(ft, locale),
             'rarity': ft['rarity'],
             'flavor': ft['flavor'],
             'price': ft['price'],
             'xp_bonus': ft['base_xp'],
             'xp_flow': ft.get('xp_flow', 0),
-            'description': ft.get('description', '')
+            'description': get_localized_food_description(ft, locale)
         })
 
     return shop_items
 
-def get_shop_menu_embed(shop_items, user_points: int, food_purchased_today: int = 0):
+def get_shop_menu_embed(shop_items, user_points: int, food_purchased_today: int = 0, locale: str | None = None):
     """创建商店菜单embed（仅显示，不含购买功能）"""
 
     from src.utils.feeding_system import FeedingSystem
     max_purchases = FeedingSystem.MAX_DAILY_FOOD_PURCHASES
 
+    if locale is None:
+        locale = get_default_locale()
+
     embed = create_embed(
-        "🏪 杂货铺",
-        f"🎯 今日特选食粮 🎯\n\n💰 你的积分： {user_points}\n🛒 今日已购买： {food_purchased_today}/{max_purchases} 份",
+        t("shop_module.items.menu.title", locale=locale),
+        t(
+            "shop_module.items.menu.header",
+            locale=locale,
+            points=user_points,
+            purchased=food_purchased_today,
+            limit=max_purchases
+        ),
         discord.Color.blue()
     )
 
     if not shop_items:
-        embed.description += f"\n\n📦 今日暂无商品，请明天再来！\n\n📝 购买说明\n• 食粮用于喂养宠物获得经验\n• 每人每日最多购买{max_purchases}份食粮\n营业时间：全天24小时 | 每日0点刷新商品"
+        embed.description += t(
+            "shop_module.items.menu.empty_notice",
+            locale=locale,
+            limit=max_purchases
+        )
         return embed
 
     items_text = ""
@@ -108,21 +125,34 @@ def get_shop_menu_embed(shop_items, user_points: int, food_purchased_today: int 
         xp_flow = item.get('xp_flow', 0)
         description = item.get('description', '')
 
-        items_text += (
-            f"\n{rarity_heart} {item['name']} {flavor_emoji}\n"
-            f"💫 稀有度：{item['rarity']}\n"
-            f"🏷️ 价格：{item['price']} 积分\n"
-            f"✨ 基础经验：{item['xp_bonus']} (±{xp_flow})\n"
+        items_text += t(
+            "shop_module.items.menu.item_block",
+            locale=locale,
+            rarity_icon=rarity_heart,
+            name=item['name'],
+            flavor_icon=flavor_emoji,
+            rarity=item['rarity'],
+            price=item['price'],
+            xp=item['xp_bonus'],
+            xp_flow=xp_flow
         )
 
         # 添加描述信息（如果存在）
         if description:
-            items_text += f"📖 {description}\n"
+            items_text += t(
+                "shop_module.items.menu.item_description",
+                locale=locale,
+                description=description
+            )
 
-    embed.description += f"\n{items_text}\n📝 购买说明\n• 食粮用于喂养宠物获得经验\n• 每人每日最多购买{max_purchases}份食粮\n\n营业时间：全天24小时 | 每日0点刷新商品"
+    embed.description += f"\n{items_text}" + t(
+        "shop_module.items.menu.tail",
+        locale=locale,
+        limit=max_purchases
+    )
 
     # 保留购买提示
-    embed.set_footer(text="💡 使用 /shop buy <商品名> <数量> 进行购买")
+    embed.set_footer(text=t("shop_module.items.menu.footer", locale=locale))
 
     return embed
 
@@ -132,8 +162,9 @@ async def item_autocomplete(
 ) -> List[app_commands.Choice[str]]:
     """为商品名称提供自动补全选项"""
     try:
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         # 获取今日商品列表
-        today_items = await get_today_shop_items()
+        today_items = await get_today_shop_items(locale)
 
         # 过滤匹配当前输入的商品
         choices = []
@@ -144,7 +175,14 @@ async def item_autocomplete(
 
             # 如果当前输入为空或商品名包含当前输入，则添加到选项中
             if not current or current.lower() in item_name.lower():
-                choice_name = f"{rarity_emoji} {item_name} {flavor_emoji} - {item['price']}积分"
+                choice_name = t(
+                    "shop_module.items.autocomplete.entry",
+                    locale=locale,
+                    rarity_icon=rarity_emoji,
+                    name=item_name,
+                    flavor_icon=flavor_emoji,
+                    price=item['price']
+                )
                 choices.append(app_commands.Choice(name=choice_name, value=item_name))
 
         # 最多返回25个选项（Discord限制）
@@ -153,22 +191,35 @@ async def item_autocomplete(
         # 如果出错，返回空列表
         return []
 
-@app_commands.command(name="shop", description="🏪 杂货铺")
+# 使用英文作为默认名称，通过 name_localizations 支持其他语言
+choice_menu = app_commands.Choice(
+    name="view menu",
+    value="menu"
+)
+choice_menu.name_localizations = get_all_localizations("shop_module.items.command.choice_menu")
+
+choice_buy = app_commands.Choice(
+    name="buy",
+    value="buy"
+)
+choice_buy.name_localizations = get_all_localizations("shop_module.items.command.choice_buy")
+
+
+@app_commands.command(name="shop", description="Shop - view items and make purchases")
 @app_commands.guild_only()
 @app_commands.describe(
-    action="操作类型",
-    item="要购买的食粮名称（仅购买时需要）",
-    quantity="购买数量（默认为1）"
+    action="Select action type",
+    item="Select item to purchase",
+    quantity="Purchase quantity (default: 1)"
 )
-@app_commands.choices(action=[
-    app_commands.Choice(name="查看商品", value="menu"),
-    app_commands.Choice(name="购买", value="buy")
-])
+@app_commands.choices(action=[choice_menu, choice_buy])
 @app_commands.autocomplete(item=item_autocomplete)
 async def shop(interaction: discord.Interaction, action: str, item: str = None, quantity: int = 1):
     """杂货铺主命令"""
     # 先defer响应避免超时
     await interaction.response.defer()
+
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
 
     # 获取用户内部ID
     user_internal_id = get_user_internal_id_with_guild_and_discord_id(
@@ -176,13 +227,17 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
         discord_user_id=interaction.user.id
     )
     if not user_internal_id:
-        embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+        embed = create_embed(
+            t("shop_module.items.errors.title", locale=locale),
+            t("shop_module.items.errors.user_missing", locale=locale),
+            discord.Color.red()
+        )
         await interaction.followup.send(embed=embed, ephemeral=True)
         return
 
     if action == "menu":
         # 获取今日商品（按服务器）
-        today_items = await get_today_shop_items()
+        today_items = await get_today_shop_items(locale)
 
         # 获取用户积分和购买限制信息
         from src.db.database import get_supabase_client
@@ -210,28 +265,40 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
             food_purchased_today = 0
 
         # 创建仅显示商店的embed（不含购买按钮）
-        embed = get_shop_menu_embed(today_items, user_points, food_purchased_today)
+        embed = get_shop_menu_embed(today_items, user_points, food_purchased_today, locale)
         await interaction.followup.send(embed=embed)
 
     elif action == "buy":
         if not item:
-            embed = create_embed("❌ 错误", "购买时必须指定商品名称！", discord.Color.red())
+            embed = create_embed(
+                t("shop_module.items.errors.title", locale=locale),
+                t("shop_module.items.errors.require_item", locale=locale),
+                discord.Color.red()
+            )
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # 验证数量
         if quantity <= 0:
-            embed = create_embed("❌ 错误", "购买数量必须大于0！", discord.Color.red())
+            embed = create_embed(
+                t("shop_module.items.errors.title", locale=locale),
+                t("shop_module.items.errors.quantity_positive", locale=locale),
+                discord.Color.red()
+            )
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         if quantity > 99:
-            embed = create_embed("❌ 错误", "单次购买数量不能超过99个！", discord.Color.red())
+            embed = create_embed(
+                t("shop_module.items.errors.title", locale=locale),
+                t("shop_module.items.errors.quantity_max", locale=locale),
+                discord.Color.red()
+            )
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # 获取今日商品
-        today_items = await get_today_shop_items()
+        today_items = await get_today_shop_items(locale)
 
         # 查找指定商品
         target_item = None
@@ -242,8 +309,8 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
 
         if not target_item:
             embed = create_embed(
-                "❌ 商品不存在",
-                f"今日杂货铺没有名为 **{item}** 的商品！\n请使用 `/shop menu` 查看可购买的商品。",
+                t("shop_module.items.not_found.title", locale=locale),
+                t("shop_module.items.not_found.description", locale=locale, item=item),
                 discord.Color.red()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -263,36 +330,62 @@ async def shop(interaction: discord.Interaction, action: str, item: str = None, 
 
         if success:
             embed = create_embed(
-                "✅ 购买成功",
-                f"{interaction.user.mention} 成功购买 {purchase_info[0]} 个 {RARITY_COLORS.get(target_item['rarity'])} **{target_item['name']}** {FLAVOR_EMOJIS.get(target_item['flavor'])}！\n花费 {purchase_info[1]} 积分，剩余 {purchase_info[2]} 积分。\n今日已购买 {purchase_info[3]}/{FeedingSystem.MAX_DAILY_FOOD_PURCHASES} 份食粮。",
+                t("shop_module.items.purchase.success_title", locale=locale),
+                t(
+                    "shop_module.items.purchase.success_description",
+                    locale=locale,
+                    mention=interaction.user.mention,
+                    quantity=purchase_info[0],
+                    rarity_icon=RARITY_COLORS.get(target_item['rarity'], '⚪'),
+                    name=target_item['name'],
+                    flavor_icon=FLAVOR_EMOJIS.get(target_item['flavor'], '❓'),
+                    cost=purchase_info[1],
+                    balance=purchase_info[2],
+                    purchased=purchase_info[3],
+                    limit=FeedingSystem.MAX_DAILY_FOOD_PURCHASES
+                ),
                 discord.Color.green()
             )
         else:
             embed = create_embed(
-                "❌ 购买失败",
-                purchase_info,
+                t("shop_module.items.purchase.failure_title", locale=locale),
+                str(purchase_info),
                 discord.Color.red()
             )
 
         await interaction.followup.send(embed=embed)
 
     else:
-        embed = create_embed("❌ 错误", "无效的操作类型！", discord.Color.red())
+        embed = create_embed(
+            t("shop_module.items.command.invalid_action_title", locale=locale),
+            t("shop_module.items.command.invalid_action_desc", locale=locale),
+            discord.Color.red()
+        )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-@app_commands.command(name="inventory", description="查看你的食粮库存")
+inventory_choice_food = app_commands.Choice(
+    name="food",
+    value="food"
+)
+inventory_choice_food.name_localizations = get_all_localizations("shop_module.items.inventory_command.choice_food")
+
+
+@app_commands.command(name="inventory", description="View your item inventory")
 @app_commands.guild_only()
-@app_commands.describe(item_type="查看的物品类型")
-@app_commands.choices(item_type=[
-    app_commands.Choice(name="food", value="food")
-])
+@app_commands.describe(item_type="Item type to view")
+@app_commands.choices(item_type=[inventory_choice_food])
 async def inventory(interaction: discord.Interaction, item_type: str = "food"):
     """查看库存命令"""
     # 先defer响应避免超时
     await interaction.response.defer()
 
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
+
     if item_type != "food":
-        await interaction.followup.send("❌ 目前只支持查看食粮库存！", ephemeral=True)
+        await interaction.followup.send(
+            t("shop_module.items.errors.unsupported_type", locale=locale),
+            ephemeral=True
+        )
         return
 
     # 获取用户内部ID
@@ -301,7 +394,11 @@ async def inventory(interaction: discord.Interaction, item_type: str = "food"):
         discord_user_id=interaction.user.id
     )
     if not user_internal_id:
-        embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+        embed = create_embed(
+            t("shop_module.items.errors.title", locale=locale),
+            t("shop_module.items.errors.user_missing", locale=locale),
+            discord.Color.red()
+        )
         await interaction.followup.send(embed=embed, ephemeral=True)
         return
 
@@ -316,8 +413,12 @@ async def inventory(interaction: discord.Interaction, item_type: str = "food"):
 
     if not response.data:
         embed = create_embed(
-            "🎒 我的食粮库存",
-            f"{interaction.user.mention} 你的食粮库存是空的！\n\n去杂货铺买点食粮来喂养宠物吧！",
+            t("shop_module.items.inventory.title", locale=locale),
+            t(
+                "shop_module.items.inventory.empty_description",
+                locale=locale,
+                mention=interaction.user.mention
+            ),
             discord.Color.orange()
         )
         await interaction.followup.send(embed=embed)
@@ -329,12 +430,12 @@ async def inventory(interaction: discord.Interaction, item_type: str = "food"):
         food_template = item['food_templates']
         if food_template:
             inventory_data.append({
-                'name': food_template['name'],
+                'name': get_localized_food_name(food_template, locale),
                 'rarity': food_template['rarity'],
                 'flavor': food_template['flavor'],
                 'quantity': item['quantity'],
                 'xp_bonus': food_template['base_xp'],
-                'description': food_template.get('description', '')
+                'description': get_localized_food_description(food_template, locale)
             })
 
     # 按稀有度排序
@@ -342,30 +443,56 @@ async def inventory(interaction: discord.Interaction, item_type: str = "food"):
     inventory_data.sort(key=lambda x: rarity_order.get(x['rarity'], 4))
 
     # 创建库存展示
-    description = f"{interaction.user.mention} 的食粮库存："
+    description = t(
+        "shop_module.items.inventory.intro",
+        locale=locale,
+        mention=interaction.user.mention
+    )
 
     for item in inventory_data:
         rarity_emoji = RARITY_COLORS.get(item['rarity'], '⚪')
         flavor_emoji = FLAVOR_EMOJIS.get(item['flavor'], '❓')
         item_description = item.get('description', '')
 
-        description += f"\n{rarity_emoji} **{item['name']}** {flavor_emoji} × {item['quantity']}"
-        description += f"\n   ✨ 经验: +{item['xp_bonus']}"
+        description += t(
+            "shop_module.items.inventory.entry_line",
+            locale=locale,
+            rarity_icon=rarity_emoji,
+            name=item['name'],
+            flavor_icon=flavor_emoji,
+            quantity=item['quantity']
+        )
+        description += t(
+            "shop_module.items.inventory.entry_stats",
+            locale=locale,
+            xp=item['xp_bonus']
+        )
 
         # 添加描述信息（如果存在）
         if item_description:
-            description += f"\n   📖 {item_description}"
+            description += t(
+                "shop_module.items.inventory.entry_description",
+                locale=locale,
+                description=item_description
+            )
 
         description += "\n"
 
     embed = create_embed(
-        "🎒 我的食粮库存",
+        t("shop_module.items.inventory.title", locale=locale),
         description,
         discord.Color.blue()
     )
 
     total_items = sum([item['quantity'] for item in inventory_data])
-    embed.set_footer(text=f"总计 {len(inventory_data)} 种食粮，{total_items} 个")
+    embed.set_footer(
+        text=t(
+            "shop_module.items.inventory.footer",
+            locale=locale,
+            types=len(inventory_data),
+            total=total_items
+        )
+    )
 
     await interaction.followup.send(embed=embed)
 
@@ -373,3 +500,21 @@ def setup(bot):
     """注册斜杠命令"""
     bot.tree.add_command(shop)
     bot.tree.add_command(inventory)
+
+
+# Apply localization to command metadata
+shop.description_localizations = get_all_localizations("shop_module.items.command.description")
+def _set_param_localizations(command, param_name, key):
+    localizations = get_all_localizations(key)
+    for param in command.parameters:
+        if param.name == param_name:
+            param.description_localizations = localizations
+            break
+
+shop.description_localizations = get_all_localizations("shop_module.items.command.description")
+_set_param_localizations(shop, "action", "shop_module.items.command.param_action")
+_set_param_localizations(shop, "item", "shop_module.items.command.param_item")
+_set_param_localizations(shop, "quantity", "shop_module.items.command.param_quantity")
+
+inventory.description_localizations = get_all_localizations("shop_module.items.inventory_command.description")
+_set_param_localizations(inventory, "item_type", "shop_module.items.inventory_command.param_item_type")

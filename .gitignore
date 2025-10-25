@@ -208,7 +208,7 @@ __marimo__/
 
 # venv
 venv/
-.env
+.env.*
 __pycache__/
 *.pyc
 
@@ -227,35 +227,13 @@ test_probability_system.py
 project_rules.md
 
 # readme
-PET_SYSTEM_README.md
 README.env
 
 CLAUDE.md
 .mcp.json
-宠物喂食以及等级方案.md
-FEEDING_SYSTEM.md
-todo.md
-test_feeding_system.py
-.vscode/settings.json
-PERFORMANCE_OPTIMIZATIONS.md
-test_level_milestone_bonus.py
-test_food_descriptions.py
-test_resetshop_command.py
-会员方案.md
-一键喂食方案.md
-项目概括.md
-data.md
-KOFI_SETUP.md
-test_pity_system.py
-docs/Redis_Migration_Plan.md
-src/commands/draw_commands.py
-migrate_to_redis.py
-test_redis_integration.py
-docs/Redis_Migration_Completed.md
-docs/redis_supabase_audit.md
-Redis缓存系统分析报告.md
-REFACTORING_PLAN.md
-docs/blackjack_design.md
 
 # docs
 docs
+
+AGENTS.md
+management_translation.todo

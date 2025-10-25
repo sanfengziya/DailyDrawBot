@@ -3,8 +3,10 @@ from discord import File, app_commands
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import os
+import json
 from src.utils.ranking import RankingManager
 from src.db.database import get_connection
+from src.utils.i18n import get_default_locale, get_guild_locale, get_all_localizations, t
 
 def create_circle_avatar(avatar_img, size=80):
     """将头像裁剪为圆形"""
@@ -112,37 +114,59 @@ async def get_ranking_data(guild_id: int, type: str, limit: int = 30):
         print(f"获取排行榜数据出错：{str(e)}")
         return []
 
-def get_ranking_config(type: str):
-    """
-    获取排行榜配置信息
-
-    Returns:
-        dict: {'title': 标题, 'value_label': 数值标签, 'value_format': 格式化函数}
-    """
+def get_ranking_config(type: str, locale: str):
+    """获取排行榜配置信息，包含本地化标题及数值标签"""
     configs = {
         "points": {
-            "title": "POINTS LEADERBOARD",
-            "value_label": "points",
-            "value_format": lambda x: f"{x:,} points"
+            "title_key": "leaderboard.types.points.title",
+            "value_label_key": "leaderboard.types.points.label",
+            "value_format": lambda x: t("leaderboard.types.points.format", locale=locale, value=f"{x:,}")
         },
         "pets": {
-            "title": "PETS LEADERBOARD",
-            "value_label": "pets",
-            "value_format": lambda x: f"{x} pets"
+            "title_key": "leaderboard.types.pets.title",
+            "value_label_key": "leaderboard.types.pets.label",
+            "value_format": lambda x: t("leaderboard.types.pets.format", locale=locale, value=x)
         },
         "hatched_eggs": {
-            "title": "HATCHED EGGS LEADERBOARD",
-            "value_label": "hatched eggs",
-            "value_format": lambda x: f"{x} eggs"
+            "title_key": "leaderboard.types.hatched_eggs.title",
+            "value_label_key": "leaderboard.types.hatched_eggs.label",
+            "value_format": lambda x: t("leaderboard.types.hatched_eggs.format", locale=locale, value=x)
         },
         "blackjack_wins": {
-            "title": "BLACKJACK WINS",
-            "value_label": "wins",
-            "value_format": lambda x: f"{x} wins"
+            "title_key": "leaderboard.types.blackjack.title",
+            "value_label_key": "leaderboard.types.blackjack.label",
+            "value_format": lambda x: t("leaderboard.types.blackjack.format", locale=locale, value=x)
         }
     }
 
-    return configs.get(type, configs["points"])
+    config = configs.get(type, configs["points"]).copy()
+    config["title"] = t(config.pop("title_key"), locale=locale)
+    config["value_label"] = t(config.pop("value_label_key"), locale=locale)
+    return config
+
+
+def load_font(path: str, size: int):
+    try:
+        return ImageFont.truetype(path, size) if os.path.exists(path) else ImageFont.load_default()
+    except Exception:
+        return ImageFont.load_default()
+
+
+def get_locale_fonts(locale: str):
+    metadata_path = f"src/res/fonts/{locale}/metadata.json"
+    if not os.path.exists(metadata_path):
+        metadata_path = f"src/res/fonts/{get_default_locale()}/metadata.json"
+    try:
+        with open(metadata_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        data = {}
+    return {
+        "title": data.get("title", "src/res/Comic Sans MS.ttf"),
+        "rank": data.get("rank", "src/res/Arial Rounded Bold.ttf"),
+        "name": data.get("name", "src/res/SnellRoundhand.ttc"),
+        "value": data.get("value", "src/res/Arial Rounded Bold.ttf")
+    }
 
 async def leaderboard(interaction: discord.Interaction, type: str = "points"):
     # 延迟响应，因为生成图片可能需要时间
@@ -151,19 +175,23 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
     try:
         # 获取当前服务器ID
         guild_id = interaction.guild.id
+        locale = get_guild_locale(guild_id)
 
         # 获取排行榜配置
-        config = get_ranking_config(type)
+        config = get_ranking_config(type, locale)
 
         # 获取更多排名数据以应对部分用户已离开服务器的情况
         rows = await get_ranking_data(guild_id, type, limit=30)
 
         if not rows:
-            await interaction.followup.send(f"当前服务器还没有{config['value_label']}排名数据。")
+            await interaction.followup.send(
+                t("leaderboard.status.no_data_type", locale=locale, label=config['value_label'])
+            )
             return
 
     except Exception as e:
-        await interaction.followup.send(f"查询排名数据时出错：{str(e)}")
+        locale = get_guild_locale(interaction.guild.id)
+        await interaction.followup.send(t("leaderboard.status.error", locale=locale, error=str(e)))
         return
 
     entries = []
@@ -194,25 +222,15 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
             continue
 
     if not entries:
-        await interaction.followup.send("当前服务器中没有符合条件的成员数据。")
+        await interaction.followup.send(t("leaderboard.status.no_members", locale=locale))
         return
 
     # 字体设置
-    font_paths = {
-        'title': "src/res/Comic Sans MS.ttf",
-        'name': "src/res/SnellRoundhand.ttc",
-        'points': "src/res/Arial Rounded Bold.ttf"
-    }
-
-    # 尝试加载自定义字体，如果失败则使用默认字体
-    try:
-        title_font = ImageFont.truetype(font_paths['title'], 32) if os.path.exists(font_paths['title']) else ImageFont.load_default()
-        name_font = ImageFont.truetype(font_paths['name'], 18) if os.path.exists(font_paths['name']) else ImageFont.load_default()
-        points_font = ImageFont.truetype(font_paths['points'], 14) if os.path.exists(font_paths['points']) else ImageFont.load_default()
-        rank_font = ImageFont.truetype(font_paths['title'], 16) if os.path.exists(font_paths['name']) else ImageFont.load_default()
-    except Exception:
-        title_font = name_font = points_font = rank_font = ImageFont.load_default()
-
+    font_map = get_locale_fonts(locale)
+    title_font = load_font(font_map['title'], 32)
+    rank_font = load_font(font_map['rank'], 16)
+    name_font = load_font(font_map['name'], 18)
+    points_font = load_font(font_map['value'], 14)
     # 图片尺寸
     width = 700
     card_height = 100
@@ -303,15 +321,46 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
 
 def setup(bot):
     """注册斜杠命令"""
-    @bot.tree.command(name="leaderboard", description="查看服务器排行榜")
-    @app_commands.describe(
-        type="选择排行榜类型"
+    # 使用英文作为默认名称，通过 name_localizations 支持其他语言
+    choice_points = app_commands.Choice(
+        name="Points Ranking",
+        value="points"
     )
-    @app_commands.choices(type=[
-        app_commands.Choice(name="points", value="points"),
-        app_commands.Choice(name="pets", value="pets"),
-        app_commands.Choice(name="hatched eggs", value="hatched_eggs"),
-        app_commands.Choice(name="blackjack wins", value="blackjack_wins")
-    ])
+    choice_points.name_localizations = get_all_localizations("leaderboard.command.choice_points")
+
+    choice_pets = app_commands.Choice(
+        name="Pet Count Ranking",
+        value="pets"
+    )
+    choice_pets.name_localizations = get_all_localizations("leaderboard.command.choice_pets")
+
+    choice_hatched = app_commands.Choice(
+        name="Hatched Egg Ranking",
+        value="hatched_eggs"
+    )
+    choice_hatched.name_localizations = get_all_localizations("leaderboard.command.choice_hatched")
+
+    choice_blackjack = app_commands.Choice(
+        name="Blackjack Wins Ranking",
+        value="blackjack_wins"
+    )
+    choice_blackjack.name_localizations = get_all_localizations("leaderboard.command.choice_blackjack")
+
+    @bot.tree.command(name="leaderboard", description="View server rankings")
+    @app_commands.describe(
+        type="Select ranking type"
+    )
+    @app_commands.choices(type=[choice_points, choice_pets, choice_hatched, choice_blackjack])
     async def leaderboard_command(interaction: discord.Interaction, type: str = "points"):
         await leaderboard(interaction, type)
+
+    leaderboard_command.description_localizations = get_all_localizations("leaderboard.command.description")
+
+    def _set_param(command, name, key):
+        locs = get_all_localizations(key)
+        for param in command.parameters:
+            if param.name == name:
+                param.description_localizations = locs
+                break
+
+    _set_param(leaderboard_command, "type", "leaderboard.command.param_type")

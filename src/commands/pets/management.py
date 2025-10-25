@@ -5,6 +5,7 @@ import datetime
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id
 from src.utils.cache import UserCache
+from src.utils.i18n import get_guild_locale, t, get_context_locale, get_localized_pet_name, get_localized_food_name, get_localized_food_description
 
 class PetCommands(commands.Cog):
     def __init__(self, bot):
@@ -46,7 +47,7 @@ class PetCommands(commands.Cog):
                 supabase.table('user_pet_fragments').insert({'user_id': player_id, 'rarity': rarity, 'amount': amount}).execute()
                 
         except Exception as e:
-            print(f"添加碎片时出错：{str(e)}")
+            print(f"Error adding fragments: {str(e)}")
     
     def calculate_pet_points(self, rarity, stars, hours, level=1):
         """计算宠物积分获取量（包含等级里程碑奖励）"""
@@ -76,7 +77,7 @@ class PetCommands(commands.Cog):
             supabase.table('users').update({'last_pet_points_update': now}).eq('id', user_id).execute()
             
         except Exception as e:
-            print(f"更新宠物积分时间戳时出错：{str(e)}")
+            print(f"Error updating pet points timestamp: {str(e)}")
 
     def calculate_pending_points(self, user_id):
         """基于时间差计算待领取的宠物积分（最多累积24小时）"""
@@ -106,7 +107,7 @@ class PetCommands(commands.Cog):
             level = pet_data['level']
             
             # 获取宠物模板信息
-            template_response = supabase.table('pet_templates').select('rarity').eq('id', pet_template_id).execute()
+            template_response = supabase.table('pet_templates').select('id, en_name, rarity').eq('id', pet_template_id).execute()
             if not template_response.data:
                 return 0
             
@@ -137,16 +138,17 @@ class PetCommands(commands.Cog):
             return int(pending_points)
             
         except Exception as e:
-            print(f"计算待领取积分时出错：{str(e)}")
+            print(f"Error calculating pending points: {str(e)}")
             return 0
 
 # 宠物选择视图
 class PetSelectView(discord.ui.View):
-    def __init__(self, user_id: int, action: str):
+    def __init__(self, user_id: int, action: str, guild_id: int = None):
         super().__init__(timeout=60)
         self.user_id = user_id
         self.action = action
-        
+        self.guild_id = guild_id
+
     async def setup_select(self):
         """设置宠物选择下拉菜单"""
         try:
@@ -161,23 +163,25 @@ class PetSelectView(discord.ui.View):
             
             # 获取所有宠物模板信息
             template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
-            templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
-            
+            templates_response = supabase.table('pet_templates').select('id, en_name, rarity').in_('id', template_ids).execute()
+
             # 创建模板映射
             template_map = {template['id']: template for template in templates_response.data}
-            
+
             pets = []
+            locale = get_guild_locale(self.guild_id)  # 使用正确的语言环境
             for pet in pets_response.data:
                 template = template_map.get(pet['pet_template_id'])
                 if template:
-                    pets.append((pet['id'], template['name'], template['rarity'], pet['stars']))
+                    pet_name = get_localized_pet_name(template, locale)
+                    pets.append((pet['id'], pet_name, template['rarity'], pet['stars']))
             
             # 按稀有度和星级排序（稀有度优先，SSR > SR > R > C；同稀有度按星级从高到低）
             rarity_order = {'SSR': 1, 'SR': 2, 'R': 3, 'C': 4}
             pets.sort(key=lambda x: (rarity_order.get(x[2], 5), -x[3]))
             
         except Exception as e:
-            print(f"设置宠物选择菜单时出错：{str(e)}")
+            print(f"Error setting up pet selection menu: {str(e)}")
             return False
             
         # 稀有度颜色映射
@@ -202,27 +206,31 @@ class PetSelectView(discord.ui.View):
                 emoji=emoji
             ))
         
-        select = PetSelect(self.action, options)
+        select = PetSelect(self.action, options, self.guild_id)
         self.add_item(select)
         return True
 
 class PetSelect(discord.ui.Select):
-    def __init__(self, action: str, options):
+    def __init__(self, action: str, options, guild_id: int = None):
         self.action = action
+        self.guild_id = guild_id
+        locale = get_guild_locale(guild_id)
         super().__init__(
-            placeholder=f"选择要{self.get_action_name()}的宠物...",
+            placeholder=t("pet.ui.placeholders.select_" + action, locale=locale, default=f"选择要{self.get_action_name(locale)}的宠物..."),
             options=options
         )
-    
-    def get_action_name(self):
+
+    def get_action_name(self, locale=None):
+        if locale is None:
+            locale = get_guild_locale(self.guild_id)
         action_names = {
-            "info": "查看详情",
-            "upgrade": "升星",
-            "dismantle": "分解",
-            "equip": "装备",
-            "feed": "喂食"
+            "info": t("pet.command.choices.info", locale=locale),
+            "upgrade": t("pet.command.choices.upgrade", locale=locale),
+            "dismantle": t("pet.command.choices.dismantle", locale=locale),
+            "equip": t("pet.command.choices.equip", locale=locale),
+            "feed": t("pet.command.choices.feed", locale=locale)
         }
-        return action_names.get(self.action, "操作")
+        return action_names.get(self.action, t("pet.ui.actions.operate", locale=locale))
     
     async def callback(self, interaction: discord.Interaction):
         pet_id = int(self.values[0])
@@ -238,61 +246,70 @@ class PetSelect(discord.ui.Select):
         elif self.action == "feed":
             await handle_pet_feed(interaction, pet_id)
 
-# 主宠物命令
-@app_commands.command(name="pet", description="🐾 宠物系统 - 查看、升星、分解")
+# 主宠物命令定义
+def _create_pet_action_choices():
+    """创建宠物action选项，使用英文作为默认名称并添加本地化支持"""
+    from src.utils.i18n import get_all_localizations
+    
+    actions = ["list", "info", "upgrade", "dismantle", "fragments", "equip", "unequip", "status", "claim", "feed"]
+    choices = []
+    
+    for action_value in actions:
+        choice = app_commands.Choice(
+            name=action_value.replace("_", " ").title() if action_value != "list" else "View List",
+            value=action_value
+        )
+        choice.name_localizations = get_all_localizations(f"pet.command.choices.{action_value}")
+        choices.append(choice)
+    
+    return choices
+
+@app_commands.command(name="pet", description="Pet system - view, upgrade, and manage pets")
 @app_commands.guild_only()
 @app_commands.describe(
-    action="选择操作类型",
-    page="页码（查看列表时使用，默认第1页）"
+    action="Select action type",
+    page="Page number (for list view, default: 1)"
 )
-@app_commands.choices(action=[
-    app_commands.Choice(name="查看列表", value="list"),
-    app_commands.Choice(name="查看详情", value="info"),
-    app_commands.Choice(name="升星", value="upgrade"),
-    app_commands.Choice(name="分解", value="dismantle"),
-    app_commands.Choice(name="查看碎片", value="fragments"),
-    app_commands.Choice(name="装备", value="equip"),
-    app_commands.Choice(name="卸下", value="unequip"),
-    app_commands.Choice(name="装备状态", value="status"),
-    app_commands.Choice(name="领取积分", value="claim"),
-    app_commands.Choice(name="喂食", value="feed"),
-])
+@app_commands.choices(action=_create_pet_action_choices())
 async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""
+    locale = get_context_locale(interaction)
+
     if action == "list":
         await handle_pet_list(interaction, page)
     elif action in ["info", "upgrade", "dismantle", "equip", "feed"]:
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 显示宠物选择界面
-        view = PetSelectView(user_internal_id, action)
+        guild_id = interaction.guild.id if interaction.guild else None
+        view = PetSelectView(user_internal_id, action, guild_id)
         has_pets = await view.setup_select()
 
         if not has_pets:
             embed = create_embed(
-                "❌ 没有宠物",
-                "你还没有任何宠物！使用 `/egg claim` 来领取宠物吧！",
+                t("pet.errors.no_pets.title", locale=locale),
+                t("pet.errors.no_pets.message", locale=locale),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         action_names = {
-            "info": "查看宠物详情",
-            "upgrade": "升星宠物",
-            "dismantle": "分解宠物",
-            "equip": "装备宠物",
-            "feed": "喂食宠物"
+            "info": t("pet.action_names.info", locale=locale),
+            "upgrade": t("pet.action_names.upgrade", locale=locale),
+            "dismantle": t("pet.action_names.dismantle", locale=locale),
+            "equip": t("pet.action_names.equip", locale=locale),
+            "feed": t("pet.action_names.feed", locale=locale)
         }
 
         embed = create_embed(
             f"🐾 {action_names[action]}",
-            "请从下方选择要操作的宠物：",
+            t("pet.select_pet.description", locale=locale),
             discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -310,11 +327,13 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
-        
+
+        locale = get_context_locale(interaction)
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -325,8 +344,8 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
 
         if not all_pets_response.data:
             embed = create_embed(
-                "🐾 我的宠物",
-                f"{interaction.user.mention} 你还没有任何宠物呢！快去抽蛋孵化吧！",
+                t("pet.list.title", locale=locale),
+                t("pet.list.no_pets", locale=locale, user=interaction.user.mention),
                 discord.Color.orange()
             )
             await interaction.response.send_message(embed=embed)
@@ -334,7 +353,7 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
 
         # 获取所有相关的宠物模板
         template_ids = list(set([pet['pet_template_id'] for pet in all_pets_response.data]))
-        templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
+        templates_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').in_('id', template_ids).execute()
         templates_dict = {template['id']: template for template in templates_response.data}
 
         # 获取稀有度配置
@@ -351,7 +370,7 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
                 max_stars = rarity_config['max_stars'] if rarity_config else 0
                 pets_data.append({
                     'id': pet['id'],
-                    'name': template['name'],
+                    'name': get_localized_pet_name(template, locale),
                     'rarity': template['rarity'],
                     'stars': pet['stars'],
                     'max_stars': max_stars,
@@ -379,16 +398,16 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         
         description = ""
         for pet_id, pet_name, rarity, stars, max_stars, created_at in pets:
-            star_display = '⭐' * stars if stars > 0 else '无星'
+            star_display = '⭐' * stars if stars > 0 else t("pet.list.star_display_none", locale=locale)
             description += f"{rarity_colors[rarity]} **{pet_name}** (ID: {pet_id})\n"
-            description += f"   星级: {star_display} ({stars}/{max_stars})\n\n"
+            description += f"   {t('pet.list.star_label', locale=locale)}: {star_display} ({stars}/{max_stars})\n\n"
         
         total_pages = (total_pets + per_page - 1) // per_page
         
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"查询宠物列表时出错：{str(e)}",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.list.query_error", locale=locale, user=interaction.user.mention, error=str(e)),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -398,11 +417,11 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         return
     
     embed = create_embed(
-        title="宠物查询",
-        description=f"{interaction.user.mention} 的宠物 (第 {page}/{total_pages} 页)\n {description}",
+        title=t("pet.ui.list_title", locale=locale, default="宠物查询"),
+        description=f"{interaction.user.mention} {t('pet.ui.possessive', locale=locale, default='的宠物')} (第 {page}/{total_pages} 页)\n {description}",
         color=discord.Color.blue()
     )
-    embed.set_footer(text=f"总共 {total_pets} 只宠物")
+    embed.set_footer(text=f"{t('pet.ui.total_pets', locale=locale, default='总共')} {total_pets} {t('pet.ui.pets_count', locale=locale, default='只宠物')}")
     await interaction.response.send_message(embed=embed)
 
 async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
@@ -410,21 +429,23 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
-        
+
+        # 获取语言设置
+        locale = get_context_locale(interaction)
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # 查询宠物基本信息
         pet_response = supabase.table('user_pets').select('id, pet_template_id, stars, created_at, level, xp_current, xp_total, satiety, favorite_flavor, dislike_flavor').eq('id', pet_id).eq('user_id', user_internal_id).execute()
-        
+
         if not pet_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                t("pet.errors.pet_not_found_or_unauthorized", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -433,9 +454,9 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         pet_data = pet_response.data[0]
         
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        template_response = supabase.table('pet_templates').select('en_name, rarity').eq('id', pet_data['pet_template_id']).execute()
         if not template_response.data:
-            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
         
@@ -444,11 +465,11 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         # 获取稀有度配置
         rarity_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', template_data['rarity']).execute()
         if not rarity_response.data:
-            embed = create_embed("❌ 错误", "稀有度配置不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.rarity_config_not_found.title", locale=locale), t("pet.upgrade.errors.rarity_config_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
         
-        pet_name = template_data['name']
+        pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
         rarity = template_data['rarity']
         stars = pet_data['stars']
         max_stars = rarity_response.data[0]['max_stars']
@@ -456,8 +477,8 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"查询宠物信息时出错：{str(e)}",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.info.query_error", locale=locale, user=interaction.user.mention, error=str(e)),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -473,15 +494,15 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         'SSR': '💛'
     }
     
-    star_display = '⭐' * stars if stars > 0 else '无星'
+    star_display = '⭐' * stars if stars > 0 else t("pet.info.star_display_none", locale=locale)
     
     # 计算升星费用（如果还能升星）
     upgrade_info = ""
     if stars < max_stars:
         cost = PetCommands.UPGRADE_COSTS[stars]
-        upgrade_info = f"\n**升星费用：**\n{cost['fragments']} 个 {rarity} 碎片 + {cost['points']} 积分"
+        upgrade_info = f"\n**{t('pet.upgrade_cost.title', locale=locale)}**\n{t('pet.upgrade_cost.format', locale=locale, count=cost['fragments'], rarity=rarity, points=cost['points'])}"
     else:
-        upgrade_info = "\n**已达到最大星级！**"
+        upgrade_info = f"\n**{t('pet.errors.max_stars_reached.title', locale=locale)}**\n{t('pet.errors.max_stars_reached.message', locale=locale, user=interaction.user.mention, pet_name=pet_name)}"
     
     # 获取宠物的等级、经验和饱食度信息
     level = pet_data['level']
@@ -521,39 +542,42 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
     satiety_bar = "🟢" * satiety_filled + "⚪" * (progress_bar_length - satiety_filled)
     
     # 口味偏好显示
-    favorite_flavor_display = flavor_emojis.get(favorite_flavor, '无偏好')
-    dislike_flavor_display = flavor_emojis.get(dislike_flavor, '无')
+    favorite_flavor_display = t(f"pet.flavor_descriptions.{favorite_flavor}", locale=locale, default=flavor_emojis.get(favorite_flavor, t("pet.info.flavor_fallback_no_preference", locale=locale)))
+    dislike_flavor_display = t(f"pet.flavor_descriptions.{dislike_flavor}", locale=locale, default=flavor_emojis.get(dislike_flavor, t("pet.info.flavor_fallback_none", locale=locale)))
     
     # 构建描述内容
-    description = f"{interaction.user.mention} 的 {rarity_colors[rarity]} **{pet_name}**\n\n"
-    
+    possessive_suffix = t("pet.info.possessive_suffix", locale=locale)
+    possessive = f"{interaction.user.mention}{possessive_suffix}"
+    description = f"{possessive} {rarity_colors[rarity]} **{pet_name}**\n\n"
+
     # 基本信息
-    description += f"🆔 **宠物ID：** {pet_id}\n"
-    description += f"💎 **稀有度：** {rarity}\n"
-    description += f"⭐ **星级：** {star_display} ({stars}/{max_stars})\n\n"
-    
+    colon = ":" if locale.startswith('en') else "："
+    description += f"🆔 **{t('pet.info_labels.pet_id', locale=locale)}{colon}** {pet_id}\n"
+    description += f"💎 **{t('pet.info_labels.rarity', locale=locale)}{colon}** {rarity}\n"
+    description += f"⭐ **{t('pet.info_labels.stars', locale=locale)}{colon}** {star_display} ({stars}/{max_stars})\n\n"
+
     # 等级和经验
-    description += f"📊 **等级：** {level}\n"
-    description += f"✨ **经验：** {xp_current}/{xp_needed_for_next_level}\n"
+    description += f"📊 **{t('pet.info_labels.level', locale=locale)}{colon}** {level}\n"
+    description += f"✨ **{t('pet.info_labels.experience', locale=locale)}{colon}** {xp_current}/{xp_needed_for_next_level}\n"
     description += f"📈 {progress_bar} {progress_percent}%\n\n"
-    
+
     # 饱食度
-    description += f"🍽️ **饱食度：** {satiety}/100\n"
+    description += f"🍽️ **{t('pet.info_labels.satiety', locale=locale)}{colon}** {satiety}/100\n"
     description += f"📊 {satiety_bar} {satiety}%\n\n"
-    
+
     # 口味偏好
-    description += f"💖 **喜欢：** {favorite_flavor_display}\n"
-    description += f"💔 **讨厌：** {dislike_flavor_display}\n\n"
-    
+    description += f"💖 **{t('pet.info_labels.favorite', locale=locale)}{colon}** {favorite_flavor_display}\n"
+    description += f"💔 **{t('pet.info_labels.dislike', locale=locale)}{colon}** {dislike_flavor_display}\n\n"
+
     # 总经验和获得时间
-    description += f"🏆 **总经验：** {xp_total}\n"
-    description += f"📅 **获得时间：** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d')}\n"
+    description += f"🏆 **{t('pet.info_labels.total_experience', locale=locale)}{colon}** {xp_total}\n"
+    description += f"📅 **{t('pet.info_labels.acquisition_date', locale=locale)}{colon}** {(datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00')) if isinstance(created_at, str) else created_at).strftime('%Y-%m-%d')}\n"
     
     # 升星信息
     description += f"{upgrade_info}"
 
     embed = create_embed(
-        "🐾 宠物信息",
+        f"🐾 {t('pet.ui.title', locale=locale)}",
         description,
         discord.Color.green()
     )
@@ -561,24 +585,25 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
 
 async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
     """升星宠物"""
+    locale = get_context_locale(interaction)
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
-        
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # 获取宠物信息
         pet_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('id', pet_id).eq('user_id', user_internal_id).execute()
-        
+
         if not pet_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                t("pet.upgrade.errors.pet_not_found.title", locale=locale),
+                t("pet.upgrade.errors.pet_not_found.description", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -587,9 +612,9 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         pet_data = pet_response.data[0]
         
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        template_response = supabase.table('pet_templates').select('en_name, rarity').eq('id', pet_data['pet_template_id']).execute()
         if not template_response.data:
-            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
         
@@ -598,19 +623,19 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         # 获取稀有度配置
         rarity_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', template_data['rarity']).execute()
         if not rarity_response.data:
-            embed = create_embed("❌ 错误", "稀有度配置不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.rarity_config_not_found.title", locale=locale), t("pet.upgrade.errors.rarity_config_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
         
-        pet_name = template_data['name']
+        pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
         rarity = template_data['rarity']
         stars = pet_data['stars']
         max_stars = rarity_response.data[0]['max_stars']
         
         if stars >= max_stars:
             embed = create_embed(
-                "⭐ 已满星",
-                f"{interaction.user.mention} 你的 {pet_name} 已经达到最大星级了！",
+                t("pet.upgrade.errors.max_stars_reached.title", locale=locale),
+                t("pet.upgrade.errors.max_stars_reached.description", locale=locale, user=interaction.user.mention, pet_name=pet_name),
                 discord.Color.yellow()
             )
             await interaction.response.send_message(embed=embed)
@@ -625,8 +650,8 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
         if not user_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 无法获取你的资源信息！",
+                t("pet.upgrade.errors.cannot_get_resources.title", locale=locale),
+                t("pet.upgrade.errors.cannot_get_resources.description", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -640,8 +665,8 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         
         if points < required_points:
             embed = create_embed(
-                "💰 积分不足",
-                f"{interaction.user.mention} 升星需要 {required_points} 积分，你只有 {points} 积分！",
+                t("pet.upgrade.errors.insufficient_points.title", locale=locale),
+                t("pet.upgrade.errors.insufficient_points.description", locale=locale, user=interaction.user.mention, required_points=required_points, points=points),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -649,8 +674,8 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         
         if fragments < required_fragments:
             embed = create_embed(
-                "🧩 碎片不足",
-                f"{interaction.user.mention} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！",
+                t("pet.upgrade.errors.insufficient_fragments.title", locale=locale),
+                t("pet.upgrade.errors.insufficient_fragments.description", locale=locale, user=interaction.user.mention, required_fragments=required_fragments, rarity=rarity, fragments=fragments),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -675,18 +700,16 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         star_display = '⭐' * new_stars
         
         embed = create_embed(
-            "🌟 升星成功！",
-            f"{interaction.user.mention} 你的 **{pet_name}** 成功升星！\n"
-            f"星级：{star_display} ({new_stars}/{max_stars})\n"
-            f"消耗：{required_fragments} 个 {rarity} 碎片 + {required_points} 积分",
+            t("pet.upgrade.success.title", locale=locale),
+            t("pet.upgrade.success.description", locale=locale, user=interaction.user.mention, pet_name=pet_name, stars=star_display, current=new_stars, max=max_stars, fragments=required_fragments, rarity=rarity, points=required_points),
             discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
         
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"升星宠物时出错：{str(e)}",
+            t("pet.upgrade.errors.system_error.title", locale=locale),
+            t("pet.upgrade.errors.system_error.description", locale=locale, error=str(e)),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -704,16 +727,18 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
+        
+        locale = get_guild_locale(interaction.guild.id)
         
         # 检查宠物是否正在装备
         user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
         if user_response.data and user_response.data[0]['equipped_pet_id'] == pet_id:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 不能分解正在装备的宠物！请先卸下宠物再进行分解。",
+                t("pet.errors.cannot_dismantle_equipped.title", locale=locale),
+                t("pet.errors.cannot_dismantle_equipped.message", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -724,8 +749,8 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         
         if not pet_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                t("pet.errors.user_not_found.title", locale=locale),
+                t("pet.errors.pet_not_found_or_unauthorized", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -736,20 +761,21 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
         stars = pet_data['stars']
         
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        template_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').eq('id', pet_template_id).execute()
         if not template_response.data:
-            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
         
         template_data = template_response.data[0]
-        pet_name = template_data['name']
+        pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
         rarity = template_data['rarity']
         
     except Exception as e:
+        locale = get_guild_locale(interaction.guild.id)
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 查询宠物信息时出错了！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.dismantle.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -766,14 +792,18 @@ async def handle_pet_dismantle(interaction: discord.Interaction, pet_id: int):
     total_fragments = base_fragments + star_bonus_fragments
     total_points = star_bonus_points
     
+    locale = get_guild_locale(interaction.guild.id)
+    
     # 创建确认界面
+    description = t("pet.dismantle.confirm.description", locale=locale, user=interaction.user.mention, pet_name=pet_name)
+    description += t("pet.dismantle.confirm.benefits", locale=locale)
+    description += t("pet.dismantle.confirm.benefits_fragments", locale=locale, fragments=total_fragments, rarity=rarity)
+    description += t("pet.dismantle.confirm.benefits_points", locale=locale, points=total_points)
+    description += t("pet.dismantle.confirm.warning", locale=locale)
+    
     embed = create_embed(
-        "⚠️ 确认分解",
-        f"{interaction.user.mention} 你确定要分解 **{pet_name}** 吗？\n\n"
-        f"**分解收益：**\n"
-        f"🧩 {total_fragments} 个 {rarity} 碎片\n"
-        f"💰 {total_points} 积分\n\n"
-        f"**注意：分解后无法恢复！**",
+        t("pet.dismantle.confirm.title", locale=locale),
+        description,
         discord.Color.orange()
     )
 
@@ -798,7 +828,7 @@ async def handle_pet_fragments(interaction: discord.Interaction):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -812,9 +842,10 @@ async def handle_pet_fragments(interaction: discord.Interaction):
         fragments.sort(key=lambda x: rarity_order.get(x['rarity'], 5))
         
     except Exception as e:
+        locale = get_guild_locale(interaction.guild.id)
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 查询碎片库存时出错了！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.fragments.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -823,10 +854,12 @@ async def handle_pet_fragments(interaction: discord.Interaction):
             await interaction.followup.send(embed=embed, ephemeral=True)
         return
     
+    locale = get_guild_locale(interaction.guild.id)
+    
     if not fragments:
         embed = create_embed(
-            "🧩 我的碎片",
-            f"{interaction.user.mention} 你还没有任何碎片呢！分解宠物可以获得碎片！",
+            t("pet.fragments.title", locale=locale),
+            t("pet.fragments.no_fragments", locale=locale, user=interaction.user.mention),
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -843,11 +876,11 @@ async def handle_pet_fragments(interaction: discord.Interaction):
     for fragment in fragments:
         rarity = fragment['rarity']
         amount = fragment['amount']
-        description += f"{rarity_colors[rarity]} **{rarity} 碎片：** {amount} 个\n"
+        description += t("pet.fragments.display", locale=locale, color=rarity_colors[rarity], rarity=rarity, amount=amount)
     
     embed = create_embed(
-        title="🧩 我的碎片",
-        description=f"{interaction.user.mention} 的碎片\n {description}",
+        title=t("pet.fragments.title", locale=locale),
+        description=t("pet.fragments.description", locale=locale, user=interaction.user.mention, description=description),
         color=discord.Color.purple()
     )
     await interaction.response.send_message(embed=embed)
@@ -863,11 +896,34 @@ class DismantleConfirmView(discord.ui.View):
         self.rarity = rarity
         self.fragments = fragments
         self.points = points
+        
+        # 获取语言环境并设置按钮标签
+        locale = get_guild_locale(guild_id)
+        
+        # 创建确认按钮
+        confirm_button = discord.ui.Button(
+            label=t("pet.ui.buttons.confirm", locale=locale),
+            style=discord.ButtonStyle.danger,
+            emoji='💥',
+            custom_id='confirm_dismantle'
+        )
+        confirm_button.callback = self.confirm_dismantle_callback
+        self.add_item(confirm_button)
+        
+        # 创建取消按钮
+        cancel_button = discord.ui.Button(
+            label=t("pet.ui.buttons.cancel", locale=locale),
+            style=discord.ButtonStyle.secondary,
+            emoji='❌',
+            custom_id='cancel_dismantle'
+        )
+        cancel_button.callback = self.cancel_dismantle_callback
+        self.add_item(cancel_button)
 
-    @discord.ui.button(label='确认分解', style=discord.ButtonStyle.danger, emoji='💥')
-    async def confirm_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm_dismantle_callback(self, interaction: discord.Interaction):
+        locale = get_guild_locale(interaction.guild.id)
         if interaction.user.id != self.discord_user_id:
-            await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
+            await interaction.response.send_message(t("pet.errors.not_your_interface", locale=locale), ephemeral=True)
             return
         
         try:
@@ -879,8 +935,8 @@ class DismantleConfirmView(discord.ui.View):
             
             if not delete_response.data:
                 embed = create_embed(
-                    "❌ 错误",
-                    f"{interaction.user.mention} 宠物不存在或已被分解！",
+                    t("pet.errors.user_not_found.title", locale=locale),
+                    t("pet.dismantle.error_deleting", locale=locale, user=interaction.user.mention),
                     discord.Color.red()
                 )
                 await interaction.response.edit_message(embed=embed, view=None)
@@ -914,42 +970,40 @@ class DismantleConfirmView(discord.ui.View):
                     
         except Exception as e:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 分解宠物时出错了！",
+                t("pet.errors.user_not_found.title", locale=locale),
+                t("pet.dismantle.error_executing", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.edit_message(embed=embed, view=None)
             return
 
         # 先编辑原消息（移除按钮）
-        await interaction.response.edit_message(content="✅ 分解确认...", embed=None, view=None)
+        await interaction.response.edit_message(content=t("pet.dismantle.confirm.processing", locale=locale), embed=None, view=None)
 
         # 发送公开的成功消息
         embed = create_embed(
-            "💥 分解成功",
-            f"{interaction.user.mention} 你的 **{self.pet_name}** 已被分解！\n\n"
-            f"**获得：**\n"
-            f"🧩 {self.fragments} 个 {self.rarity} 碎片\n"
-            f"💰 {self.points} 积分",
+            t("pet.dismantle.success.title", locale=locale),
+            t("pet.dismantle.success.description", locale=locale, user=interaction.user.mention, pet_name=self.pet_name, fragments=self.fragments, rarity=self.rarity, points=self.points),
             discord.Color.green()
         )
         await interaction.followup.send(embed=embed)
 
-    @discord.ui.button(label='取消', style=discord.ButtonStyle.secondary, emoji='❌')
-    async def cancel_dismantle(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cancel_dismantle_callback(self, interaction: discord.Interaction):
+        locale = get_guild_locale(interaction.guild.id)
         if interaction.user.id != self.discord_user_id:
-            await interaction.response.send_message("这不是你的分解确认界面！", ephemeral=True)
+            await interaction.response.send_message(t("pet.errors.not_your_interface", locale=locale), ephemeral=True)
             return
         
         embed = create_embed(
-            "✅ 已取消",
-            f"{interaction.user.mention} 分解操作已取消。",
+            t("pet.dismantle.cancelled.title", locale=locale),
+            t("pet.dismantle.cancelled.message", locale=locale, user=interaction.user.mention),
             discord.Color.blue()
         )
         await interaction.response.edit_message(embed=embed, view=None)
 
 async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     """装备宠物"""
+    locale = get_guild_locale(interaction.guild.id)
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
@@ -957,7 +1011,7 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -966,8 +1020,8 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         
         if not pet_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 找不到这只宠物或者它不属于你！",
+                t("pet.equip.pet_not_found.title", locale=locale),
+                t("pet.equip.pet_not_found.message", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -979,14 +1033,14 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         level = pet_data['level']
 
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        template_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').eq('id', pet_template_id).execute()
         if not template_response.data:
-            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
 
         template_data = template_response.data[0]
-        pet_name = template_data['name']
+        pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
         rarity = template_data['rarity']
 
         # 检查是否已经装备了这只宠物
@@ -998,8 +1052,8 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
         
         if current_equipped_id == pet_id:
             embed = create_embed(
-                "⚠️ 已装备",
-                f"{interaction.user.mention} 你已经装备了 **{pet_name}**！",
+                t("pet.errors.already_equipped.title", locale=locale),
+                t("pet.errors.already_equipped.message", locale=locale, user=interaction.user.mention, pet_name=pet_name),
                 discord.Color.yellow()
             )
             await interaction.response.send_message(embed=embed)
@@ -1007,8 +1061,8 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
             
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 装备宠物时出错了！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.equip.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -1022,9 +1076,8 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     pending_points = pet_commands.calculate_pending_points(user_internal_id)
     if pending_points > 0:
         embed = create_embed(
-            "⚠️ 请先领取积分",
-            f"{interaction.user.mention} 你有 **{pending_points}** 点待领取的宠物积分！\n\n"
-            f"请先使用 `/pet claim` 领取积分，然后再更换宠物。",
+            t("pet.equip.claim_pending_points.title", locale=locale),
+            t("pet.equip.claim_pending_points.description", locale=locale, user=interaction.user.mention, points=pending_points),
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -1052,18 +1105,15 @@ async def handle_pet_equip(interaction: discord.Interaction, pet_id: int):
     rarity_color = rarity_colors.get(rarity, '🤍')
     
     embed = create_embed(
-        "🎒 装备成功！",
-        f"{interaction.user.mention} 成功装备了 **{pet_name}**！\n\n"
-        f"{rarity_color} **稀有度：** {rarity}\n"
-        f"{star_display} **星级：** {stars}\n"
-        f"💰 **每小时积分：** {hourly_points}\n\n"
-        f"你的宠物现在会自动为你获取积分！",
+        t("pet.equip.success.title", locale=locale),
+        t("pet.equip.success.description", locale=locale, user=interaction.user.mention, pet_name=pet_name, rarity_color=rarity_color, rarity=rarity, stars=star_display, star_count=stars, hourly_points=hourly_points),
         discord.Color.green()
     )
     await interaction.response.send_message(embed=embed)
 
 async def handle_pet_unequip(interaction: discord.Interaction):
     """卸下宠物"""
+    locale = get_guild_locale(interaction.guild.id)
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
@@ -1071,14 +1121,14 @@ async def handle_pet_unequip(interaction: discord.Interaction):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # 查询用户装备的宠物
         user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
         if not user_response.data:
-            embed = create_embed("❌ 错误", "用户信息异常！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.unequip.user_data_error", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -1086,34 +1136,35 @@ async def handle_pet_unequip(interaction: discord.Interaction):
         
         if not equipped_pet_id:
             embed = create_embed(
-                "❌ 没有装备宠物",
-                f"{interaction.user.mention} 你当前没有装备任何宠物！",
+                t("pet.errors.no_equipped_pet.title", locale=locale),
+                t("pet.errors.no_equipped_pet.message", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
             return
         
         # 获取装备宠物的详细信息
-        pet_response = supabase.table('user_pets').select('stars, pet_templates(name, rarity)').eq('id', equipped_pet_id).execute()
+        pet_response = supabase.table('user_pets').select('stars, pet_templates(en_name, rarity)').eq('id', equipped_pet_id).execute()
         
         if not pet_response.data:
             embed = create_embed(
-                "❌ 错误",
-                f"{interaction.user.mention} 装备的宠物信息异常！",
+                t("pet.errors.user_not_found.title", locale=locale),
+                t("pet.errors.equipped_pet_info_malformed", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
             return
         
         pet_data = pet_response.data[0]
-        pet_name = pet_data['pet_templates']['name']
-        rarity = pet_data['pet_templates']['rarity']
+        pet_template_data = pet_data['pet_templates']
+        pet_name = get_localized_pet_name(pet_template_data, get_context_locale(interaction))
+        rarity = pet_template_data['rarity']
         stars = pet_data['stars']
         
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 卸下宠物时出错了！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.unequip.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -1127,9 +1178,8 @@ async def handle_pet_unequip(interaction: discord.Interaction):
     pending_points = pet_commands.calculate_pending_points(user_internal_id)
     if pending_points > 0:
         embed = create_embed(
-            "⚠️ 请先领取积分",
-            f"{interaction.user.mention} 你有 **{pending_points}** 点待领取的宠物积分！\n\n"
-            f"请先使用 `/pet claim` 领取积分，然后再卸下宠物。",
+            t("pet.unequip.claim_pending_points.title", locale=locale),
+            t("pet.unequip.claim_pending_points.description", locale=locale, user=interaction.user.mention, points=pending_points),
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -1146,15 +1196,15 @@ async def handle_pet_unequip(interaction: discord.Interaction):
     }).eq('id', user_internal_id).execute()
     
     embed = create_embed(
-        "📤 卸下成功！",
-        f"{interaction.user.mention} 成功卸下了 **{pet_name}**！\n\n"
-        f"你可以装备其他宠物来继续获取积分。",
+        t("pet.unequip.success.title", locale=locale),
+        t("pet.unequip.success.description", locale=locale, user=interaction.user.mention, pet_name=pet_name),
         discord.Color.blue()
     )
     await interaction.response.send_message(embed=embed)
 
 async def handle_pet_status(interaction: discord.Interaction):
     """查看装备状态"""
+    locale = get_guild_locale(interaction.guild.id)
     try:
         from src.db.database import get_supabase_client
         supabase = get_supabase_client()
@@ -1162,14 +1212,14 @@ async def handle_pet_status(interaction: discord.Interaction):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if user_internal_id is None:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # 查询用户信息
         user_response = supabase.table('users').select('equipped_pet_id, points').eq('id', user_internal_id).execute()
         if not user_response.data:
-            embed = create_embed("❌ 错误", "用户数据异常！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.status.user_data_error", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -1179,10 +1229,8 @@ async def handle_pet_status(interaction: discord.Interaction):
         
         if not equipped_pet_id:
             embed = create_embed(
-                "👀 装备状态",
-                f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
-                f"💰 **当前积分：** {current_points}\n\n"
-                f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+                t("pet.status.no_pet_equipped.title", locale=locale),
+                t("pet.status.no_pet_equipped.description", locale=locale, user=interaction.user.mention, points=current_points),
                 discord.Color.orange()
             )
             await interaction.response.send_message(embed=embed)
@@ -1193,8 +1241,8 @@ async def handle_pet_status(interaction: discord.Interaction):
         
         if not pet_response.data:
             embed = create_embed(
-                "❌ 宠物不存在",
-                f"{interaction.user.mention} 装备的宠物不存在！",
+                t("pet.status.pet_not_found.title", locale=locale),
+                t("pet.status.pet_not_found.message", locale=locale, user=interaction.user.mention),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
@@ -1206,14 +1254,14 @@ async def handle_pet_status(interaction: discord.Interaction):
         level = pet_data['level']
 
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+        template_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').eq('id', pet_template_id).execute()
         if not template_response.data:
-            embed = create_embed("❌ 错误", "宠物模板不存在！", discord.Color.red())
+            embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
             return
 
         template_data = template_response.data[0]
-        pet_name = template_data['name']
+        pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
         rarity = template_data['rarity']
 
         # 计算每小时积分和待领取积分
@@ -1226,23 +1274,15 @@ async def handle_pet_status(interaction: discord.Interaction):
         rarity_color = rarity_colors.get(rarity, '🤍')
         
         embed = create_embed(
-            "👀 装备状态",
-            f"{interaction.user.mention} 的宠物装备状态：\n\n"
-            f"🐾 **装备宠物：** {pet_name}\n"
-            f"{rarity_color} **稀有度：** {rarity}\n"
-            f"{star_display} **星级：** {stars}\n"
-            f"🔢 **等级：** {level}\n"
-            f"💰 **每小时积分：** {hourly_points}\n"
-            f"⏰ **待领取积分：** {pending_points}\n"
-            f"💎 **当前总积分：** {current_points}\n\n"
-            f"💡 使用 `/pet claim` 来领取你的宠物积分！",
+            t("pet.status.title", locale=locale),
+            t("pet.status.equipment_info", locale=locale, user=interaction.user.mention, pet_name=pet_name, rarity_color=rarity_color, rarity=rarity, stars=star_display, star_count=stars, level=level, hourly_points=hourly_points, pending_points=pending_points, points=current_points),
             discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 查看装备状态时发生错误！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.status.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -1257,16 +1297,17 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         supabase = get_supabase_client()
         
         # 获取用户内部ID
+        locale = get_guild_locale(interaction.guild.id)
         user_internal_id = get_user_internal_id(interaction)
         if user_internal_id is None:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # 查询用户信息
         user_response = supabase.table('users').select('equipped_pet_id, points').eq('id', user_internal_id).execute()
         if not user_response.data:
-            embed = create_embed("❌ 错误", "用户数据异常！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.claim.user_data_error", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -1287,10 +1328,10 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
                 stars = pet_data['stars']
                 
                 # 获取宠物模板信息
-                template_response = supabase.table('pet_templates').select('name, rarity').eq('id', pet_template_id).execute()
+                template_response = supabase.table('pet_templates').select('*').eq('id', pet_template_id).execute()
                 if template_response.data:
                     template_data = template_response.data[0]
-                    pet_name = template_data['name']
+                    pet_name = get_localized_pet_name(template_data, get_context_locale(interaction))
                     rarity = template_data['rarity']
     
         # 使用新方法计算待领取积分
@@ -1299,10 +1340,8 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         
         if not equipped_pet_id:
             embed = create_embed(
-                "❌ 没有装备宠物",
-                f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
-                f"💰 **当前积分：** {current_points}\n\n"
-                f"使用 `/pet equip` 来装备一只宠物开始获取积分吧！",
+                t("pet.claim.no_equipped_pet.title", locale=locale),
+                t("pet.claim.no_equipped_pet.description", locale=locale, user=interaction.user.mention, points=current_points),
                 discord.Color.orange()
             )
             await interaction.response.send_message(embed=embed)
@@ -1314,13 +1353,8 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
             rarity_color = rarity_colors.get(rarity, '🤍')
             
             embed = create_embed(
-                "💰 没有可领取的积分",
-                f"{interaction.user.mention} 当前没有可领取的积分！\n\n"
-                f"🐾 **装备宠物：** {pet_name}\n"
-                f"{rarity_color} **稀有度：** {rarity}\n"
-                f"{star_display} **星级：** {stars}\n"
-                f"💎 **当前积分：** {current_points}\n\n"
-                f"💡 宠物会随着时间自动累积积分，请稍后再来领取！",
+                t("pet.claim.no_points_to_claim.title", locale=locale),
+                t("pet.claim.no_points_to_claim.description", locale=locale, user=interaction.user.mention, pet_name=pet_name, rarity_color=rarity_color, rarity=rarity, stars=star_display, star_count=stars, points=current_points),
                 discord.Color.blue()
             )
             await interaction.response.send_message(embed=embed)
@@ -1345,22 +1379,17 @@ async def handle_pet_claim_points(interaction: discord.Interaction):
         rarity_color = rarity_colors.get(rarity, '🤍')
         
         embed = create_embed(
-            "💰 积分领取成功！",
-            f"{interaction.user.mention} 成功领取了宠物积分！\n\n"
-            f"🐾 **装备宠物：** {pet_name}\n"
-            f"{rarity_color} **稀有度：** {rarity}\n"
-            f"{star_display} **星级：** {stars}\n"
-            f"✨ **领取积分：** +{pending_points}\n"
-            f"💎 **当前总积分：** {new_total_points}\n\n"
-            f"🎉 继续让你的宠物为你赚取更多积分吧！",
+            t("pet.claim.success.title", locale=locale),
+            t("pet.claim.success.description", locale=locale, user=interaction.user.mention, pet_name=pet_name, rarity_color=rarity_color, rarity=rarity, stars=star_display, star_count=stars, points=pending_points, total=new_total_points),
             discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        print(f"领取积分时发生错误：{str(e)}")
+        locale = get_guild_locale(interaction.guild.id)
+        print(t("pet.claim.debug_error", locale=locale, error=str(e)))
         embed = create_embed(
-            "❌ 错误",
-            f"{interaction.user.mention} 领取积分时发生错误！",
+            t("pet.errors.user_not_found.title", locale=locale),
+            t("pet.claim.query_error", locale=locale, user=interaction.user.mention),
             discord.Color.red()
         )
         if not interaction.response.is_done():
@@ -1376,38 +1405,42 @@ async def handle_pet_feed(interaction: discord.Interaction, pet_id: int):
     # 获取用户内部ID
     user_internal_id = get_user_internal_id(interaction)
     if not user_internal_id:
-        embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+        embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
+    # 获取语言设置
+    locale = get_guild_locale(interaction.guild.id)
+    
     # 获取宠物喂食信息
     pet_info = get_pet_feeding_info(pet_id)
     if not pet_info:
-        embed = create_embed("❌ 错误", "宠物不存在或不属于你！", discord.Color.red())
+        embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.pet_not_found_or_unauthorized_feed", locale=locale), discord.Color.red())
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     # 检查宠物所有权
     if pet_info['user_id'] != user_internal_id:
-        embed = create_embed("❌ 错误", "这只宠物不属于你！", discord.Color.red())
+        embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.pet_not_owned", locale=locale), discord.Color.red())
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     # 显示宠物喂食界面
-    view = PetFeedingView(user_internal_id, pet_id, pet_info)
+    view = PetFeedingView(user_internal_id, pet_id, pet_info, interaction.guild.id if interaction.guild else None)
     embed = view.create_feeding_embed()
 
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 class PetFeedingView(discord.ui.View):
-    def __init__(self, user_id: int, pet_id: int, pet_info: dict):
+    def __init__(self, user_id: int, pet_id: int, pet_info: dict, guild_id: int = None):
         super().__init__(timeout=300)
         self.user_id = user_id
         self.pet_id = pet_id
         self.pet_info = pet_info
+        self.guild_id = guild_id
 
         # 添加食粮选择下拉菜单
-        self.add_item(FoodSelectForFeeding(user_id, pet_id))
+        self.add_item(FoodSelectForFeeding(user_id, pet_id, guild_id))
 
     def create_feeding_embed(self) -> discord.Embed:
         """创建喂食界面embed"""
@@ -1421,18 +1454,12 @@ class PetFeedingView(discord.ui.View):
             'SSR': '🟡'
         }
 
-        # 口味表情映射
-        flavor_emojis = {
-            'SWEET': '🍯 甜味',
-            'SALTY': '🧂 咸味',
-            'SOUR': '🍋 酸味',
-            'SPICY': '🌶️ 辣味',
-            'UMAMI': '🍄 鲜味'
-        }
+        # 获取语言环境
+        locale = get_guild_locale(self.guild_id)
 
         rarity_color = rarity_colors.get(self.pet_info['rarity'], '⚪')
-        favorite_flavor = flavor_emojis.get(self.pet_info['favorite_flavor'], '无偏好')
-        dislike_flavor = flavor_emojis.get(self.pet_info['dislike_flavor'], '无')
+        favorite_flavor = t(f"pet.flavor_descriptions.{self.pet_info['favorite_flavor']}", locale=locale, default=t("pet.flavor_descriptions.no_preference", locale=locale))
+        dislike_flavor = t(f"pet.flavor_descriptions.{self.pet_info['dislike_flavor']}", locale=locale, default=t("pet.flavor_descriptions.none", locale=locale))
 
         # 计算经验进度条
         progress_bar_length = 10
@@ -1451,29 +1478,29 @@ class PetFeedingView(discord.ui.View):
         description = f"{rarity_color} **{self.pet_info['name']}**\n\n"
 
         # 基本信息
-        description += f"📊 **等级：** {self.pet_info['level']}\n"
-        description += f"✨ **经验：** {self.pet_info['xp_current']}/{self.pet_info['xp_next_level']}\n"
-        description += f"📈 {progress_bar} {int(progress * 100) if self.pet_info['xp_next_level'] > 0 else 100}%\n\n"
+        description += t("pet.feed.display.level", locale=locale, level=self.pet_info['level'])
+        description += t("pet.feed.display.experience", locale=locale, current=self.pet_info['xp_current'], needed=self.pet_info['xp_next_level'])
+        description += t("pet.feed.display.experience_bar", locale=locale, bar=progress_bar, percent=int(progress * 100) if self.pet_info['xp_next_level'] > 0 else 100)
 
         # 饱食度
-        description += f"🍽️ **饱食度：** {self.pet_info['satiety']}/100\n"
-        description += f"📊 {satiety_bar} {self.pet_info['satiety']}%\n\n"
+        description += t("pet.feed.display.satiety", locale=locale, satiety=self.pet_info['satiety'])
+        description += t("pet.feed.display.satiety_bar", locale=locale, bar=satiety_bar, satiety=self.pet_info['satiety'])
 
         # 口味偏好
-        description += f"💖 **喜欢：** {favorite_flavor}\n"
-        description += f"💔 **讨厌：** {dislike_flavor}\n\n"
+        description += t("pet.feed.display.favorite", locale=locale, flavor=favorite_flavor)
+        description += t("pet.feed.display.dislike", locale=locale, flavor=dislike_flavor)
 
         # 喂食说明
         if self.pet_info['satiety'] >= FeedingSystem.SATIETY_MAX:
-            description += "⚠️ **宠物已经吃饱了！**\n请等待饱食度重置后再来喂食。"
+            description += t("pet.feed.already_full", locale=locale)
         else:
-            description += "🍴 **选择食粮进行喂食：**\n"
-            description += "• 匹配口味偏好可获得额外经验\n"
-            description += "• 讨厌的口味会减少经验获得\n"
-            description += "• 饱食度每日重置2次（美东时间0点和12点）"
+            description += t("pet.feed.instructions.title", locale=locale)
+            description += t("pet.feed.instructions.match_bonus", locale=locale)
+            description += t("pet.feed.instructions.dislike_penalty", locale=locale)
+            description += t("pet.feed.instructions.satiety_reset", locale=locale)
 
         embed = create_embed(
-            "🍽️ 宠物喂食",
+            t("pet.feed.title", locale=locale),
             description,
             discord.Color.green() if self.pet_info['satiety'] < FeedingSystem.SATIETY_MAX else discord.Color.orange()
         )
@@ -1481,14 +1508,16 @@ class PetFeedingView(discord.ui.View):
         return embed
 
 class FoodSelectForFeeding(discord.ui.Select):
-    def __init__(self, user_id: int, pet_id: int):
+    def __init__(self, user_id: int, pet_id: int, guild_id: int = None):
         self.user_id = user_id
         self.pet_id = pet_id
+        self.guild_id = guild_id
 
         options = self._load_food_options()
 
+        locale = get_guild_locale(guild_id)
         super().__init__(
-            placeholder="选择要投喂的食粮...",
+            placeholder=t("pet.feed.select_food.placeholder", locale=locale),
             options=options
         )
 
@@ -1504,10 +1533,11 @@ class FoodSelectForFeeding(discord.ui.Select):
             food_templates(*)
         ''').eq('user_id', self.user_id).gt('quantity', 0).execute()
 
+        locale = get_guild_locale(self.guild_id)
         if not response.data:
             return [discord.SelectOption(
-                label="没有食粮库存",
-                description="去杂货铺购买食粮吧！",
+                label=t("pet.feed.no_food_stock", locale=locale),
+                description=t("pet.feed.go_shop_to_buy", locale=locale),
                 value="none",
                 emoji="❌"
             )]
@@ -1537,8 +1567,9 @@ class FoodSelectForFeeding(discord.ui.Select):
             rarity_emoji = rarity_emojis.get(food['rarity'], '⚪')
             flavor_emoji = flavor_emojis.get(food['flavor'], '🍽️')
 
-            label = f"{food['name']} {flavor_emoji}"
-            description = f"库存:{quantity} | {food['base_xp']}经验 | +5-8饱食度"
+            food_name = get_localized_food_name(food, locale)
+            label = f"{food_name} {flavor_emoji}"
+            description = t("pet.feed.select_food.stock_format", locale=locale, quantity=quantity, xp=food['base_xp'])
 
             options.append(discord.SelectOption(
                 label=label[:100],
@@ -1551,8 +1582,9 @@ class FoodSelectForFeeding(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         """处理食粮选择回调"""
+        locale = get_guild_locale(interaction.guild.id)
         if self.values[0] == "none":
-            await interaction.response.send_message("❌ 没有可用的食粮！请先去杂货铺购买。", ephemeral=True)
+            await interaction.response.send_message(t("pet.feed.no_available_food", locale=locale), ephemeral=True)
             return
 
         food_template_id = int(self.values[0])
@@ -1565,6 +1597,7 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
     from src.db.database import get_supabase_client
     from src.utils.feeding_system import feed_pet
 
+    locale = get_guild_locale(interaction.guild.id)
     supabase = get_supabase_client()
 
     try:
@@ -1572,14 +1605,14 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
         inventory_response = supabase.table('user_food_inventory').select('quantity').eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
 
         if not inventory_response.data or inventory_response.data[0]['quantity'] <= 0:
-            await interaction.response.send_message("❌ 食粮库存不足！", ephemeral=True)
+            await interaction.response.send_message(t("pet.feed.insufficient_food_stock", locale=locale), ephemeral=True)
             return
 
         # 执行喂食
-        result = feed_pet(pet_id, food_template_id)
+        result = feed_pet(pet_id, food_template_id, locale)
 
         if not result['success']:
-            embed = create_embed("❌ 喂食失败", result['message'], discord.Color.red())
+            embed = create_embed(t("pet.feed.failure.title", locale=locale), result['message'], discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -1593,27 +1626,28 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
             supabase.table('user_food_inventory').delete().eq('user_id', user_id).eq('food_template_id', food_template_id).execute()
 
         # 创建成功消息
-        description = f"{interaction.user.mention} 的 **{result['pet_name']}** 吃了 **{result['food_name']}**！\n\n"
+        locale = get_guild_locale(interaction.guild.id)
+        description = t("pet.feed.display.ate", locale=locale, user=interaction.user.mention, pet_name=result['pet_name'], food_name=result['food_name'])
 
         # 经验获得
-        description += f"✨ **获得经验：** +{result['xp_gained']}\n"
+        description += t("pet.feed.success.description.xp_gained", locale=locale, xp=result['xp_gained'])
 
         # 口味匹配bonus
         if result['flavor_bonus'] == 'favorite':
-            description += f"💖 **口味匹配：** 额外30%经验！\n"
+            description += t("pet.feed.success.description.flavor_match", locale=locale)
         elif result['flavor_bonus'] == 'dislike':
-            description += f"💔 **不喜欢：** 经验减少10%\n"
+            description += t("pet.feed.success.description.dislike_penalty", locale=locale)
 
         # 饱食度
-        description += f"🍽️ **饱食度：** +{result['satiety_gained']} → {result['new_satiety']}/100\n"
+        description += t("pet.feed.success.description.satiety_increase", locale=locale, gained=result['satiety_gained'], new=result['new_satiety'])
 
         # 等级提升
         if result['level_up']:
-            description += f"\n🎉 **恭喜！宠物升级了！**\n"
-            description += f"🆙 **新等级：** {result['new_level']}\n"
+            description += "\n" + t("pet.feed.success.description.level_up", locale=locale)
+            description += t("pet.feed.success.description.new_level", locale=locale, level=result['new_level'])
 
         embed = create_embed(
-            "🍴 喂食成功！",
+            t("pet.feed.success.title", locale=locale),
             description,
             discord.Color.green()
         )
@@ -1621,16 +1655,16 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
         # 如果饱食度满了，添加提示
         if result['new_satiety'] >= 100:
             embed.add_field(
-                name="⚠️ 提示",
-                value="宠物已经吃饱了！饱食度会在美东时间0点和12点重置。",
+                name=t("common.notice", locale=locale, default="⚠️ 提示"),
+                value=t("pet.feed.satiety_full_notice", locale=locale),
                 inline=False
             )
 
         await interaction.response.send_message(embed=embed)
 
     except Exception as e:
-        print(f"喂食执行错误: {e}")
-        embed = create_embed("❌ 错误", "喂食过程中发生错误！", discord.Color.red())
+        print(t("pet.feed.execution_debug_error", locale=locale, error=str(e)))
+        embed = create_embed(t("pet.feed.error.title", locale=locale), t("pet.feed.error.message", locale=locale), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
@@ -1647,6 +1681,7 @@ async def pet_autocomplete(interaction: discord.Interaction, current: str) -> li
         if not user_internal_id:
             return []
 
+        locale = get_context_locale(interaction)
         supabase = get_supabase_client()
 
         # 查询用户的宠物
@@ -1657,7 +1692,7 @@ async def pet_autocomplete(interaction: discord.Interaction, current: str) -> li
 
         # 获取宠物模板信息
         template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
-        templates_response = supabase.table('pet_templates').select('id, name, rarity').in_('id', template_ids).execute()
+        templates_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').in_('id', template_ids).execute()
 
         # 创建模板映射
         template_map = {template['id']: template for template in templates_response.data}
@@ -1668,7 +1703,7 @@ async def pet_autocomplete(interaction: discord.Interaction, current: str) -> li
             if template:
                 pets.append({
                     'id': pet['id'],
-                    'name': template['name'],
+                    'name': get_localized_pet_name(template, locale),
                     'rarity': template['rarity'],
                     'stars': pet['stars']
                 })
@@ -1704,25 +1739,43 @@ async def pet_autocomplete(interaction: discord.Interaction, current: str) -> li
         return choices
 
     except Exception as e:
-        print(f"宠物自动补全时出错：{str(e)}")
+        print(f"Error in pet autocomplete: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
 
+# 创建喂食模式选项
+def _create_feed_mode_choices():
+    """创建喂食模式选项，使用英文作为默认名称并添加本地化支持"""
+    from src.utils.i18n import get_all_localizations
+    
+    modes = ["optimal_xp", "flavor_match", "economic", "clear_inventory"]
+    mode_names = {
+        "optimal_xp": "Optimal XP - Best experience efficiency",
+        "flavor_match": "Flavor Match - Match pet's flavor preference",
+        "economic": "Economic - Use cheapest available food",
+        "clear_inventory": "Clear Inventory - Prioritize abundant food"
+    }
+    
+    choices = []
+    for mode_value in modes:
+        choice = app_commands.Choice(name=mode_names[mode_value], value=mode_value)
+        choice.name_localizations = get_all_localizations(f"pet.auto_feed.command.choices.mode.{mode_value}")
+        choices.append(choice)
+    
+    return choices
+
 # 一键喂食命令
-@app_commands.command(name="feed_auto", description="🍽️ 一键喂食 - 自动为指定宠物选择最优食粮")
+@app_commands.command(name="auto_feed", description="Auto feed - automatically select optimal food for specified pet")
 @app_commands.describe(
-    pet="选择要喂食的宠物（留空则喂食装备的宠物）",
-    mode="喂食模式（选择策略）",
-    quantity="喂食次数（可选，默认喂到饱）"
+    pet="Select pet to feed (leave empty to feed equipped pet)",
+    mode="Feeding mode (strategy selection)",
+    quantity="Number of times to feed (optional, default: until full)"
 )
 @app_commands.autocomplete(pet=pet_autocomplete)
-@app_commands.choices(mode=[
-    app_commands.Choice(name="🏆 最优经验 - 选择经验效率最高的食粮", value="optimal_xp"),
-    app_commands.Choice(name="💖 口味匹配 - 优先匹配宠物偏好口味", value="flavor_match"),
-    app_commands.Choice(name="💰 节约模式 - 使用最便宜的可用食粮", value="economic"),
-    app_commands.Choice(name="📦 清空库存 - 优先消耗数量多的食粮", value="clear_inventory"),
-])
+@app_commands.choices(mode=_create_feed_mode_choices())
 @app_commands.guild_only()
-async def feed_auto(interaction: discord.Interaction, pet: str = None, mode: str = "optimal_xp", quantity: int = None):
+async def auto_feed(interaction: discord.Interaction, pet: str = None, mode: str = "optimal_xp", quantity: int = None):
     """一键喂食指定宠物或装备的宠物"""
     await handle_auto_feeding(interaction, mode, quantity, pet)
 
@@ -1733,10 +1786,13 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
         from src.utils.helpers import get_user_internal_id
         from src.db.database import get_supabase_client
 
+        # 获取当前语言环境
+        locale = get_guild_locale(interaction.guild.id)
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.user_not_found.message", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -1749,8 +1805,8 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
             pet_response = supabase.table('user_pets').select('id').eq('id', int(pet_id)).eq('user_id', user_internal_id).execute()
             if not pet_response.data:
                 embed = create_embed(
-                    "❌ 宠物不存在",
-                    f"{interaction.user.mention} 指定的宠物不存在或不属于你！",
+                    t("pet.auto_feed.errors.pet_not_exist_title", locale=locale, default="❌ 宠物不存在"),
+                    t("pet.auto_feed.pet_not_exist", locale=locale, user=interaction.user.mention),
                     discord.Color.red()
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1762,9 +1818,8 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
 
             if not user_response.data or not user_response.data[0]['equipped_pet_id']:
                 embed = create_embed(
-                    "❌ 没有装备宠物",
-                    f"{interaction.user.mention} 你当前没有装备任何宠物！\n\n"
-                    "请先使用 `/pet equip` 装备一只宠物，或在命令中指定要喂食的宠物。",
+                    t("pet.auto_feed.errors.no_equipped_title", locale=locale, default="❌ 没有装备宠物"),
+                    t("pet.auto_feed.no_equipped_pet", locale=locale, user=interaction.user.mention),
                     discord.Color.red()
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1773,38 +1828,33 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
             target_pet_id = user_response.data[0]['equipped_pet_id']
 
         # 发送初始响应
-        await interaction.response.send_message("🍽️ 正在为你的宠物准备最优食粮...", ephemeral=False)
+        await interaction.response.send_message(t("pet.feed.preparing_food", locale=locale), ephemeral=False)
 
         # 执行一键喂食
-        result = AutoFeedingSystem.auto_feed_pet(user_internal_id, target_pet_id, mode, quantity)
+        result = AutoFeedingSystem.auto_feed_pet(user_internal_id, target_pet_id, mode, quantity, locale)
 
         if not result['success']:
-            embed = create_embed("❌ 喂食失败", result['message'], discord.Color.red())
-            await interaction.edit_original_response(content="", embed=embed, ephemeral=True)
+            embed = create_embed(t("pet.feed.failure.title", locale=locale), result['message'], discord.Color.red())
+            await interaction.edit_original_response(content="", embed=embed)
             return
 
         # 构建成功结果显示
-        embed = create_auto_feeding_result_embed(interaction.user.mention, result, mode)
+        embed = create_auto_feeding_result_embed(interaction.user.mention, result, mode, locale)
         await interaction.edit_original_response(content="", embed=embed)
 
     except Exception as e:
-        print(f"一键喂食错误: {e}")
-        embed = create_embed("❌ 错误", f"喂食过程中发生错误：{str(e)}", discord.Color.red())
+        print(t("pet.feed.execution_debug_error", locale=locale, error=str(e)))
+        embed = create_embed(t("pet.feed.error.title", locale=locale), t("pet.auto_feed.error", locale=locale, error=str(e)), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
             await interaction.edit_original_response(content="", embed=embed)
 
-def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str) -> discord.Embed:
+def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str, locale: str) -> discord.Embed:
     """创建一键喂食结果展示"""
 
-    # 模式名称映射
-    mode_names = {
-        "optimal_xp": "🏆 最优经验",
-        "flavor_match": "💖 口味匹配",
-        "economic": "💰 节约模式",
-        "clear_inventory": "📦 清空库存"
-    }
+    # 使用翻译获取模式名称
+    mode_name = t(f"pet.auto_feed.mode_names.{mode}", locale=locale, default=mode)
 
     # 稀有度颜色映射
     rarity_colors = {
@@ -1823,20 +1873,18 @@ def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str)
         'UMAMI': '🍄'
     }
 
-    mode_name = mode_names.get(mode, mode)
-
-    description = f"{user_mention} 一键喂食完成！\n\n"
+    description = t("pet.auto_feed.completed.description", locale=locale, user=user_mention) + "\n\n"
 
     # 基础统计信息
-    description += f"**📊 喂食统计：**\n"
-    description += f"• 喂食模式：{mode_name}\n"
-    description += f"• 喂食次数：{result['total_feeds']}次\n"
-    description += f"• 经验获得：+{result['total_xp_gained']} XP\n"
-    description += f"• 饱食度：{result['original_satiety']} → {result['new_satiety']}\n\n"
+    description += t("pet.auto_feed.completed.statistics.title", locale=locale) + "\n"
+    description += t("pet.auto_feed.completed.statistics.mode", locale=locale, mode=mode_name) + "\n"
+    description += t("pet.auto_feed.completed.statistics.feed_count", locale=locale, count=result['total_feeds']) + "\n"
+    description += t("pet.auto_feed.completed.statistics.xp_gained", locale=locale, xp=result['total_xp_gained']) + "\n"
+    description += t("pet.auto_feed.completed.statistics.satiety_change", locale=locale, original=result['original_satiety'], new=result['new_satiety']) + "\n\n"
 
     # 使用的食粮详情
     if result['food_summary']:
-        description += f"**🍯 使用的食粮：**\n"
+        description += t("pet.auto_feed.completed.used_food.title", locale=locale) + "\n"
         for food_name, info in result['food_summary'].items():
             rarity_color = rarity_colors.get(info['rarity'], '⚪')
             flavor_emoji = flavor_emojis.get(info['flavor'], '🍽️')
@@ -1844,29 +1892,29 @@ def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str)
             # 口味匹配提示
             match_text = ""
             if info['flavor_matches'] > 0:
-                match_text = f" (匹配偏好 +30% 经验 x{info['flavor_matches']})"
+                match_text = t("pet.auto_feed.completed.used_food.flavor_matches", locale=locale, count=info['flavor_matches'])
 
             description += f"{rarity_color} {food_name} {flavor_emoji} x{info['count']}{match_text}\n"
         description += "\n"
 
     # 等级变化
     if result['level_up']:
-        description += f"**🎉 恭喜升级！**\n"
-        description += f"⭐ **等级变化：** Lv.{result['original_level']} → Lv.{result['new_level']}！\n\n"
+        description += t("pet.auto_feed.completed.level_up.title", locale=locale) + "\n"
+        description += t("pet.auto_feed.completed.level_up.description", locale=locale, original=result['original_level'], new=result['new_level']) + "\n\n"
 
     # 宠物状态
-    description += f"**🐾 宠物：** {result['pet_name']}\n"
-    description += f"**🆙 当前等级：** Lv.{result['new_level']}"
+    description += t("pet.auto_feed.completed.pet_status.title", locale=locale, name=result['pet_name']) + "\n"
+    description += t("pet.auto_feed.completed.pet_status.level", locale=locale, level=result['new_level'])
 
     # 如果饱食度满了，添加提示
     if result['new_satiety'] >= 100:
-        description += f"\n\n💡 **提示：** 宠物已经吃饱了！饱食度会在美东时间0点和12点重置。"
+        description += f"\n\n" + t("pet.auto_feed.completed.satiety_full_notice", locale=locale)
 
-    embed = create_embed("🍽️ 一键喂食完成", description, discord.Color.green())
+    embed = create_embed(t("pet.auto_feed.completed.title", locale=locale), description, discord.Color.green())
 
     return embed
 
 def setup(bot):
     """注册斜杠命令"""
     bot.tree.add_command(pet)
-    bot.tree.add_command(feed_auto)
+    bot.tree.add_command(auto_feed)

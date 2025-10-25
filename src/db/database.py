@@ -27,6 +27,35 @@ def get_supabase_client() -> Client:
     """
     return get_connection()
 
+
+def _to_db_locale(locale: str) -> str:
+    """Convert locale code to database-compatible format."""
+    # Extract just the language part for database enum (e.g., 'en-US' -> 'en')
+    return locale.split('-')[0].lower()
+
+
+def _from_db_locale(locale: str) -> Optional[str]:
+    """Convert database locale back to full locale code."""
+    if not locale:
+        return None
+
+    try:
+        from src.utils.i18n import SUPPORTED_LOCALES
+        # Try to find a matching locale by language part
+        for code in SUPPORTED_LOCALES:
+            if code.split('-')[0].lower() == locale.lower():
+                return code
+    except Exception:
+        pass
+
+    # Fallback: construct common locale codes
+    if locale.lower() == 'en':
+        return 'en-US'
+    elif locale.lower() == 'zh':
+        return 'zh-CN'
+
+    return locale
+
 # 注意：init_db函数已移除，因为Supabase中的表结构已经存在
 # 如果需要初始化数据，请使用Supabase的迁移功能
 
@@ -269,4 +298,41 @@ def is_guild_subscribed(guild_id: int) -> bool:
 
     except Exception as e:
         print(f"检查服务器订阅状态错误: {e}")
+        return False
+
+
+def get_guild_language(guild_id: int) -> Optional[str]:
+    """Fetch persisted guild language preference."""
+    try:
+        supabase = get_connection()
+        response = (
+            supabase
+            .table('guild_settings')
+            .select('language')
+            .eq('guild_id', str(guild_id))
+            .limit(1)
+            .execute()
+        )
+        if response.data:
+            language = response.data[0].get('language')
+            return _from_db_locale(language)
+        return None
+    except Exception as e:
+        print(f"获取服务器语言失败: {e}")
+        return None
+
+
+def upsert_guild_language(guild_id: int, language: str) -> bool:
+    """Create or update guild language preference."""
+    try:
+        supabase = get_connection()
+        payload = {
+            'guild_id': str(guild_id),
+            'language': _to_db_locale(language),
+            'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+        }
+        response = supabase.table('guild_settings').upsert(payload, on_conflict='guild_id').execute()
+        return bool(response.data is not None)
+    except Exception as e:
+        print(f"更新服务器语言失败: {e}")
         return False

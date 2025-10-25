@@ -6,6 +6,7 @@ import datetime
 from src.db.database import get_connection
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id, get_user_data_sync
+from src.utils.i18n import get_guild_locale, t, get_context_locale, get_localized_pet_name
 from src.utils.draw_limiter import DrawLimiter
 from src.utils.cache import UserCache
 
@@ -35,17 +36,17 @@ class EggCommands(commands.Cog):
 
 
     @staticmethod
-    def get_pet_names():
+    def get_pet_names(locale=None):
         """从数据库获取宠物名称"""
         supabase = get_connection()
 
         try:
-            result = supabase.table("pet_templates").select("name, rarity").execute()
+            result = supabase.table("pet_templates").select("id, en_name, rarity").execute()
 
             # 组织数据为字典格式
             pet_names = {}
             for template in result.data:
-                pet_name = template["name"]
+                pet_name = get_localized_pet_name(template, locale)
                 rarity = template["rarity"]
                 if rarity not in pet_names:
                     pet_names[rarity] = []
@@ -103,15 +104,25 @@ class EggCommands(commands.Cog):
             print(f"获取孵化概率失败: {e}")
             return []
 
+# 创建蛋action选项
+def _create_egg_action_choices():
+    """创建蛋action选项，使用英文作为默认名称并添加本地化支持"""
+    from src.utils.i18n import get_all_localizations
+    
+    actions = ["draw", "list", "hatch", "claim"]
+    choices = []
+    
+    for action_value in actions:
+        choice = app_commands.Choice(name=action_value.title(), value=action_value)
+        choice.name_localizations = get_all_localizations(f"egg.command.choices.{action_value}")
+        choices.append(choice)
+    
+    return choices
+
 # 斜杠命令定义
-@app_commands.command(name="egg", description="🥚 蛋系统 - 抽蛋、孵化、查看")
-@app_commands.describe(action="选择操作类型")
-@app_commands.choices(action=[
-    app_commands.Choice(name="抽蛋", value="draw"),
-    app_commands.Choice(name="查看蛋列表", value="list"),
-    app_commands.Choice(name="孵化蛋", value="hatch"),
-    app_commands.Choice(name="领取宠物", value="claim")
-])
+@app_commands.command(name="egg", description="Egg system - draw, hatch, and view eggs")
+@app_commands.describe(action="Select action type")
+@app_commands.choices(action=_create_egg_action_choices())
 @app_commands.guild_only()
 async def egg(interaction: discord.Interaction, action: str):
     """蛋系统主命令"""
@@ -128,6 +139,7 @@ async def handle_egg_draw(interaction: discord.Interaction):
     """处理抽蛋功能"""
     # 检查用户积分和保底进度
     supabase = get_connection()
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
 
     try:
         user_internal_id = get_user_internal_id(interaction)
@@ -145,41 +157,38 @@ async def handle_egg_draw(interaction: discord.Interaction):
 
     except Exception as e:
         print(f"抽蛋功能错误: {e}")
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         embed = discord.Embed(
-            title="❌ 系统错误",
-            description="抽蛋功能暂时不可用，请稍后再试。",
+            title=t("common.system_error_title", locale=locale),
+            description=t("egg.errors.draw_function_unavailable", locale=locale),
             color=0xff0000
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     # 构建概率显示文本
-    rarity_names = {'SSR': '💛 传说蛋', 'SR': '💜 史诗蛋', 'R': '💙 稀有蛋', 'C': '🤍 普通蛋'}
-    probability_text = "**蛋稀有度概率：**\n"
+    rarity_names = {'SSR': t("egg.rarity_display.SSR", locale=locale), 'SR': t("egg.rarity_display.SR", locale=locale), 'R': t("egg.rarity_display.R", locale=locale), 'C': t("egg.rarity_display.C", locale=locale)}
+    probability_text = t("egg.probability_display", locale=locale)
     for rarity, probability in draw_probabilities:
         probability_text += f"{rarity_names[rarity]}：{float(probability)}%\n"
 
     # 保底进度显示
     remaining_draws = 50 - pity_counter
-    pity_text = f"\n**🎯 保底进度：** {pity_counter}/50"
+    pity_text = f"\n**🎯 {t('egg.pity.progress_title', locale=locale)}：** {pity_counter}/50"
     if remaining_draws <= 10:
-        pity_text += f" ⚠️ 还有 **{remaining_draws}** 抽必出传说蛋！"
-    elif remaining_draws == 50:
-        pity_text += f" 📊 距离保底还有 {remaining_draws} 抽"
+        pity_text += t("egg.pity.warning_legendary_soon", locale=locale, remaining_draws=remaining_draws)
     else:
-        pity_text += f" 📊 距离保底还有 {remaining_draws} 抽"
+        pity_text += t("egg.pity.distance_to_pity", locale=locale, remaining_draws=remaining_draws)
 
     embed = create_embed(
-        "🎰 抽蛋界面",
-        f"你当前有 **{points}** 积分\n\n"
-        f"**单抽：** {EggCommands.SINGLE_DRAW_COST} 积分\n"
-        f"**十连：** {EggCommands.TEN_DRAW_COST} 积分（9折优惠！）\n\n"
+        t("egg.ui.draw_interface.title", locale=locale),
+        t("egg.ui.draw_interface.points_info", locale=locale, points=points, single_cost=EggCommands.SINGLE_DRAW_COST, ten_cost=EggCommands.TEN_DRAW_COST) +
         f"{probability_text}"
         f"{pity_text}",
         discord.Color.gold()
     )
 
-    view = EggDrawView(interaction.user)
+    view = EggDrawView(interaction.user, interaction.guild.id)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def handle_egg_list(interaction: discord.Interaction):
@@ -189,6 +198,7 @@ async def handle_egg_list(interaction: discord.Interaction):
 async def handle_egg_hatch(interaction: discord.Interaction):
     """处理孵化蛋功能"""
     supabase = get_connection()
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
 
     try:
         # 获取用户ID并验证
@@ -204,8 +214,8 @@ async def handle_egg_hatch(interaction: discord.Interaction):
     except Exception as e:
         print(f"孵化蛋功能错误: {e}")
         embed = discord.Embed(
-            title="❌ 系统错误",
-            description="孵化蛋功能暂时不可用，请稍后再试。",
+            title=t("common.system_error_title", locale=locale),
+            description=t("egg.errors.hatch_function_unavailable", locale=locale),
             color=0xff0000
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -217,7 +227,7 @@ async def handle_egg_hatch(interaction: discord.Interaction):
         start_time = incubating_egg["hatch_started_at"]
         end_time = incubating_egg["hatch_completed_at"]
 
-        rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
+        rarity_names = {'C': t("egg.rarity_names.C", locale=locale), 'R': t("egg.rarity_names.R", locale=locale), 'SR': t("egg.rarity_names.SR", locale=locale), 'SSR': t("egg.rarity_names.SSR", locale=locale)}
         rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
 
         rarity_name = rarity_names[rarity]
@@ -225,8 +235,8 @@ async def handle_egg_hatch(interaction: discord.Interaction):
 
         current_time = datetime.datetime.now(datetime.timezone.utc)
         if end_time and current_time >= datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00')):
-            status_text = "✅ 已完成，可以领取！"
-            action_text = "使用 `/egg claim` 来领取你的宠物！"
+            status_text = t("egg.inventory.status.completed", locale=locale)
+            action_text = t("egg.inventory.status.action_claim", locale=locale)
         else:
             if end_time:
                 end_dt = datetime.datetime.fromisoformat(end_time.replace('Z', '+00:00'))
@@ -234,20 +244,17 @@ async def handle_egg_hatch(interaction: discord.Interaction):
                 hours = int(remaining.total_seconds() // 3600)
                 minutes = int((remaining.total_seconds() % 3600) // 60)
                 if hours > 0:
-                    time_text = f"{hours}小时{minutes}分钟"
+                    time_text = t("egg.inventory.status.time_format_hours", locale=locale, hours=hours, minutes=minutes)
                 else:
-                    time_text = f"{minutes}分钟"
-                status_text = f"⏰ 还需要 {time_text}"
+                    time_text = t("egg.inventory.status.time_format_minutes", locale=locale, minutes=minutes)
+                status_text = t("egg.inventory.status.time_remaining", locale=locale, time=time_text)
             else:
-                status_text = "⏰ 正在孵化中"
-            action_text = "请耐心等待孵化完成！"
+                status_text = t("egg.inventory.status.incubating", locale=locale)
+            action_text = t("egg.inventory.status.waiting", locale=locale)
 
         embed = create_embed(
-            "🚫 无法开始新的孵化",
-            f"你已经有一颗蛋正在孵化中！\n\n"
-            f"{emoji} **{rarity_name}蛋**\n"
-            f"状态：{status_text}\n\n"
-            f"{action_text}",
+            t("egg.hatch.already_hatching.title", locale=locale),
+            t("egg.hatch.already_hatching.description", locale=locale, emoji=emoji, rarity_name=rarity_name, status_text=status_text, action_text=action_text),
             discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -260,14 +267,14 @@ async def handle_egg_hatch(interaction: discord.Interaction):
         eggs = result.data
 
         if not eggs:
-            await interaction.response.send_message("你没有可以孵化的蛋！先去抽一些蛋吧！", ephemeral=True)
+            await interaction.response.send_message(t("egg.hatch.no_eggs_available", locale=locale), ephemeral=True)
             return
 
     except Exception as e:
         print(f"查询待孵化蛋错误: {e}")
         embed = discord.Embed(
-            title="❌ 系统错误",
-            description="查询蛋列表失败，请稍后再试。",
+            title=t("common.system_error_title", locale=locale),
+            description=t("egg.errors.query_eggs_failed", locale=locale),
             color=0xff0000
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -275,17 +282,18 @@ async def handle_egg_hatch(interaction: discord.Interaction):
 
     # 创建选择界面
     embed = create_embed(
-        "🐣 选择要孵化的蛋",
-        f"你有 {len(eggs)} 个待孵化的蛋，请选择一个开始孵化：",
+        t("egg.hatch.select_egg.title", locale=locale),
+        t("egg.hatch.select_egg.description", locale=locale, count=len(eggs)),
         discord.Color.orange()
     )
 
-    view = EggHatchView(eggs)
+    view = EggHatchView(eggs, interaction.guild.id)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def handle_egg_claim(interaction: discord.Interaction):
     """处理领取宠物功能"""
     supabase = get_connection()
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
 
     try:
         # 获取用户ID并验证
@@ -307,7 +315,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
         ready_eggs = result.data
 
         if not ready_eggs:
-            await interaction.response.send_message("没有可以领取的宠物！请先孵化一些蛋，或者等待孵化完成。", ephemeral=True)
+            await interaction.response.send_message(t("egg.claim.no_ready_pets", locale=locale), ephemeral=True)
             return
 
         # 获取用户的传说蛋保底计数器
@@ -317,8 +325,8 @@ async def handle_egg_claim(interaction: discord.Interaction):
     except Exception as e:
         print(f"查询已完成孵化的蛋错误: {e}")
         embed = discord.Embed(
-            title="❌ 系统错误",
-            description="查询孵化完成的蛋失败，请稍后再试。",
+            title=t("common.system_error_title", locale=locale),
+            description=t("egg.errors.query_completed_eggs_failed", locale=locale),
             color=0xff0000
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -331,7 +339,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
 
     try:
         # 获取宠物名称数据
-        pet_names = EggCommands.get_pet_names()
+        pet_names = EggCommands.get_pet_names(locale)
 
         for egg in ready_eggs:
             egg_id = egg["id"]
@@ -391,11 +399,15 @@ async def handle_egg_claim(interaction: discord.Interaction):
             rarity_config_response = supabase.table('pet_rarity_configs').select('max_stars').eq('rarity', pet_rarity).execute()
             max_stars = rarity_config_response.data[0]['max_stars'] if rarity_config_response.data else EggCommands.MAX_STARS[pet_rarity]
 
-            # 从pet_templates表获取pet_template_id
-            pet_template_response = supabase.table('pet_templates').select('id').eq('name', pet_name).eq('rarity', pet_rarity).execute()
-            if pet_template_response.data:
-                pet_template_id = pet_template_response.data[0]['id']
-            else:
+            # 从pet_templates表获取pet_template_id（需要通过cn_name和en_name查找）
+            pet_template_response = supabase.table('pet_templates').select('id, en_name').eq('rarity', pet_rarity).execute()
+            pet_template_id = None
+            for template in pet_template_response.data:
+                if get_localized_pet_name(template, locale) == pet_name:
+                    pet_template_id = template['id']
+                    break
+
+            if not pet_template_id:
                 # 如果找不到对应的模板，跳过这个宠物
                 continue
 
@@ -423,7 +435,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
             # 更新蛋状态为已领取
             supabase.table("user_eggs").update({"status": "claimed"}).eq("id", egg_id).execute()
 
-            rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
+            rarity_names = {'C': t("egg.rarity_names.C", locale=locale), 'R': t("egg.rarity_names.R", locale=locale), 'SR': t("egg.rarity_names.SR", locale=locale), 'SSR': t("egg.rarity_names.SSR", locale=locale)}
             rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
 
             claimed_pets.append({
@@ -441,8 +453,8 @@ async def handle_egg_claim(interaction: discord.Interaction):
     except Exception as e:
         print(f"领取宠物错误: {e}")
         embed = discord.Embed(
-            title="❌ 系统错误",
-            description="领取宠物失败，请稍后再试。",
+            title=t("common.system_error_title", locale=locale),
+            description=t("egg.errors.claim_pet_failed", locale=locale),
             color=0xff0000
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -452,26 +464,23 @@ async def handle_egg_claim(interaction: discord.Interaction):
     result_text = ""
     for pet in claimed_pets:
         stars_text = "⭐" * pet['stars']
-        result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} 来自 ({pet['egg_rarity']}蛋)\n"
+        result_text += f"{pet['emoji']} **{pet['name']}** ({pet['rarity_name']}) {stars_text} {t('egg.from_egg', locale=locale, rarity=pet['egg_rarity'])}\n"
 
     # 添加保底触发信息
     pity_info = ""
     if pity_triggered:
-        pity_info = "\n\n🎯 **恭喜！触发传说蛋保底，获得SSR宠物！**"
+        pity_info = t("egg.claim.pity_triggered.legendary", locale=locale)
 
     # 只在领取了传说蛋时才显示保底进度
     pity_status = ""
     if has_legendary_egg:
-        pity_status = f"\n\n**传说蛋保底进度：** {legendary_pity_counter}/1"
+        pity_status = t("egg.claim.pity_status.legendary", locale=locale, counter=legendary_pity_counter)
         if legendary_pity_counter == 1:
-            pity_status += " ⚠️ 下次开传说蛋必出SSR！"
+            pity_status += t("egg.claim.pity_status.legendary_next", locale=locale)
 
     embed = create_embed(
-        "🎉 宠物领取成功！",
-        f"恭喜 {interaction.user.mention} 获得了以下宠物：\n\n{result_text}\n"
-        f"总共领取了 **{len(claimed_pets)}** 只宠物！"
-        f"{pity_info}"
-        f"{pity_status}",
+        t("egg.claim.success.title", locale=locale),
+        t("egg.claim.success.description", locale=locale, user=interaction.user.mention, result_text=result_text, count=len(claimed_pets)) + pity_info + pity_status,
         discord.Color.gold()
     )
 
@@ -479,6 +488,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
 
 async def egg_list(interaction: discord.Interaction):
     """查看蛋和孵化状态"""
+    locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
     try:
         supabase = get_connection()
 
@@ -501,13 +511,13 @@ async def egg_list(interaction: discord.Interaction):
         ready_count = len([egg for egg in ready_response.data if egg.get('hatch_completed_at') and datetime.datetime.fromisoformat(egg['hatch_completed_at'].replace('Z', '+00:00')) <= current_time])
 
     except Exception as e:
-        await interaction.response.send_message(f"查询蛋列表时出错：{str(e)}", ephemeral=True)
+        await interaction.response.send_message(t("egg.errors.query_list_error", locale=locale, error=str(e)), ephemeral=True)
         return
 
     if not eggs and not incubating:
         embed = create_embed(
-            "📋 我的蛋库存",
-            "你还没有任何蛋！\n使用 `/egg draw` 来抽取你的第一个蛋吧！",
+            t("egg.inventory.title", locale=locale),
+            t("egg.inventory.no_eggs", locale=locale),
             discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed)
@@ -518,13 +528,13 @@ async def egg_list(interaction: discord.Interaction):
 
     # 显示可领取提示
     if ready_count > 0:
-        description += f"🎉 **你有 {ready_count} 只宠物可以领取！**\n使用 `/egg claim` 来领取它们！\n\n"
+        description += t("egg.inventory.ready_pets_notification", locale=locale, count=ready_count)
 
     if incubating:
-        description += "**🔥 孵化中：**\n"
+        description += t("egg.inventory.sections.hatching", locale=locale)
         for egg_id, rarity, start_time, end_time in incubating:
             rarity_emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[rarity]
-            rarity_name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[rarity]
+            rarity_name = {'C': t("egg.rarity_names.C", locale=locale), 'R': t("egg.rarity_names.R", locale=locale), 'SR': t("egg.rarity_names.SR", locale=locale), 'SSR': t("egg.rarity_names.SSR", locale=locale)}[rarity]
             now = datetime.datetime.now(datetime.timezone.utc)
 
             # 确保end_time也是UTC时区
@@ -534,21 +544,23 @@ async def egg_list(interaction: discord.Interaction):
                 end_time = datetime.datetime.fromisoformat(end_time)
 
             if now >= end_time:
-                status = "✅ 可领取"
+                status = t("egg.inventory.status.ready", locale=locale)
             else:
                 remaining = end_time - now
                 hours = int(remaining.total_seconds() // 3600)
                 minutes = int((remaining.total_seconds() % 3600) // 60)
                 if hours > 0:
-                    status = f"⏰ {hours}小时{minutes}分钟"
+                    time_str = t("egg.inventory.status.time_format_hours", locale=locale, hours=hours, minutes=minutes)
+                    status = f"⏰ {time_str}"
                 else:
-                    status = f"⏰ {minutes}分钟"
+                    time_str = t("egg.inventory.status.time_format_minutes", locale=locale, minutes=minutes)
+                    status = f"⏰ {time_str}"
 
-            description += f"{rarity_emoji} {rarity_name}蛋 - {status}\n"
+            description += f"{rarity_emoji} {rarity_name}{t('common.egg_suffix', locale=locale)} - {status}\n"
         description += "\n"
 
     if eggs:
-        description += "**📦 库存中：**\n"
+        description += t("egg.inventory.sections.inventory", locale=locale)
         egg_count = {}
         for egg_id, rarity, created_at in eggs:
             if egg_id not in [inc[0] for inc in incubating]:  # 排除孵化中的蛋
@@ -559,11 +571,11 @@ async def egg_list(interaction: discord.Interaction):
         for rarity in ['SSR', 'SR', 'R', 'C']:
             if rarity in egg_count:
                 rarity_emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[rarity]
-                rarity_name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[rarity]
-                description += f"{rarity_emoji} {rarity_name}蛋 x{len(egg_count[rarity])}\n"
+                rarity_name = {'C': t("egg.rarity_names.C", locale=locale), 'R': t("egg.rarity_names.R", locale=locale), 'SR': t("egg.rarity_names.SR", locale=locale), 'SSR': t("egg.rarity_names.SSR", locale=locale)}[rarity]
+                description += f"{rarity_emoji} {rarity_name}{t('common.egg_suffix', locale=locale)} x{len(egg_count[rarity])}\n"
 
     embed = create_embed(
-        "📋 我的蛋库存",
+        t("egg.inventory.title", locale=locale),
         description,
         discord.Color.blue()
     )
@@ -572,22 +584,34 @@ async def egg_list(interaction: discord.Interaction):
 
 # 抽蛋视图类
 class EggDrawView(discord.ui.View):
-    def __init__(self, user):
+    def __init__(self, user, guild_id):
         super().__init__(timeout=300)
         self.user = user
+        self.guild_id = guild_id
+        self.locale = get_guild_locale(guild_id)
+        self._update_button_labels()
+    
+    def _update_button_labels(self):
+        """初始化按钮标签"""
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                if item.custom_id == "single_draw_btn":
+                    item.label = t("egg.ui.buttons.single_draw", locale=self.locale)
+                elif item.custom_id == "ten_draw_btn":
+                    item.label = t("egg.ui.buttons.ten_draw", locale=self.locale)
 
-    @discord.ui.button(label="单抽 (250积分)", style=discord.ButtonStyle.primary, emoji="🎲")
+    @discord.ui.button(label="🎲", style=discord.ButtonStyle.primary, custom_id="single_draw_btn")
     async def single_draw(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("你无法使用别人的抽蛋界面！", ephemeral=True)
+            await interaction.response.send_message(t("egg.errors.not_your_interface", locale=self.locale), ephemeral=True)
             return
 
         await self.perform_draw(interaction, 1, EggCommands.SINGLE_DRAW_COST)
 
-    @discord.ui.button(label="十连抽 (2250积分)", style=discord.ButtonStyle.success, emoji="🎰")
+    @discord.ui.button(label="🎰", style=discord.ButtonStyle.success, custom_id="ten_draw_btn")
     async def ten_draw(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            await interaction.response.send_message("你无法使用别人的抽蛋界面！", ephemeral=True)
+            await interaction.response.send_message(t("egg.errors.not_your_interface", locale=self.locale), ephemeral=True)
             return
 
         await self.perform_draw(interaction, 10, EggCommands.TEN_DRAW_COST)
@@ -598,11 +622,12 @@ class EggDrawView(discord.ui.View):
             supabase = get_connection()
             guild_id = interaction.guild.id
             discord_user_id = interaction.user.id
+            locale = get_guild_locale(guild_id)
 
             # 获取用户ID
             user_id = await UserCache.get_user_id(guild_id, discord_user_id)
             if not user_id:
-                await interaction.response.send_message("用户数据不存在", ephemeral=True)
+                await interaction.response.send_message(t("egg.errors.user_not_found", locale=locale), ephemeral=True)
                 return
 
             # 使用Redis获取积分
@@ -610,7 +635,7 @@ class EggDrawView(discord.ui.View):
 
             if points < cost:
                 await interaction.response.send_message(
-                    f"积分不足！需要 {cost} 积分，你只有 {points} 积分。",
+                    t("egg.errors.insufficient_points", locale=locale, cost=cost, points=points),
                     ephemeral=True
                 )
                 return
@@ -619,7 +644,7 @@ class EggDrawView(discord.ui.View):
             current_pity = await DrawLimiter.get_egg_pity_count(guild_id, discord_user_id)
 
             # 先发送初始响应，避免交互超时
-            await interaction.response.send_message("🎰 正在抽蛋中...", ephemeral=True)
+            await interaction.response.send_message(t("egg.drawing.in_progress", locale=locale), ephemeral=True)
 
             # 扣除积分 (使用UserCache更新缓存)
             await UserCache.update_points(guild_id, discord_user_id, user_id, -cost)
@@ -655,7 +680,7 @@ class EggDrawView(discord.ui.View):
                 supabase.table('user_eggs').insert(eggs_to_insert).execute()
 
         except Exception as e:
-            await interaction.edit_original_response(content=f"抽蛋时出错：{str(e)}")
+            await interaction.edit_original_response(content=t("egg.errors.draw_error", locale=locale, error=str(e)))
             return
 
         # 显示结果
@@ -667,30 +692,30 @@ class EggDrawView(discord.ui.View):
         for rarity in ['SSR', 'SR', 'R', 'C']:
             if rarity in rarity_count:
                 emoji = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}[rarity]
-                name = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}[rarity]
-                result_text += f"{emoji} {name}蛋 x{rarity_count[rarity]}\n"
+                name = {'C': t("egg.rarity_names.C", locale=locale), 'R': t("egg.rarity_names.R", locale=locale), 'SR': t("egg.rarity_names.SR", locale=locale), 'SSR': t("egg.rarity_names.SSR", locale=locale)}[rarity]
+                result_text += f"{emoji} {name}{t('common.egg_suffix', locale=locale)} x{rarity_count[rarity]}\n"
 
         # 检查是否触发了保底
         pity_triggered = current_pity + count > 49 and 'SSR' in rarity_count
         pity_info = ""
         if pity_triggered and current_pity >= 49:
-            pity_info = "\n\n🎯 **恭喜！触发50抽保底，获得传说蛋！**"
+            pity_info = t("egg.drawing.pity_triggered_legendary", locale=locale)
 
         # 显示新的保底进度
         remaining = 50 - new_pity
-        pity_progress = f"\n**保底进度：** {new_pity}/50 (距离保底还有 {remaining} 抽)"
+        pity_progress = t("egg.drawing.pity_progress", locale=locale, current=new_pity, remaining=remaining)
 
         embed = create_embed(
-            f"🎉 抽蛋结果 - {count}抽",
-            f"**{interaction.user.mention} 获得：**\n{result_text}\n"
-            f"**消耗：** {cost} 积分"
+            t("egg.drawing.result.title", locale=locale, count=count),
+            f"**{interaction.user.mention} {t('egg.drawing.result.obtained', locale=locale)}：**\n{result_text}\n"
+            f"**{t('egg.drawing.result.cost', locale=locale)}：** {cost} {t('common.points', locale=locale)}"
             f"{pity_info}"
             f"{pity_progress}",
             discord.Color.green()
         )
 
         # 先编辑原始私有消息
-        await interaction.edit_original_response(content="✅ 抽蛋完成！", embed=None, view=None)
+        await interaction.edit_original_response(content=t("egg.drawing.result.completed", locale=locale), embed=None, view=None)
         # 然后发送公开的结果消息
         await interaction.followup.send(embed=embed)
 
@@ -742,9 +767,10 @@ class EggDrawView(discord.ui.View):
 
 
 class EggHatchView(discord.ui.View):
-    def __init__(self, eggs):
+    def __init__(self, eggs, guild_id=None):
         super().__init__(timeout=300)
         self.eggs = eggs
+        self.locale = get_guild_locale(guild_id)
 
         # 创建选择菜单
         options = []
@@ -752,10 +778,10 @@ class EggHatchView(discord.ui.View):
             egg_id = egg['id']
             rarity = egg['rarity']
             created_at = egg['created_at']
-            rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
+            rarity_names = {'C': t("egg.rarity_names.C", locale=self.locale), 'R': t("egg.rarity_names.R", locale=self.locale), 'SR': t("egg.rarity_names.SR", locale=self.locale), 'SSR': t("egg.rarity_names.SSR", locale=self.locale)}
             rarity_emojis = {'C': '🤍', 'R': '💙', 'SR': '💜', 'SSR': '💛'}
 
-            rarity_name = rarity_names.get(rarity, '未知')
+            rarity_name = rarity_names.get(rarity, t("common.unknown", locale=self.locale))
             emoji = rarity_emojis.get(rarity, '❓')
 
             # 格式化创建时间
@@ -766,21 +792,22 @@ class EggHatchView(discord.ui.View):
             time_str = created_at_dt.strftime("%m-%d %H:%M")
 
             options.append(discord.SelectOption(
-                label=f"{emoji} {rarity_name}蛋",
-                description=f"获得时间: {time_str}",
+                label=f"{emoji} {rarity_name} {t('common.egg_suffix', locale=self.locale).strip()}",
+                description=t("egg.ui.description.got", locale=self.locale, time=time_str),
                 value=str(egg_id),
                 emoji=emoji
             ))
 
         if options:
-            select = EggSelect(options, self.eggs)
+            select = EggSelect(options, self.eggs, self.locale)
             self.add_item(select)
 
 
 class EggSelect(discord.ui.Select):
-    def __init__(self, options, eggs):
-        super().__init__(placeholder="选择要孵化的蛋...", options=options)
+    def __init__(self, options, eggs, locale):
+        super().__init__(placeholder=t("egg.ui.placeholders.select_egg", locale=locale), options=options)
         self.eggs = eggs
+        self.locale = locale
 
     async def callback(self, interaction: discord.Interaction):
         selected_egg_id = int(self.values[0])
@@ -793,7 +820,7 @@ class EggSelect(discord.ui.Select):
                 break
 
         if not selected_egg:
-            await interaction.response.send_message("蛋不存在！", ephemeral=True)
+            await interaction.response.send_message(t("egg.errors.egg_not_found", locale=self.locale), ephemeral=True)
             return
 
         egg_id = selected_egg['id']
@@ -817,22 +844,20 @@ class EggSelect(discord.ui.Select):
             }).eq('id', egg_id).execute()
 
         except Exception as e:
-            await interaction.response.send_message(f"开始孵化时出错：{str(e)}", ephemeral=True)
+            await interaction.response.send_message(t("egg.errors.start_hatch_error", locale=self.locale, error=str(e)), ephemeral=True)
             return
 
-        rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
-        rarity_name = rarity_names.get(rarity, '未知')
+        rarity_names = {'C': t("egg.rarity_names.C", locale=self.locale), 'R': t("egg.rarity_names.R", locale=self.locale), 'SR': t("egg.rarity_names.SR", locale=self.locale), 'SSR': t("egg.rarity_names.SSR", locale=self.locale)}
+        rarity_name = rarity_names.get(rarity, t("common.unknown", locale=self.locale))
 
         embed = create_embed(
-            "🐣 开始孵化！",
-            f"**{interaction.user.mention}** 的 **{rarity_name}蛋** 开始孵化了！\n\n"
-            f"⏰ 孵化时间：{hatch_hours} 小时\n\n"
-            f"请耐心等待，到时间后使用 `/egg claim` 来领取你的宠物！",
+            t("egg.hatch.start.title", locale=self.locale),
+            t("egg.hatch.start.description", locale=self.locale, user=interaction.user.mention, rarity_name=rarity_name, hours=hatch_hours),
             discord.Color.green()
         )
 
         # 先编辑原始私有消息
-        await interaction.response.edit_message(content="✅ 孵化开始！", embed=None, view=None)
+        await interaction.response.edit_message(content=t("egg.hatch.start.confirmation", locale=self.locale), embed=None, view=None)
         # 然后发送公开的孵化消息
         await interaction.followup.send(embed=embed)
 

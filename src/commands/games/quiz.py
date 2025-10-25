@@ -5,22 +5,34 @@ import datetime
 from src.db.database import get_connection
 from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
 from src.utils.cache import UserCache
+from src.utils.i18n import get_guild_locale, t
 
 async def quizlist(ctx, language: str = "all"):
     supabase = get_connection()
+    locale = get_guild_locale(ctx.guild.id if ctx.guild else None)
+
+    language_key = language.lower()
+    valid_languages = {"all", "chinese", "english"}
 
     try:
         # 根据语言参数筛选
-        if language.lower() == "all":
+        if language_key == "all":
             result = supabase.table("quiz_questions").select("category, language").execute()
-        elif language.lower() in ["chinese", "english"]:
-            result = supabase.table("quiz_questions").select("category, language").eq("language", language.lower()).execute()
+        elif language_key in valid_languages:
+            result = (
+                supabase
+                .table("quiz_questions")
+                .select("category, language")
+                .eq("language", language_key)
+                .execute()
+            )
         else:
-            await ctx.send("❌ 无效的语言参数！请使用：`chinese`、`english` 或 `all`")
+            options = ", ".join(sorted(valid_languages))
+            await ctx.send(t("quiz.list.invalid_language", locale=locale, options=options))
             return
 
         if not result.data:
-            await ctx.send("暂无题库。")
+            await ctx.send(t("quiz.list.no_data", locale=locale))
             return
 
         # 按语言分组类别
@@ -34,25 +46,43 @@ async def quizlist(ctx, language: str = "all"):
                 english_categories.add(row["category"])
 
         # 构建消息
-        message_parts = ["📋 **题库类别**\n"]
+        message_parts = [t("quiz.list.header", locale=locale)]
 
-        if language.lower() in ["all", "chinese"] and chinese_categories:
-            message_parts.append(f"🇨🇳 **中文题库：**\n{', '.join(sorted(chinese_categories))}\n")
+        if language_key in ["all", "chinese"] and chinese_categories:
+            message_parts.append(
+                t(
+                    "quiz.list.section_chinese",
+                    locale=locale,
+                    categories=", ".join(sorted(chinese_categories))
+                )
+            )
 
-        if language.lower() in ["all", "english"] and english_categories:
-            message_parts.append(f"🇺🇸 **英文题库：**\n{', '.join(sorted(english_categories))}")
+        if language_key in ["all", "english"] and english_categories:
+            message_parts.append(
+                t(
+                    "quiz.list.section_english",
+                    locale=locale,
+                    categories=", ".join(sorted(english_categories))
+                )
+            )
 
         if len(message_parts) == 1:
-            await ctx.send(f"暂无 {language} 题库。")
+            language_label = t(
+                f"quiz.list.language_label.{language_key}",
+                locale=locale,
+                default=language_key
+            )
+            await ctx.send(t("quiz.list.none_for_language", locale=locale, language=language_label))
         else:
             await ctx.send("\n".join(message_parts))
 
     except Exception as e:
         print(f"获取题库类别失败: {e}")
-        await ctx.send("获取题库类别失败，请稍后重试。")
+        await ctx.send(t("quiz.list.error", locale=locale))
 
 async def quiz(ctx, category, number):
     supabase = get_connection()
+    locale = get_guild_locale(ctx.guild.id if ctx.guild else None)
 
     try:
         # 先尝试完全匹配
@@ -65,17 +95,17 @@ async def quiz(ctx, category, number):
             if result.data:
                 # 获取所有匹配的子类别
                 matched_categories = list(set([row["category"] for row in result.data]))
-                await ctx.send(f"✨ 找到匹配类别：{', '.join(matched_categories)}")
+                await ctx.send(t("quiz.match.found", locale=locale, categories=", ".join(matched_categories)))
 
         rows = [(row["question"], row["option_a"], row["option_b"], row["option_c"], row["option_d"], row["answer"]) for row in result.data]
 
         if not rows:
-            await ctx.send(f"❌ 没有找到类别 `{category}` 的题目。\n💡 使用 `!quizlist` 查看所有可用类别。")
+            await ctx.send(t("quiz.match.none", locale=locale, category=category))
             return
             
     except Exception as e:
         print(f"获取题目失败: {e}")
-        await ctx.send("获取题目失败，请稍后重试。")
+        await ctx.send(t("quiz.match.error", locale=locale))
         return
 
     random.shuffle(rows)
@@ -84,7 +114,19 @@ async def quiz(ctx, category, number):
     rows = rows[:number]
 
     for idx, (q, o1, o2, o3, o4, ans) in enumerate(rows, 1):
-        await ctx.send(f"**第 {idx}/{len(rows)} 题:**\n\n**{q}**\nA. {o1}\nB. {o2}\nC. {o3}\nD. {o4}\n🎮 游戏开始，你只有 60 秒的时间作答！")
+        await ctx.send(
+            t(
+                "quiz.game.question",
+                locale=locale,
+                index=idx,
+                total=len(rows),
+                question=q,
+                a=o1,
+                b=o2,
+                c=o3,
+                d=o4
+            )
+        )
 
         start = asyncio.get_event_loop().time()
         answered = False
@@ -93,7 +135,7 @@ async def quiz(ctx, category, number):
         async def warn_after_delay():
             await asyncio.sleep(50)
             if not answered:
-                await ctx.send("⏰ 仅剩下 10 秒！")
+                await ctx.send(t("quiz.game.warning", locale=locale))
 
         warning_task = asyncio.create_task(warn_after_delay())
 
@@ -123,7 +165,14 @@ async def quiz(ctx, category, number):
                 choice_letter = txt
 
             if choice_letter == ans:
-                await ctx.send(f"✅ {reply.author.mention} 答对了！正确答案是 {ans}，奖励 20 分")
+                await ctx.send(
+                    t(
+                        "quiz.game.correct",
+                        locale=locale,
+                        mention=reply.author.mention,
+                        answer=ans
+                    )
+                )
 
                 try:
                     supabase = get_connection()
@@ -154,12 +203,18 @@ async def quiz(ctx, category, number):
                 answered = True
                 break
             else:
-                await ctx.send(f"❌ {reply.author.mention} 答错了！你已经没有再答的机会啦")
+                await ctx.send(
+                    t(
+                        "quiz.game.wrong",
+                        locale=locale,
+                        mention=reply.author.mention
+                    )
+                )
 
         if not warning_task.done():
             warning_task.cancel()
 
         if not answered:
-            await ctx.send(f"⏰ 时间到，正确答案是 {ans}")
+            await ctx.send(t("quiz.game.timeout", locale=locale, answer=ans))
 
-    await ctx.send("答题结束！")
+    await ctx.send(t("quiz.game.end", locale=locale))

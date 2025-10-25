@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from src.utils.ui import create_embed
 from src.utils.helpers import get_user_internal_id
+from src.utils.i18n import get_guild_locale, t
 from src.utils.cache import UserCache
 
 class ForgeCommands(commands.Cog):
@@ -16,13 +17,11 @@ class ForgeCommands(commands.Cog):
         'SR_TO_SSR': {'ratio': 3, 'points': 100}
     }
 
-    # 稀有度映射
-    RARITY_MAPPING = {
-        'C': '普通',
-        'R': '稀有',
-        'SR': '史诗',
-        'SSR': '传说'
-    }
+    # 稀有度映射 - 使用国际化
+    @staticmethod
+    def get_rarity_name(rarity, locale='zh-CN'):
+        """获取稀有度名称"""
+        return t("forge.rarity_mapping." + rarity, locale=locale)
 
     # 稀有度颜色
     RARITY_COLORS = {
@@ -47,14 +46,14 @@ class ForgeCommands(commands.Cog):
             return fragments
 
         except Exception as e:
-            print(f"获取用户碎片库存失败: {e}")
+            print(f"{t('forge.errors.get_user_fragments_failed', locale='zh-CN', error=e)}")
             return {}
 
-    def calculate_max_crafts(self, from_rarity, to_rarity, fragments, user_points):
+    def calculate_max_crafts(self, from_rarity, to_rarity, fragments, user_points, locale='zh-CN'):
         """计算最大可合成数量"""
         recipe_key = f"{from_rarity}_TO_{to_rarity}"
         if recipe_key not in self.FORGE_RECIPES:
-            return 0, "无效的合成配方"
+            return 0, t("forge.errors.invalid_recipe", locale=locale)
 
         recipe = self.FORGE_RECIPES[recipe_key]
         required_fragments = recipe['ratio']
@@ -63,7 +62,7 @@ class ForgeCommands(commands.Cog):
         # 检查碎片数量
         available_fragments = fragments.get(from_rarity, 0)
         if available_fragments < required_fragments:
-            return 0, f"碎片不足，需要 {required_fragments} 个 {self.RARITY_MAPPING[from_rarity]} 碎片"
+            return 0, t("forge.errors.insufficient_fragments", locale=locale, required=required_fragments, rarity=self.get_rarity_name(from_rarity, locale))
 
         # 基于碎片数量计算最大合成次数
         max_by_fragments = available_fragments // required_fragments
@@ -76,13 +75,13 @@ class ForgeCommands(commands.Cog):
 
         if max_crafts == 0:
             if max_by_fragments == 0:
-                return 0, f"碎片不足，需要 {required_fragments} 个 {self.RARITY_MAPPING[from_rarity]} 碎片"
+                return 0, t("forge.errors.insufficient_fragments", locale=locale, required=required_fragments, rarity=self.get_rarity_name(from_rarity, locale))
             else:
-                return 0, f"积分不足，需要 {required_points} 积分"
+                return 0, t("forge.errors.insufficient_points", locale=locale, required=required_points)
 
         return max_crafts, None
 
-    def execute_forge(self, user_id, from_rarity, to_rarity, quantity):
+    def execute_forge(self, user_id, from_rarity, to_rarity, quantity, locale='zh-CN'):
         """执行合成操作"""
         try:
             from src.db.database import get_supabase_client
@@ -97,23 +96,23 @@ class ForgeCommands(commands.Cog):
             # 获取当前用户数据
             user_response = supabase.table('users').select('points').eq('id', user_id).execute()
             if not user_response.data:
-                return False, "用户数据不存在"
+                return False, t("forge.errors.user_data_not_found", locale=locale)
 
             current_points = user_response.data[0]['points']
 
             # 获取当前碎片数量
             fragments_response = supabase.table('user_pet_fragments').select('amount').eq('user_id', user_id).eq('rarity', from_rarity).execute()
             if not fragments_response.data:
-                return False, f"没有 {self.RARITY_MAPPING[from_rarity]} 碎片"
+                return False, t("forge.errors.no_fragments_of_type", locale=locale, rarity=self.get_rarity_name(from_rarity, locale))
 
             current_fragments = fragments_response.data[0]['amount']
 
             # 验证资源是否足够
             if current_fragments < total_fragments_needed:
-                return False, f"碎片不足，需要 {total_fragments_needed} 个，只有 {current_fragments} 个"
+                return False, t("forge.errors.insufficient_fragments_detail", locale=locale, required=total_fragments_needed, current=current_fragments)
 
             if current_points < total_points_needed:
-                return False, f"积分不足，需要 {total_points_needed} 积分，只有 {current_points} 积分"
+                return False, t("forge.errors.insufficient_points_detail", locale=locale, required=total_points_needed, current=current_points)
 
             # 扣除源碎片
             new_source_amount = current_fragments - total_fragments_needed
@@ -141,34 +140,53 @@ class ForgeCommands(commands.Cog):
                     'amount': quantity
                 }).execute()
 
-            return True, f"成功合成 {quantity} 个 {self.RARITY_MAPPING[to_rarity]} 碎片"
+            return True, t("forge.success.message", locale=locale, quantity=quantity, rarity=self.get_rarity_name(to_rarity, locale))
 
         except Exception as e:
-            print(f"执行合成操作失败: {e}")
-            return False, f"合成失败: {str(e)}"
+            print(f"{t('forge.errors.execute_failed', locale=locale, error=e)}")
+            return False, t("forge.errors.synthesis_failed", locale=locale, error=str(e))
+
+# 创建锻造选项
+def _create_forge_choices():
+    """创建锻造选项，使用英文作为默认名称并添加本地化支持"""
+    from src.utils.i18n import get_all_localizations
+    
+    # Action choices
+    action_choices = []
+    for action in ["view", "craft"]:
+        choice = app_commands.Choice(name=action.title(), value=action)
+        choice.name_localizations = get_all_localizations(f"forge.command.choices.action.{action}")
+        action_choices.append(choice)
+    
+    # From rarity choices
+    from_rarity_choices = []
+    for rarity in ["C", "R", "SR"]:
+        choice = app_commands.Choice(name=f"Common ({rarity})" if rarity == "C" else f"Rare ({rarity})" if rarity == "R" else f"Epic ({rarity})", value=rarity)
+        choice.name_localizations = get_all_localizations(f"forge.command.choices.from_rarity.{rarity}")
+        from_rarity_choices.append(choice)
+    
+    # To rarity choices
+    to_rarity_choices = []
+    for rarity in ["R", "SR", "SSR"]:
+        choice = app_commands.Choice(name=f"Rare ({rarity})" if rarity == "R" else f"Epic ({rarity})" if rarity == "SR" else f"Legendary ({rarity})", value=rarity)
+        choice.name_localizations = get_all_localizations(f"forge.command.choices.to_rarity.{rarity}")
+        to_rarity_choices.append(choice)
+    
+    return action_choices, from_rarity_choices, to_rarity_choices
+
+_forge_action_choices, _forge_from_rarity_choices, _forge_to_rarity_choices = _create_forge_choices()
 
 # 主锻造命令
-@app_commands.command(name="forge", description="🔨 锻造台 - 合成宠物碎片")
+@app_commands.command(name="forge", description="Fragment forge - convert and combine fragments")
 @app_commands.describe(
-    action="选择操作类型",
-    from_rarity="源稀有度（要消耗的碎片）",
-    to_rarity="目标稀有度（要获得的碎片）",
-    quantity="合成次数（默认1次）"
+    action="Select action type",
+    from_rarity="Source fragment rarity",
+    to_rarity="Target fragment rarity",
+    quantity="Number of fragments to convert (default: 1)"
 )
-@app_commands.choices(action=[
-    app_commands.Choice(name="查看锻造台", value="view"),
-    app_commands.Choice(name="合成碎片", value="craft")
-])
-@app_commands.choices(from_rarity=[
-    app_commands.Choice(name="🤍 普通(C)", value="C"),
-    app_commands.Choice(name="💙 稀有(R)", value="R"),
-    app_commands.Choice(name="💜 史诗(SR)", value="SR")
-])
-@app_commands.choices(to_rarity=[
-    app_commands.Choice(name="💙 稀有(R)", value="R"),
-    app_commands.Choice(name="💜 史诗(SR)", value="SR"),
-    app_commands.Choice(name="💛 传说(SSR)", value="SSR")
-])
+@app_commands.choices(action=_forge_action_choices)
+@app_commands.choices(from_rarity=_forge_from_rarity_choices)
+@app_commands.choices(to_rarity=_forge_to_rarity_choices)
 @app_commands.guild_only()
 async def forge(interaction: discord.Interaction, action: str, from_rarity: str = None, to_rarity: str = None, quantity: int = 1):
     """锻造台主命令"""
@@ -177,16 +195,19 @@ async def forge(interaction: discord.Interaction, action: str, from_rarity: str 
     elif action == "craft":
         await handle_forge_craft(interaction, from_rarity, to_rarity, quantity)
     else:
-        embed = create_embed("❌ 错误", "无效的操作类型！", discord.Color.red())
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
+        embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.invalid_action_type", locale=locale), discord.Color.red())
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def handle_forge_view(interaction: discord.Interaction):
     """处理查看锻造台"""
     try:
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.user_not_registered", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -196,7 +217,7 @@ async def handle_forge_view(interaction: discord.Interaction):
         user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
 
         if not user_response.data:
-            embed = create_embed("❌ 错误", "无法获取用户数据！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.cannot_get_user_data", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -207,33 +228,33 @@ async def handle_forge_view(interaction: discord.Interaction):
         fragments = forge_commands.get_user_fragments(user_internal_id)
 
         # 构建显示内容
-        description = f"{interaction.user.mention} 的锻造台\n\n"
+        description = t("forge.view.user_forge.title", locale=locale, user=interaction.user.mention)
 
         # 显示碎片库存
         if fragments:
-            description += "**📦 碎片库存：**\n"
+            description += t("forge.view.fragments.title", locale=locale)
             rarity_order = ['SSR', 'SR', 'R', 'C']
             for rarity in rarity_order:
                 if rarity in fragments:
                     color = ForgeCommands.RARITY_COLORS[rarity]
-                    name = ForgeCommands.RARITY_MAPPING[rarity]
+                    name = forge_commands.get_rarity_name(rarity, locale)
                     amount = fragments[rarity]
                     description += f"{color} {name}碎片：{amount} 个\n"
         else:
-            description += "**📦 碎片库存：** 无\n"
+            description += t("forge.view.fragments.no_fragments", locale=locale)
 
-        description += f"\n💰 **当前积分：** {user_points}\n\n"
+        description += t("forge.view.current_points", locale=locale, points=user_points)
 
         # 显示合成规则
-        description += "**🔨 合成规则：**\n"
-        description += "• C碎片 → R碎片：10:1 + 50积分\n"
-        description += "• R碎片 → SR碎片：5:1 + 80积分\n"
-        description += "• SR碎片 → SSR碎片：3:1 + 100积分\n\n"
+        description += t("forge.view.crafting_rules.title", locale=locale)
+        description += t("forge.view.crafting_rules.c_to_r", locale=locale)
+        description += t("forge.view.crafting_rules.r_to_sr", locale=locale)
+        description += t("forge.view.crafting_rules.sr_to_ssr", locale=locale)
 
         # 显示使用说明
-        description += "**📋 使用方法：**\n"
-        description += "`/forge action:合成碎片 from_rarity:C to_rarity:R quantity:1`\n"
-        description += "例如：将10个C碎片合成1个R碎片\n\n"
+        description += t("forge.view.usage.title", locale=locale)
+        description += t("forge.view.usage.example_command", locale=locale)
+        description += t("forge.view.usage.example_description", locale=locale)
 
         # 显示可用操作
         if fragments:
@@ -246,19 +267,20 @@ async def handle_forge_view(interaction: discord.Interaction):
                 available_crafts.append("SR → SSR")
 
             if available_crafts:
-                description += "**✅ 可进行的合成：**\n"
+                description += t("forge.view.available_crafts.title", locale=locale)
                 description += " | ".join(available_crafts)
             else:
-                description += "**❌ 暂无可进行的合成**\n需要更多碎片才能进行合成！"
+                description += t("forge.view.no_available_crafts", locale=locale)
         else:
-            description += "**❌ 没有碎片**\n分解宠物可以获得碎片！"
+            description += t("forge.view.no_fragments_tip", locale=locale)
 
-        embed = create_embed("🔨 锻造台", description, discord.Color.gold())
+        embed = create_embed(t("forge.view.title", locale=locale), description, discord.Color.gold())
         await interaction.response.send_message(embed=embed)
 
     except Exception as e:
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         print(f"查看锻造台错误: {e}")
-        embed = create_embed("❌ 错误", "锻造台暂时不可用，请稍后再试！", discord.Color.red())
+        embed = create_embed("❌ 错误", t("forge.errors.forge_unavailable", locale=locale), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
@@ -267,28 +289,30 @@ async def handle_forge_view(interaction: discord.Interaction):
 async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str, to_rarity: str, quantity: int):
     """处理合成碎片"""
     try:
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
+
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", "用户不存在，请先使用抽卡功能注册！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.user_not_found_craft", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 验证参数
         if not from_rarity or not to_rarity:
-            embed = create_embed("❌ 错误", "请指定源稀有度和目标稀有度！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.missing_rarity_params", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         if quantity < 1:
-            embed = create_embed("❌ 错误", "合成次数必须大于0！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.invalid_quantity", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 验证合成路径
         valid_paths = [('C', 'R'), ('R', 'SR'), ('SR', 'SSR')]
         if (from_rarity, to_rarity) not in valid_paths:
-            embed = create_embed("❌ 错误", "无效的合成路径！只能按照 C→R→SR→SSR 的顺序合成。", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.invalid_crafting_path", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -298,7 +322,7 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
 
         if not user_response.data:
-            embed = create_embed("❌ 错误", "无法获取用户数据！", discord.Color.red())
+            embed = create_embed("❌ 错误", t("forge.errors.cannot_get_data_craft", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -309,7 +333,7 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         fragments = forge_commands.get_user_fragments(user_internal_id)
 
         # 计算最大可合成数量
-        max_crafts, error_msg = forge_commands.calculate_max_crafts(from_rarity, to_rarity, fragments, user_points)
+        max_crafts, error_msg = forge_commands.calculate_max_crafts(from_rarity, to_rarity, fragments, user_points, locale)
 
         if max_crafts == 0:
             embed = create_embed("❌ 无法合成", error_msg, discord.Color.red())
@@ -319,15 +343,15 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         # 检查请求数量是否可行
         if quantity > max_crafts:
             embed = create_embed(
-                "❌ 数量超限",
-                f"最多只能合成 {max_crafts} 次，但你请求了 {quantity} 次！",
+                t("forge.errors.quantity_exceeded.title", locale=locale),
+                t("forge.errors.quantity_exceeded.description", locale=locale, max=max_crafts, requested=quantity),
                 discord.Color.red()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 执行合成
-        success, message = forge_commands.execute_forge(user_internal_id, from_rarity, to_rarity, quantity)
+        success, message = forge_commands.execute_forge(user_internal_id, from_rarity, to_rarity, quantity, locale)
 
         # 清除积分缓存，确保check命令显示最新数据
         if success:
@@ -340,32 +364,33 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
             recipe_key = f"{from_rarity}_TO_{to_rarity}"
             recipe = ForgeCommands.FORGE_RECIPES[recipe_key]
 
-            from_name = ForgeCommands.RARITY_MAPPING[from_rarity]
-            to_name = ForgeCommands.RARITY_MAPPING[to_rarity]
+            from_name = forge_commands.get_rarity_name(from_rarity, locale)
+            to_name = forge_commands.get_rarity_name(to_rarity, locale)
             from_color = ForgeCommands.RARITY_COLORS[from_rarity]
             to_color = ForgeCommands.RARITY_COLORS[to_rarity]
 
             total_fragments_consumed = recipe['ratio'] * quantity
             total_points_consumed = recipe['points'] * quantity
 
-            description = f"🎉 {interaction.user.mention} 合成成功！\n\n"
-            description += f"**合成结果：**\n"
-            description += f"{from_color} {from_name}碎片 → {to_color} {to_name}碎片\n\n"
-            description += f"**消耗：**\n"
+            description = t("forge.craft.success.title", locale=locale, user=interaction.user.mention)
+            description += t("forge.craft.success.result.title", locale=locale)
+            description += t("forge.craft.success.result.description", locale=locale, from_color=from_color, from_name=from_name, to_color=to_color, to_name=to_name)
+            description += t("forge.craft.success.result.consumed", locale=locale)
             description += f"• {from_color} {from_name}碎片：{total_fragments_consumed} 个\n"
             description += f"• 💰 积分：{total_points_consumed} 点\n\n"
-            description += f"**获得：**\n"
+            description += t("forge.craft.success.result.gained", locale=locale)
             description += f"• {to_color} {to_name}碎片：{quantity} 个"
 
-            embed = create_embed("🔨 锻造成功", description, discord.Color.green())
+            embed = create_embed(t("forge.craft.success.embed_title", locale=locale), description, discord.Color.green())
         else:
-            embed = create_embed("❌ 合成失败", message, discord.Color.red())
+            embed = create_embed(t("forge.craft.failure.title", locale=locale), message, discord.Color.red())
 
         await interaction.response.send_message(embed=embed)
 
     except Exception as e:
+        locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         print(f"合成碎片错误: {e}")
-        embed = create_embed("❌ 错误", f"合成过程中发生错误：{str(e)}", discord.Color.red())
+        embed = create_embed("❌ 错误", t("forge.errors.crafting_failed", locale=locale, error=str(e)), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:

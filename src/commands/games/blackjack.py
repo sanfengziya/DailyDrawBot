@@ -5,6 +5,7 @@ import random
 import datetime
 from src.db.database import get_connection
 from src.utils.helpers import get_user_internal_id_with_guild_and_discord_id
+from src.utils.i18n import get_guild_locale, t
 from src.utils.cache import UserCache
 
 
@@ -205,9 +206,9 @@ class BlackjackGame:
         else:
             return "tie", "same_value"
 
-    def get_game_state_embed(self, show_dealer_card=False, game_over=False):
+    def get_game_state_embed(self, show_dealer_card=False, game_over=False, locale="zh-CN"):
         """生成游戏状态的embed消息"""
-        embed = discord.Embed(title="🎰 二十一点游戏", color=0xdc143c)  # 红色
+        embed = discord.Embed(title=t("blackjack.game_title", locale=locale), color=0xdc143c)  # 红色
 
         # 庄家的牌
         dealer_hand_str = self._format_hand(self.dealer_hand, hide_first=not show_dealer_card)
@@ -216,7 +217,7 @@ class BlackjackGame:
         # 玩家的牌显示
         if self.is_split:
             # 分牌模式：显示多手牌
-            player_section = "**👤 你的牌**\n\n"
+            player_section = t("blackjack.embed.player_section", locale=locale) + "\n\n"
             for i, hand_data in enumerate(self.split_hands):
                 hand = hand_data["hand"]
                 bet = hand_data["bet"]
@@ -226,35 +227,37 @@ class BlackjackGame:
 
                 status = ""
                 if i == self.current_hand_index and not game_over:
-                    status = " ← 当前"
+                    status = t("blackjack.embed.hand_status", locale=locale)
                 if doubled:
-                    status += " [已加倍]"
+                    status += t("blackjack.embed.doubled_status", locale=locale)
 
-                player_section += f"手牌 {i+1}{status}\n{hand_str}\n点数: `{hand_value}` | 下注: `{bet}` 积分\n\n"
+                player_section += t("blackjack.embed.hand_info", locale=locale).format(
+                    index=i+1, status=status, cards=hand_str, value=hand_value, bet=bet
+                )
         else:
             # 普通模式
             player_hand_str = self._format_hand(self.player_hand)
             player_value = self._calculate_hand_value(self.player_hand)
 
-            double_status = " **[已加倍]**" if self.doubled_down else ""
-            player_section = f"""**👤 你的牌**{double_status}
+            double_status = t("blackjack.embed.doubled_status", locale=locale) if self.doubled_down else ""
+            player_section = f"""{t("blackjack.embed.player_section", locale=locale)}{double_status}
 
 {player_hand_str}
 
-点数: `{player_value}`"""
+{t("blackjack.embed.points", locale=locale).format(value=player_value)}"""
 
         # 保险状态显示
         insurance_info = ""
         if self.insurance_bought:
-            insurance_info = f"\n**🛡️ 保险:** `{self.insurance_amount}` 积分"
+            insurance_info = t("blackjack.embed.insurance_info", locale=locale).format(amount=self.insurance_amount)
 
         # 使用更宽的描述字段，增加空行让排版更舒服
         description = f"""
-**🤖 庄家的牌**
+{t("blackjack.embed.dealer_section", locale=locale)}
 
 {dealer_hand_str}
 
-点数: `{dealer_value}`
+{t("blackjack.embed.points", locale=locale).format(value=dealer_value)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -262,13 +265,13 @@ class BlackjackGame:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**💰 总下注金额:** `{self.bet_amount}` 积分{insurance_info}
+{t("blackjack.embed.total_bet", locale=locale).format(amount=self.bet_amount)}{insurance_info}
 """
 
         embed.description = description.strip()
 
         if not game_over:
-            embed.set_footer(text="使用按钮选择你的行动 | 2分钟内有效")
+            embed.set_footer(text=t("blackjack.embed.footer", locale=locale))
 
         return embed
 
@@ -283,9 +286,30 @@ class BlackjackView(discord.ui.View):
         self.guild_id = guild_id
         self.current_points = current_points  # 当前积分（用于检查是否能加倍/分牌）
         self.message = None
+        self.locale = get_guild_locale(guild_id)
 
+        # 初始化按钮标签
+        self._initialize_button_labels()
+        
         # 根据游戏状态动态设置按钮可用性
         self._update_button_states()
+
+    def _initialize_button_labels(self):
+        """初始化所有按钮的标签"""
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                if item.custom_id == "hit_button":
+                    item.label = t("blackjack.buttons.hit", locale=self.locale)
+                elif item.custom_id == "stand_button":
+                    item.label = t("blackjack.buttons.stand", locale=self.locale)
+                elif item.custom_id == "double_down":
+                    item.label = t("blackjack.buttons.double_down", locale=self.locale)
+                elif item.custom_id == "split":
+                    item.label = t("blackjack.buttons.split", locale=self.locale)
+                elif item.custom_id == "insurance":
+                    item.label = t("blackjack.buttons.insurance", locale=self.locale)
+                elif item.custom_id == "surrender":
+                    item.label = t("blackjack.buttons.surrender", locale=self.locale)
 
     def _update_button_states(self):
         """根据游戏状态更新按钮可用性"""
@@ -340,11 +364,11 @@ class BlackjackView(discord.ui.View):
         except Exception as e:
             print(f"超时返还积分失败: {e}")
 
-    @discord.ui.button(label="要牌 (Hit)", style=discord.ButtonStyle.primary, emoji="🎴")
+    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, emoji="🎴", custom_id="hit_button")
     async def hit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """要牌按钮"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 根据是否分牌选择不同的逻辑
@@ -373,14 +397,14 @@ class BlackjackView(discord.ui.View):
             self._update_button_states()
 
         # 更新显示
-        embed = self.game.get_game_state_embed(show_dealer_card=False)
+        embed = self.game.get_game_state_embed(show_dealer_card=False, locale=self.locale)
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="停牌 (Stand)", style=discord.ButtonStyle.success, emoji="✋")
+    @discord.ui.button(label="Stand", style=discord.ButtonStyle.success, emoji="✋", custom_id="stand_button")
     async def stand_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """停牌按钮"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 根据是否分牌选择不同的逻辑
@@ -401,23 +425,26 @@ class BlackjackView(discord.ui.View):
             self._update_button_states()
 
             # 更新显示，显示下一手牌
-            embed = self.game.get_game_state_embed(show_dealer_card=False)
-            embed.set_footer(text=f"正在处理手牌 {self.game.current_hand_index + 1}/{len(self.game.split_hands)}")
+            embed = self.game.get_game_state_embed(show_dealer_card=False, locale=self.locale)
+            embed.set_footer(text=t("blackjack.embed.split_progress", locale=self.locale).format(
+                current=self.game.current_hand_index + 1,
+                total=len(self.game.split_hands)
+            ))
             await interaction.response.edit_message(embed=embed, view=self)
         else:
             # 所有手牌处理完毕，进入庄家回合
             await self._dealer_turn(interaction)
 
-    @discord.ui.button(label="加倍 (Double)", style=discord.ButtonStyle.secondary, emoji="🎲", custom_id="double_down", row=1)
+    @discord.ui.button(label="Double", style=discord.ButtonStyle.secondary, emoji="🎲", custom_id="double_down", row=1)
     async def double_down_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """加倍下注按钮（支持DAS - Double After Split）"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 检查是否可以加倍
         if not self.game.can_double_down():
-            await interaction.response.send_message("❌ 当前无法加倍下注！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.cannot_double_down", locale=self.locale), ephemeral=True)
             return
 
         user_internal_id = get_user_internal_id_with_guild_and_discord_id(
@@ -430,7 +457,7 @@ class BlackjackView(discord.ui.View):
             # 分牌模式 - DAS规则
             current_hand = self.game.get_current_split_hand()
             if not current_hand:
-                await interaction.response.send_message("❌ 获取当前手牌失败！", ephemeral=True)
+                await interaction.response.send_message(t("blackjack.command.user_info_failed", locale=self.locale), ephemeral=True)
                 return
 
             additional_bet = current_hand["bet"]
@@ -438,7 +465,7 @@ class BlackjackView(discord.ui.View):
             # 检查积分是否足够
             if self.current_points < additional_bet:
                 await interaction.response.send_message(
-                    f"❌ 积分不足！加倍需要额外 {additional_bet} 积分。",
+                    t("blackjack.messages.insufficient_points_double", locale=self.locale).format(amount=additional_bet),
                     ephemeral=True
                 )
                 return
@@ -453,7 +480,7 @@ class BlackjackView(discord.ui.View):
                 )
             except Exception as e:
                 print(f"扣除加倍积分失败: {e}")
-                await interaction.response.send_message("❌ 扣除积分失败，请稍后重试。", ephemeral=True)
+                await interaction.response.send_message(t("blackjack.messages.deduct_points_failed", locale=self.locale), ephemeral=True)
                 return
 
             # 更新当前手牌状态
@@ -479,7 +506,7 @@ class BlackjackView(discord.ui.View):
             # 检查积分是否足够
             if self.current_points < self.game.bet_amount:
                 await interaction.response.send_message(
-                    f"❌ 积分不足！加倍需要额外 {self.game.bet_amount} 积分。",
+                    t("blackjack.messages.insufficient_points_double", locale=self.locale).format(amount=self.game.bet_amount),
                     ephemeral=True
                 )
                 return
@@ -494,7 +521,7 @@ class BlackjackView(discord.ui.View):
                 )
             except Exception as e:
                 print(f"扣除加倍积分失败: {e}")
-                await interaction.response.send_message("❌ 扣除积分失败，请稍后重试。", ephemeral=True)
+                await interaction.response.send_message(t("blackjack.messages.deduct_points_failed", locale=self.locale), ephemeral=True)
                 return
 
             # 更新游戏状态
@@ -513,22 +540,22 @@ class BlackjackView(discord.ui.View):
             # 加倍后自动停牌，进入庄家回合
             await self._dealer_turn(interaction)
 
-    @discord.ui.button(label="分牌 (Split)", style=discord.ButtonStyle.secondary, emoji="✂️", custom_id="split", row=1)
+    @discord.ui.button(label="Split", style=discord.ButtonStyle.secondary, emoji="✂️", custom_id="split", row=1)
     async def split_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """分牌按钮"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 检查是否可以分牌
         if not self.game.can_split():
-            await interaction.response.send_message("❌ 当前无法分牌！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.cannot_split", locale=self.locale), ephemeral=True)
             return
 
         # 检查积分是否足够（需要额外下注相同金额）
         if self.current_points < self.game.bet_amount:
             await interaction.response.send_message(
-                f"❌ 积分不足！分牌需要额外 {self.game.bet_amount} 积分。",
+                t("blackjack.messages.insufficient_points_split", locale=self.locale).format(amount=self.game.bet_amount),
                 ephemeral=True
             )
             return
@@ -548,7 +575,7 @@ class BlackjackView(discord.ui.View):
             )
         except Exception as e:
             print(f"扣除分牌积分失败: {e}")
-            await interaction.response.send_message("❌ 扣除积分失败，请稍后重试。", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.deduct_points_failed", locale=self.locale), ephemeral=True)
             return
 
         # 执行分牌
@@ -560,19 +587,19 @@ class BlackjackView(discord.ui.View):
         self._update_button_states()
 
         # 更新显示
-        embed = self.game.get_game_state_embed(show_dealer_card=False)
+        embed = self.game.get_game_state_embed(show_dealer_card=False, locale=self.locale)
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="保险 (Insurance)", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="insurance", row=2)
+    @discord.ui.button(label="Insurance", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="insurance", row=2)
     async def insurance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """保险按钮"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 检查是否可以购买保险
         if not self.game.can_buy_insurance():
-            await interaction.response.send_message("❌ 当前无法购买保险！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.cannot_buy_insurance", locale=self.locale), ephemeral=True)
             return
 
         # 计算保险费用（原下注金额的一半）
@@ -581,7 +608,7 @@ class BlackjackView(discord.ui.View):
         # 检查积分是否足够
         if self.current_points < insurance_cost:
             await interaction.response.send_message(
-                f"❌ 积分不足！购买保险需要 {insurance_cost} 积分。",
+                t("blackjack.messages.insufficient_points_insurance", locale=self.locale).format(amount=insurance_cost),
                 ephemeral=True
             )
             return
@@ -601,7 +628,7 @@ class BlackjackView(discord.ui.View):
             )
         except Exception as e:
             print(f"扣除保险费用失败: {e}")
-            await interaction.response.send_message("❌ 扣除积分失败，请稍后重试。", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.deduct_points_failed", locale=self.locale), ephemeral=True)
             return
 
         # 更新游戏状态
@@ -620,28 +647,28 @@ class BlackjackView(discord.ui.View):
                 user_internal_id,
                 insurance_payout
             )
-            result_msg = f"🛡️ **保险成功！**\n\n庄家是BlackJack，保险赔付 `{insurance_cost * 2}` 积分！"
+            result_msg = t("blackjack.messages.insurance_success", locale=self.locale).format(amount=insurance_cost * 2)
         else:
-            result_msg = f"🛡️ **已购买保险**\n\n保险费用: `{insurance_cost}` 积分"
+            result_msg = t("blackjack.messages.insurance_bought", locale=self.locale).format(cost=insurance_cost)
 
         # 更新按钮状态
         self._update_button_states()
 
         # 更新显示
-        embed = self.game.get_game_state_embed(show_dealer_card=False)
+        embed = self.game.get_game_state_embed(show_dealer_card=False, locale=self.locale)
         embed.set_footer(text=result_msg)
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="投降 (Surrender)", style=discord.ButtonStyle.danger, emoji="🏳️", custom_id="surrender", row=2)
+    @discord.ui.button(label="Surrender", style=discord.ButtonStyle.danger, emoji="🏳️", custom_id="surrender", row=2)
     async def surrender_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """投降按钮"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("这不是你的游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.not_your_game", locale=self.locale), ephemeral=True)
             return
 
         # 检查是否可以投降
         if not self.game.can_surrender():
-            await interaction.response.send_message("❌ 当前无法投降！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.messages.cannot_surrender", locale=self.locale), ephemeral=True)
             return
 
         # 标记为投降
@@ -669,12 +696,14 @@ class BlackjackView(discord.ui.View):
             item.disabled = True
 
         # 显示最终结果
-        embed = self.game.get_game_state_embed(show_dealer_card=True, game_over=True)
+        embed = self.game.get_game_state_embed(show_dealer_card=True, game_over=True, locale=self.locale)
         loss_amount = self.game.bet_amount - surrender_return
-        result_text = f"🏳️ **投降！**\n\n返还 `{surrender_return}` 积分\n损失 `{loss_amount}` 积分"
+        result_text = t("blackjack.messages.surrender_result", locale=self.locale).format(
+            return_amount=surrender_return, loss_amount=loss_amount
+        )
 
-        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**🎮 游戏结果**\n\n{result_text}"
-        embed.set_footer(text="游戏结束 | 感谢游玩")
+        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n{t('blackjack.results.game_result', locale=self.locale)}\n\n{result_text}"
+        embed.set_footer(text=t("blackjack.embed.game_over", locale=self.locale))
 
         # 保存游戏记录到数据库
         await self._save_game_record("surrender", surrender_return)
@@ -748,15 +777,15 @@ class BlackjackView(discord.ui.View):
             item.disabled = True
 
         # 显示庄家的牌
-        embed = self.game.get_game_state_embed(show_dealer_card=True)
-        embed.set_footer(text="庄家正在要牌...")
+        embed = self.game.get_game_state_embed(show_dealer_card=True, locale=self.locale)
+        embed.set_footer(text=t("blackjack.embed.dealer_turn", locale=self.locale))
         await interaction.response.edit_message(embed=embed, view=self)
 
         # 庄家自动要牌（小于17点必须要牌）
         await asyncio.sleep(1.5)
         while self.game.dealer_should_hit():
             self.game.hit(is_player=False)
-            embed = self.game.get_game_state_embed(show_dealer_card=True)
+            embed = self.game.get_game_state_embed(show_dealer_card=True, locale=self.locale)
             await interaction.edit_original_response(embed=embed, view=self)
             await asyncio.sleep(1.5)
 
@@ -771,7 +800,7 @@ class BlackjackView(discord.ui.View):
             item.disabled = True
 
         # 显示最终牌面
-        embed = self.game.get_game_state_embed(show_dealer_card=True, game_over=True)
+        embed = self.game.get_game_state_embed(show_dealer_card=True, game_over=True, locale=self.locale)
 
         # 检查 interaction 是否已经被响应
         already_responded = interaction.response.is_done()
@@ -786,7 +815,7 @@ class BlackjackView(discord.ui.View):
         if self.game.is_split:
             # 分牌模式：判断每手牌的输赢
             dealer_value = self._calculate_hand_value(self.game.dealer_hand)
-            result_text = "**📊 每手牌结果：**\n\n"
+            result_text = t("blackjack.results.split_results", locale=self.locale)
             total_points_change = 0
             wins = 0
             losses = 0
@@ -799,45 +828,47 @@ class BlackjackView(discord.ui.View):
 
                 # 判断每手牌的输赢
                 if player_value > 21:
-                    result = "💥 爆牌"
+                    result = t("blackjack.results.bust", locale=self.locale)
                     hand_result = "lose"
                     hand_points = 0
                     losses += 1
                 elif dealer_value > 21:
-                    result = "🎉 庄家爆牌"
+                    result = t("blackjack.results.dealer_bust", locale=self.locale)
                     hand_result = "win"
                     hand_points = bet * 2
                     wins += 1
                 elif player_value > dealer_value:
-                    result = "🎉 赢了"
+                    result = t("blackjack.results.win", locale=self.locale)
                     hand_result = "win"
                     hand_points = bet * 2
                     wins += 1
                 elif dealer_value > player_value:
-                    result = "😢 输了"
+                    result = t("blackjack.results.lose", locale=self.locale)
                     hand_result = "lose"
                     hand_points = 0
                     losses += 1
                 else:
-                    result = "🤝 平局"
+                    result = t("blackjack.results.tie", locale=self.locale)
                     hand_result = "tie"
                     hand_points = bet
                     ties += 1
 
                 total_points_change += hand_points
                 hand_str = self._format_hand(hand)
-                result_text += f"手牌 {i+1}: {hand_str} (`{player_value}`点)\n{result}\n\n"
+                result_text += t("blackjack.results.hand_result", locale=self.locale).format(
+                    index=i+1, cards=hand_str, value=player_value, result=result
+                )
 
             # 计算净盈亏（已扣除本金）
             net_profit = total_points_change - self.game.bet_amount
             if net_profit > 0:
-                profit_text = f"总计赢了 `{net_profit}` 积分 ✨"
+                profit_text = t("blackjack.results.total_profit", locale=self.locale).format(amount=net_profit)
             elif net_profit < 0:
-                profit_text = f"总计输了 `{abs(net_profit)}` 积分"
+                profit_text = t("blackjack.results.total_loss", locale=self.locale).format(amount=abs(net_profit))
             else:
-                profit_text = "总计打平"
+                profit_text = t("blackjack.results.total_tie", locale=self.locale)
 
-            result_text += f"━━━━━━━━━\n\n{profit_text}\n胜: {wins} | 负: {losses} | 平: {ties}"
+            result_text += f"━━━━━━━━━\n\n{profit_text}\n{t('blackjack.results.win_loss_record', locale=self.locale).format(wins=wins, losses=losses, ties=ties)}"
             points_change = total_points_change
 
         else:
@@ -845,25 +876,25 @@ class BlackjackView(discord.ui.View):
             # 积分结算逻辑（开始游戏时已经扣除了下注金额）
             if reason == "player_bust":
                 # 玩家爆牌，输掉（已经扣了下注金额，不需要额外操作）
-                result_text = f"💥 **爆牌了！**\n\n你输了 `{self.game.bet_amount}` 积分"
+                result_text = t("blackjack.results.player_bust", locale=self.locale).format(amount=self.game.bet_amount)
                 points_change = 0
             elif reason == "dealer_bust":
                 # 庄家爆牌，玩家赢（返还本金 + 奖励 = 2倍下注金额）
                 winnings = self.game.bet_amount * 2
-                result_text = f"🎉 **庄家爆牌！**\n\n你赢了 `{self.game.bet_amount}` 积分"
+                result_text = t("blackjack.results.dealer_bust_win", locale=self.locale).format(amount=self.game.bet_amount)
                 points_change = winnings
             elif winner == "player":
                 # 玩家赢（返还本金 + 奖励 = 2倍下注金额）
                 winnings = self.game.bet_amount * 2
-                result_text = f"🎉 **你赢了！**\n\n你赢了 `{self.game.bet_amount}` 积分"
+                result_text = t("blackjack.results.player_win", locale=self.locale).format(amount=self.game.bet_amount)
                 points_change = winnings
             elif winner == "dealer":
                 # 庄家赢，玩家输（已经扣了下注金额，不需要额外操作）
-                result_text = f"😢 **你输了！**\n\n你输了 `{self.game.bet_amount}` 积分"
+                result_text = t("blackjack.results.player_lose", locale=self.locale).format(amount=self.game.bet_amount)
                 points_change = 0
             else:  # tie
                 # 平局（返还本金）
-                result_text = f"🤝 **平局！**\n\n返还 `{self.game.bet_amount}` 积分"
+                result_text = t("blackjack.results.tie_result", locale=self.locale).format(amount=self.game.bet_amount)
                 points_change = self.game.bet_amount
 
         # 更新积分（注意：开始游戏时已经扣除了下注金额，这里是结算输赢）
@@ -878,8 +909,8 @@ class BlackjackView(discord.ui.View):
             print(f"更新积分失败: {e}")
 
         # 在描述中添加游戏结果
-        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**🎮 游戏结果**\n\n{result_text}"
-        embed.set_footer(text="游戏结束 | 感谢游玩")
+        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n{t('blackjack.results.game_result', locale=self.locale)}\n\n{result_text}"
+        embed.set_footer(text=t("blackjack.embed.game_over", locale=self.locale))
 
         # 确定游戏结果类型
         if self.game.is_split:
@@ -922,8 +953,8 @@ class BlackjackView(discord.ui.View):
 
 
 # 斜杠命令定义
-@app_commands.command(name="blackjack", description="🎰 二十一点游戏 - 和AI庄家对决")
-@app_commands.describe(bet="下注金额 (输入数字或 'all' 下注全部)")
+@app_commands.command(name="blackjack", description="Play blackjack against the AI dealer")
+@app_commands.describe(bet="Bet amount (enter number or 'all' to bet all)")
 @app_commands.guild_only()
 async def blackjack(interaction: discord.Interaction, bet: str):
     """
@@ -934,6 +965,9 @@ async def blackjack(interaction: discord.Interaction, bet: str):
         bet: 下注金额（可以是数字或 "all"）
     """
     supabase = get_connection()
+
+    # 获取服务器语言设置
+    locale = get_guild_locale(interaction.guild.id)
 
     # 获取用户内部ID
     user_internal_id = get_user_internal_id_with_guild_and_discord_id(interaction.guild.id, interaction.user.id)
@@ -954,44 +988,44 @@ async def blackjack(interaction: discord.Interaction, bet: str):
             user_internal_id = create_response.data[0]['id']
         except Exception as e:
             print(f"创建用户失败: {e}")
-            await interaction.response.send_message("❌ 获取用户信息失败，请稍后重试。", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.command.user_info_failed", locale=locale), ephemeral=True)
             return
 
     # 检查用户积分
     try:
         user_result = supabase.table('users').select('points').eq('id', user_internal_id).execute()
         if not user_result.data:
-            await interaction.response.send_message("❌ 获取用户信息失败！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.command.user_info_failed", locale=locale), ephemeral=True)
             return
 
         current_points = user_result.data[0]['points']
     except Exception as e:
         print(f"查询用户积分失败: {e}")
-        await interaction.response.send_message("❌ 查询积分失败，请稍后重试。", ephemeral=True)
+        await interaction.response.send_message(t("blackjack.command.user_info_failed", locale=locale), ephemeral=True)
         return
 
     # 处理下注金额
     if bet.lower() == "all":
         bet_amount = current_points
         if bet_amount < 1:
-            await interaction.response.send_message("❌ 你没有足够的积分开始游戏！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.command.insufficient_points", locale=locale), ephemeral=True)
             return
     else:
         # 尝试转换为整数
         try:
             bet_amount = int(bet)
         except ValueError:
-            await interaction.response.send_message("❌ 无效的下注金额！请输入数字或 'all'", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.command.invalid_bet_amount", locale=locale), ephemeral=True)
             return
 
         # 验证下注金额
         if bet_amount < 1:
-            await interaction.response.send_message("❌ 下注金额必须大于0！", ephemeral=True)
+            await interaction.response.send_message(t("blackjack.command.bet_must_be_positive", locale=locale), ephemeral=True)
             return
 
         if current_points < bet_amount:
             await interaction.response.send_message(
-                f"❌ 积分不足！你当前有 {current_points} 积分，需要 {bet_amount} 积分才能开始游戏。",
+                t("blackjack.command.not_enough_points", locale=locale).format(current=current_points, required=bet_amount),
                 ephemeral=True
             )
             return
@@ -1006,7 +1040,7 @@ async def blackjack(interaction: discord.Interaction, bet: str):
         )
     except Exception as e:
         print(f"扣除积分失败: {e}")
-        await interaction.response.send_message("❌ 下注失败，请稍后重试。", ephemeral=True)
+        await interaction.response.send_message(t("blackjack.command.deduct_bet_failed", locale=locale), ephemeral=True)
         return
 
     # 创建游戏实例
@@ -1016,23 +1050,23 @@ async def blackjack(interaction: discord.Interaction, bet: str):
     # 检查是否开局就是21点
     blackjack_check = game.check_blackjack()
     if blackjack_check:
-        embed = game.get_game_state_embed(show_dealer_card=True, game_over=True)
+        embed = game.get_game_state_embed(show_dealer_card=True, game_over=True, locale=locale)
 
         if blackjack_check == "player_blackjack":
             # 玩家BlackJack，赢1.5倍（返还本金 + 1.5倍奖励）
             total_return = int(bet_amount * 2.5)
             profit = int(bet_amount * 1.5)
-            result_text = f"🎰 **BlackJack!**\n\n你开局就是21点！\n\n你赢了 `{profit}` 积分"
+            result_text = t("blackjack.results.blackjack", locale=locale).format(profit=profit)
             # 保持红色主题
             points_change = total_return
         elif blackjack_check == "dealer_blackjack":
             # 庄家BlackJack，玩家输（已经扣了下注金额）
-            result_text = f"😢 **庄家BlackJack!**\n\n庄家开局就是21点！\n\n你输了 `{bet_amount}` 积分"
+            result_text = t("blackjack.results.dealer_blackjack", locale=locale).format(amount=bet_amount)
             # 保持红色主题
             points_change = 0
         else:  # tie
             # 平局（返还本金）
-            result_text = f"🤝 **双方BlackJack平局！**\n\n双方都是21点！\n\n返还 `{bet_amount}` 积分"
+            result_text = t("blackjack.results.both_blackjack", locale=locale).format(amount=bet_amount)
             # 保持红色主题
             points_change = bet_amount
 
@@ -1048,8 +1082,8 @@ async def blackjack(interaction: discord.Interaction, bet: str):
             print(f"更新积分失败: {e}")
 
         # 在描述中添加游戏结果
-        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**🎮 游戏结果**\n\n{result_text}"
-        embed.set_footer(text="游戏结束 | 感谢游玩")
+        embed.description += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n{t('blackjack.results.game_result', locale=locale)}\n\n{result_text}"
+        embed.set_footer(text=t("blackjack.embed.game_over", locale=locale))
 
         # 保存开局BlackJack的游戏记录
         try:
@@ -1101,12 +1135,10 @@ async def blackjack(interaction: discord.Interaction, bet: str):
     # 创建交互视图（传入剩余积分用于检查是否能加倍/分牌）
     remaining_points = current_points - bet_amount
     view = BlackjackView(game, interaction.user.id, interaction.guild.id, remaining_points)
-    embed = game.get_game_state_embed(show_dealer_card=False)
+    embed = game.get_game_state_embed(show_dealer_card=False, locale=locale)
     await interaction.response.send_message(embed=embed, view=view)
 
 
-@app_commands.command(name="blackjack_stats", description="📊 查看你的二十一点游戏统计数据")
-@app_commands.guild_only()
 async def blackjack_stats(interaction: discord.Interaction):
     """
     查看玩家的二十一点游戏统计信息
@@ -1116,6 +1148,9 @@ async def blackjack_stats(interaction: discord.Interaction):
     """
     supabase = get_connection()
 
+    # 获取服务器语言设置
+    locale = get_guild_locale(interaction.guild.id)
+
     # 获取用户内部ID
     user_internal_id = get_user_internal_id_with_guild_and_discord_id(
         interaction.guild.id,
@@ -1124,7 +1159,7 @@ async def blackjack_stats(interaction: discord.Interaction):
 
     if not user_internal_id:
         await interaction.response.send_message(
-            "❌ 找不到你的用户信息！请先玩一局二十一点游戏。",
+            t("blackjack.stats.no_user_found", locale=locale),
             ephemeral=True
         )
         return
@@ -1138,7 +1173,7 @@ async def blackjack_stats(interaction: discord.Interaction):
 
         if not games_result.data:
             await interaction.response.send_message(
-                "❌ 你还没有玩过二十一点游戏！使用 `/blackjack` 开始你的第一局游戏。",
+                t("blackjack.stats.no_games", locale=locale),
                 ephemeral=True
             )
             return
@@ -1176,21 +1211,21 @@ async def blackjack_stats(interaction: discord.Interaction):
 
         # 创建embed显示统计信息
         embed = discord.Embed(
-            title="📊 二十一点游戏统计",
-            description=f"**{interaction.user.display_name}** 的游戏数据",
+            title=t("blackjack.stats.title", locale=locale),
+            description=t("blackjack.stats.description", locale=locale).format(user=interaction.user.display_name),
             color=0xdc143c  # 红色
         )
 
         # 基本统计
         embed.add_field(
-            name="🎮 基本数据",
+            name=t("blackjack.stats.basic_stats", locale=locale),
             value=f"""
-**总局数:** `{total_games}` 局
-**胜场:** `{wins}` 场 ({win_rate:.1f}%)
-**败场:** `{losses}` 场 ({loss_rate:.1f}%)
-**平局:** `{ties}` 场 ({tie_rate:.1f}%)
-**投降:** `{surrenders}` 场
-**BlackJack:** `{blackjack_count}` 次 🎰
+{t("blackjack.stats.total_games", locale=locale).format(count=total_games)}
+{t("blackjack.stats.wins", locale=locale).format(count=wins, rate=win_rate)}
+{t("blackjack.stats.losses", locale=locale).format(count=losses, rate=loss_rate)}
+{t("blackjack.stats.ties", locale=locale).format(count=ties, rate=tie_rate)}
+{t("blackjack.stats.surrenders", locale=locale).format(count=surrenders)}
+{t("blackjack.stats.blackjack_count", locale=locale).format(count=blackjack_count)}
 """,
             inline=False
         )
@@ -1200,42 +1235,50 @@ async def blackjack_stats(interaction: discord.Interaction):
         profit_text = f"+{total_profit}" if total_profit >= 0 else str(total_profit)
 
         embed.add_field(
-            name="💰 积分统计",
+            name=t("blackjack.stats.points_stats", locale=locale),
             value=f"""
-**总盈亏:** `{profit_text}` 积分 {profit_emoji}
-**最大单局盈利:** `+{max_win}` 积分 ✨
-**最大单局亏损:** `{max_loss}` 积分 💸
-**平均下注:** `{avg_bet:.1f}` 积分
+{t("blackjack.stats.total_profit", locale=locale).format(amount=profit_text, emoji=profit_emoji)}
+{t("blackjack.stats.max_win", locale=locale).format(amount=max_win)}
+{t("blackjack.stats.max_loss", locale=locale).format(amount=max_loss)}
+{t("blackjack.stats.avg_bet", locale=locale).format(amount=avg_bet)}
 """,
             inline=False
         )
 
         # 高级操作统计
         embed.add_field(
-            name="🎲 高级操作",
+            name=t("blackjack.stats.advanced_stats", locale=locale),
             value=f"""
-**Double Down 次数:** `{double_count}` 次
-**Split 次数:** `{split_count}` 次
-**使用保险次数:** `{sum(1 for g in games if g.get('had_insurance', False))}` 次
+{t("blackjack.stats.double_down_count", locale=locale).format(count=double_count)}
+{t("blackjack.stats.split_count", locale=locale).format(count=split_count)}
+{t("blackjack.stats.insurance_count", locale=locale).format(count=sum(1 for g in games if g.get('had_insurance', False)))}
 """,
             inline=False
         )
 
         # 设置缩略图和底部信息
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        embed.set_footer(text="继续游戏并提升你的技巧！🎰")
+        embed.set_footer(text=t("blackjack.stats.footer", locale=locale))
 
         await interaction.response.send_message(embed=embed)
 
     except Exception as e:
         print(f"查询统计数据失败: {e}")
         await interaction.response.send_message(
-            "❌ 查询统计数据时发生错误，请稍后重试。",
+            t("blackjack.stats.query_failed", locale=locale),
             ephemeral=True
         )
 
 
+# 为 blackjack_stats 添加装饰器使其成为独立命令
+@app_commands.command(name="blackjack_stats", description="View your blackjack game statistics")
+@app_commands.guild_only()
+async def blackjack_stats_command(interaction: discord.Interaction):
+    """查看统计数据"""
+    await blackjack_stats(interaction)
+
 def setup(bot):
     """注册斜杠命令"""
+    # 注册独立的 /blackjack 和 /blackjack_stats 命令
     bot.tree.add_command(blackjack)
-    bot.tree.add_command(blackjack_stats)
+    bot.tree.add_command(blackjack_stats_command)

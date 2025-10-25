@@ -5,5 +5,6 @@
 
 from . import help as help_module
 from . import admin
+from . import language
 
-__all__ = ['help_module', 'admin']
+__all__ = ['help_module', 'admin', 'language']

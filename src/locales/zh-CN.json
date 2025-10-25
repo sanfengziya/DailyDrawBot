@@ -1,0 +1,1183 @@
+{
+  "common": {
+    "guild_only": "❌ 此机器人只能在服务器中使用",
+    "subscription_required": "❌ 此服务器未订阅或订阅已失效，无法使用机器人功能",
+    "unknown_error": "系统错误，请稍后再试！",
+    "system_error_title": "❌ 系统错误",
+    "unknown": "未知",
+    "egg_suffix": "蛋",
+    "points": "积分"
+  },
+  "language": {
+    "prompt_supported": "支持的语言: {codes}",
+    "updated": "✅ 服务器语言已更新为 **{language}**",
+    "unchanged": "ℹ️ 服务器语言已是 **{language}**",
+    "unsupported": "❌ 暂不支持的语言：{locale}",
+    "current": "当前服务器语言为 **{language}**",
+    "missing_permissions": "❌ 只有管理员可以修改服务器语言",
+    "guild_only": "❌ 仅可在服务器中设置语言"
+  },
+  "commands": {
+    "settings": {
+      "name": {
+        "zh-CN": "设置"
+      },
+      "description": {
+        "zh-CN": "配置服务器参数"
+      }
+    },
+    "language": {
+      "name": {
+        "zh-CN": "语言"
+      },
+      "description": {
+        "zh-CN": "设置服务器语言"
+      }
+    }
+  },
+  "subscription": {
+    "check_failed": "检查订阅状态失败：{error}"
+  },
+  "rewards": {
+    "small_gift": "小小心意",
+    "regular_reward": "普通奖励",
+    "nice_reward": "不错哦",
+    "good_luck": "运气不错",
+    "happy": "有点开心",
+    "rare": "较稀有",
+    "very_rare": "稀有奖励",
+    "legendary": "传说级运气",
+    "ultimate": "极低概率大奖",
+    "super": "超级大奖",
+    "devil": "恶魔奖励",
+    "lucky": "幸运之神奖",
+    "final": "终极大奖"
+  },
+  "admin": {
+    "rewardinfo": {
+      "title": "🎁 奖品信息",
+      "footer": "共 {count} 种奖励",
+      "line": "{emoji} **{points}分** - {message} ({probability}%)"
+    },
+    "testdraw": {
+      "title": "🎲 抽奖测试结果 ({times}次)",
+      "field_name": "{emoji} {points}分 ({message})",
+      "field_value": "实际: {count}次 ({percentage}%)\\n预期: {expected}%"
+    },
+    "subscription": {
+      "title": "📋 服务器订阅状态",
+      "server_id": "服务器ID",
+      "server_name": "服务器名称",
+      "status": "订阅状态",
+      "status_active": "✅ 已订阅",
+      "status_inactive": "❌ 未订阅",
+      "status_missing": "❌ 未找到订阅记录",
+      "note_title": "说明",
+      "note_missing": "此服务器未在订阅列表中",
+      "start": "订阅开始",
+      "end": "订阅结束",
+      "type": "订阅类型",
+      "auto_renew": "自动续费",
+      "auto_renew_yes": "是",
+      "auto_renew_no": "否",
+      "error": "❌ 检查订阅状态失败: {error}"
+    }
+  },
+  "economy": {
+    "common": {
+      "query_failed": "查询用户数据时出错：{error}",
+      "generic_error": "操作失败，请稍后重试。"
+    },
+    "check": {
+      "user_info_title": "❌ 用户信息",
+      "user_info_description": "{mention} 还没有参与过抽奖~",
+      "title": "💰 {display_name} 的积分信息",
+      "current_points_name": "当前积分",
+      "current_points_value": "**{points}** 分",
+      "free_draw_name": "今日抽奖",
+      "free_draw_incomplete": "❌ 未完成",
+      "free_draw_complete": "✅ 已完成",
+      "paid_draw_name": "付费抽奖",
+      "paid_draw_value": "**{used}/{limit}** 次\\n剩余: **{remaining}** 次"
+    },
+    "gift": {
+      "self_transfer": "❌ 你不能给自己赠送积分哦！",
+      "positive_only": "❌ 赠送的积分必须是正数！",
+      "sender_missing": "❌ 用户信息获取失败，请稍后重试。",
+      "insufficient": "❌ 你的积分不足！当前积分: {points}",
+      "confirm_title": "🎁 积分赠送确认",
+      "confirm_desc": "你确定要赠送 **{amount}** 积分给 {mention} 吗？\\n\\n发送 `Y` 继续，或任意其他内容取消。",
+      "cancelled": "❌ 已取消赠送。",
+      "timeout": "⏰ 确认超时，已取消赠送。",
+      "receiver_missing": "❌ 接收者信息获取失败，请稍后重试。",
+      "success_title": "✅ 积分赠送成功",
+      "success_desc": "{sender} 成功赠送了 **{amount}** 积分给 {receiver}！",
+      "failure": "积分赠送失败，请稍后重试。"
+    },
+    "give": {
+      "user_missing": "用户信息获取失败，请稍后重试。",
+      "success": "{staff} 已给予 {member} {amount} 分。",
+      "failure": "给予积分失败，请稍后重试。"
+    },
+    "set": {
+      "user_missing": "用户信息获取失败，请稍后重试。",
+      "success": "{staff} 已将 {member} 的分数设为 {points} 分。",
+      "failure": "设置积分失败，请稍后重试。"
+    },
+    "draw": {
+      "validation": {
+        "count_positive": "❌ 抽奖次数必须大于0",
+        "count_max": "❌ 单次最多只能抽50次",
+        "complete_free_first": "❌ 请先完成今天的免费抽奖，然后才能使用多次抽奖功能"
+      },
+      "free_start": "🎉 {mention} 开始今天的抽奖吧！",
+      "paid_limit": {
+        "title": "❌ 付费抽奖次数不足",
+        "description": "你今日已付费抽奖 **{used}** 次\\n剩余付费抽奖次数: **{remaining}** 次\\n你要求抽奖 **{requested}** 次\\n\\n请减少抽奖次数或明天再来！"
+      },
+      "insufficient": {
+        "title": "❌ 积分不足",
+        "description": "抽奖 **{count}** 次需要 **{cost}** 积分\\n当前积分: **{points}**\\n还需要: **{missing}** 积分"
+      },
+      "confirm": {
+        "title": "🎰 付费抽奖确认",
+        "description": "抽奖次数: **{count}** 次\\n消耗积分: **{cost}**\\n当前积分: **{points}**\\n今日已付费抽奖: **{used}** 次\\n剩余付费抽奖次数: **{remaining}** 次\\n\\n发送 `Y` 确认抽奖"
+      },
+      "cancel_timeout": "⏰ 已取消抽奖。",
+      "cancel_manual": "❌ 已取消抽奖。",
+      "limit_hit": "❌ 第 {index} 次抽奖失败：已达到每日付费抽奖上限",
+      "deduct_error": "第 {index} 次抽奖扣除积分时出错：{error}",
+      "update_error": "第 {index} 次抽奖更新积分时出错：{error}",
+      "persist_error": "更新用户数据时出错：{error}",
+      "single": {
+        "title": "{emoji} 抽奖结果",
+        "description": "**{message}**\\n获得 **{points}** 分！",
+        "ultimate": "\\n\\n🏆 **恭喜你抽中了终极大奖！** 🏆",
+        "lucky": "\\n\\n🎉 **恭喜你抽中了幸运之神奖！** 🎉",
+        "devil": "\\n\\n😈 **哇！你抽中了恶魔奖励！** 😈",
+        "super": "\\n\\n🔥 **太棒了！你抽中了超级大奖！** 🔥",
+        "rare": "\\n\\n⭐ **哇！你抽中了稀有奖励！** ⭐"
+      },
+      "multi": {
+        "title": "🎰 {count}连抽结果",
+        "line": "{entry} x{count} ({points_label})",
+        "line_points_label": "每个{points}分",
+        "summary": "\\n\\n**总计获得: {total} 分**",
+        "best_reward": "\\n\\n🎉 **最高奖励: {emoji} {message} ({points}分)**"
+      }
+    }
+  },
+  "egg": {
+    "command": {
+      "choices": {
+        "draw": "抽蛋",
+        "list": "查看列表",
+        "hatch": "孵化",
+        "claim": "领取"
+      }
+    },
+    "rarity_names": {
+      "C": "普通",
+      "R": "稀有",
+      "SR": "史诗",
+      "SSR": "传说"
+    },
+    "probability_display": "**蛋稀有度概率：**\n",
+    "from_egg": "来自 ({rarity}蛋)",
+    "rarity_display": {
+      "SSR": "💛 传说蛋",
+      "SR": "💜 史诗蛋",
+      "R": "💙 稀有蛋",
+      "C": "🤍 普通蛋"
+    },
+    "pity": {
+      "progress_title": "保底进度",
+      "warning_legendary_soon": " ⚠️ 还有 **{remaining_draws}** 抽必出传说蛋！",
+      "distance_to_pity": " 📊 距离保底还有 {remaining_draws} 抽"
+    },
+    "ui": {
+      "draw_interface": {
+        "title": "🎰 抽蛋界面",
+        "points_info": "你当前有 **{points}** 积分\\n\\n**单抽：** {single_cost} 积分\\n**十连：** {ten_cost} 积分（9折优惠！）\\n\\n"
+      },
+      "buttons": {
+        "single_draw": "单抽 (250积分)",
+        "ten_draw": "十连 (2250积分)"
+      },
+      "placeholders": {
+        "select_egg": "选择要孵化的蛋..."
+      },
+      "description": {
+        "got": "获得时间: {time}"
+      }
+    },
+    "hatch": {
+      "already_hatching": {
+        "title": "🚫 无法开始新的孵化",
+        "description": "你已经有一颗蛋正在孵化中！\\n\\n{emoji} **{rarity_name}蛋**\\n状态：{status_text}\\n\\n{action_text}"
+      },
+      "no_eggs_available": "你没有可以孵化的蛋！先去抽一些蛋吧！",
+      "select_egg": {
+        "title": "🐣 选择要孵化的蛋",
+        "description": "你有 {count} 个待孵化的蛋，请选择一个开始孵化："
+      },
+      "start": {
+        "title": "🐣 开始孵化！",
+        "description": "**{user}** 的 **{rarity_name}蛋** 开始孵化了！\\n\\n⏰ 孵化时间：{hours} 小时\\n\\n请耐心等待，到时间后使用 `/egg claim` 来领取你的宠物！",
+        "confirmation": "✅ 孵化开始！"
+      }
+    },
+    "claim": {
+      "no_ready_pets": "没有可以领取的宠物！请先孵化一些蛋，或者等待孵化完成。",
+      "success": {
+        "title": "🎉 宠物领取成功！",
+        "description": "恭喜 {user} 获得了以下宠物：\\n\\n{result_text}\\n总共领取了 **{count}** 只宠物！"
+      },
+      "pity_triggered": {
+        "legendary": "\\n\\n🎯 **恭喜！触发传说蛋保底，获得SSR宠物！**"
+      },
+      "pity_status": {
+        "legendary": "\\n\\n**传说蛋保底进度：** {counter}/1",
+        "legendary_next": " ⚠️ 下次开传说蛋必出SSR！"
+      }
+    },
+    "inventory": {
+      "title": "📋 我的蛋库存",
+      "no_eggs": "你还没有任何蛋！\\n使用 `/egg draw` 来抽取你的第一个蛋吧！",
+      "ready_pets_notification": "🎉 **你有 {count} 只宠物可以领取！**\\n使用 `/egg claim` 来领取它们！\\n\\n",
+      "sections": {
+        "hatching": "**🔥 孵化中：**\\n",
+        "inventory": "**📦 库存中：**\\n"
+      },
+      "status": {
+        "ready": "✅ 可领取",
+        "completed": "✅ 已完成，可以领取！",
+        "action_claim": "使用 `/egg claim` 来领取你的宠物！",
+        "waiting": "请耐心等待孵化完成！",
+        "incubating": "⏰ 正在孵化中",
+        "time_remaining": "⏰ 还需要 {time}",
+        "time_format_hours": "{hours}小时{minutes}分钟",
+        "time_format_minutes": "{minutes}分钟"
+      }
+    },
+    "forge": {
+      "no_available_crafts": "**❌ 暂无可进行的合成**\\n需要更多碎片才能进行合成！",
+      "no_fragments": "**❌ 没有碎片**\\n分解宠物可以获得碎片！"
+    },
+    "errors": {
+      "user_not_found": "用户数据不存在",
+      "insufficient_points": "积分不足！需要 {cost} 积分，你只有 {points} 积分。",
+      "egg_not_found": "蛋不存在！",
+      "not_your_interface": "你无法使用别人的抽蛋界面！",
+      "draw_function_unavailable": "抽蛋功能暂时不可用，请稍后再试。",
+      "hatch_function_unavailable": "孵化蛋功能暂时不可用，请稍后再试。",
+      "query_eggs_failed": "查询蛋列表失败，请稍后再试。",
+      "query_completed_eggs_failed": "查询孵化完成的蛋失败，请稍后再试。",
+      "claim_pet_failed": "领取宠物失败，请稍后再试。",
+      "draw_error": "抽蛋时出错：{error}",
+      "start_hatch_error": "开始孵化时出错：{error}",
+      "query_list_error": "查询蛋列表时出错：{error}"
+    },
+    "drawing": {
+      "in_progress": "🎰 正在抽蛋中...",
+      "pity_triggered_legendary": "\\n\\n🎯 **恭喜！触发50抽保底，获得传说蛋！**",
+      "pity_progress": "\\n**保底进度：** {current}/50 (距离保底还有 {remaining} 抽)",
+      "result": {
+        "title": "🎉 抽蛋结果 - {count}抽",
+        "completed": "✅ 抽蛋完成！",
+        "obtained": "获得",
+        "cost": "消耗"
+      }
+    }
+  },
+  "pet": {
+    "rarity_descriptions": {
+      "C": "普通宠物",
+      "R": "稀有宠物",
+      "SR": "史诗宠物",
+      "SSR": "传说宠物"
+    },
+    "stars": {
+      "no_stars": "无星"
+    },
+    "flavor_descriptions": {
+      "SWEET": "🍯 甜味",
+      "SALTY": "🧂 咸味",
+      "SOUR": "🍋 酸味",
+      "SPICY": "🌶️ 辣味",
+      "UMAMI": "🍄 鲜味"
+    },
+    "no_preference": "无偏好",
+    "none": "无",
+    "info_labels": {
+      "pet_id": "宠物ID",
+      "rarity": "稀有度",
+      "stars": "星级",
+      "level": "等级",
+      "experience": "经验",
+      "satiety": "饱食度",
+      "favorite": "喜欢",
+      "dislike": "讨厌",
+      "total_experience": "总经验",
+      "acquisition_date": "获得时间"
+    },
+    "flavor_descriptions": {
+      "SWEET": "🍯 甜味",
+      "SALTY": "🧂 咸味",
+      "SOUR": "🍋 酸味",
+      "SPICY": "🌶️ 辣味",
+      "UMAMI": "🍄 鲜味",
+      "no_preference": "无偏好",
+      "none": "无"
+    },
+    "upgrade_cost": {
+      "title": "升星费用：",
+      "format": "{count} 个 {rarity} 碎片 + {points} 积分"
+    },
+    "upgrade": {
+      "success": {
+        "title": "🌟 升星成功！",
+        "description": "{user} 你的 **{pet_name}** 成功升星！\n星级：{stars} ({current}/{max})\n消耗：{fragments} 个 {rarity} 碎片 + {points} 积分"
+      },
+      "errors": {
+        "pet_not_found": {
+          "title": "❌ 错误",
+          "description": "{user} 找不到这只宠物或者它不属于你！"
+        },
+        "template_not_found": {
+          "title": "❌ 错误",
+          "description": "宠物模板不存在！"
+        },
+        "rarity_config_not_found": {
+          "title": "❌ 错误",
+          "description": "稀有度配置不存在！"
+        },
+        "max_stars_reached": {
+          "title": "⭐ 已满星",
+          "description": "{user} 你的 {pet_name} 已经达到最大星级了！"
+        },
+        "cannot_get_resources": {
+          "title": "❌ 错误",
+          "description": "{user} 无法获取你的资源信息！"
+        },
+        "insufficient_points": {
+          "title": "💰 积分不足",
+          "description": "{user} 升星需要 {required_points} 积分，你只有 {points} 积分！"
+        },
+        "insufficient_fragments": {
+          "title": "🧩 碎片不足",
+          "description": "{user} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！"
+        },
+        "system_error": {
+          "title": "❌ 错误",
+          "description": "升星宠物时出错：{error}"
+        }
+      }
+    },
+    "action_names": {
+      "info": "查看宠物详情",
+      "upgrade": "升星宠物",
+      "dismantle": "分解宠物",
+      "equip": "装备宠物",
+      "feed": "喂食宠物"
+    },
+    "command": {
+      "choices": {
+        "list": "查看列表",
+        "info": "查看详情",
+        "upgrade": "升星",
+        "dismantle": "分解",
+        "fragments": "查看碎片",
+        "equip": "装备",
+        "unequip": "卸下",
+        "status": "装备状态",
+        "claim": "领取积分",
+        "feed": "喂食"
+      }
+    },
+    "select_pet": {
+      "description": "请从下方选择要操作的宠物："
+    },
+    "ui": {
+      "title": "宠物详情",
+      "list_title": "宠物查询",
+      "possessive": "的宠物",
+      "total_pets": "总共",
+      "pets_count": "只宠物",
+      "placeholders": {
+        "select_info": "选择要查看详情的宠物...",
+        "select_upgrade": "选择要升星的宠物...",
+        "select_dismantle": "选择要分解的宠物...",
+        "select_equip": "选择要装备的宠物...",
+        "select_feed": "选择要喂食的宠物...",
+        "select_food": "选择要投喂的食粮..."
+      },
+      "buttons": {
+        "confirm_dismantle": "确认分解",
+        "cancel": "取消",
+        "confirm": "确认",
+        "ok": "确定"
+      },
+      "actions": {
+        "info": "查看详情",
+        "upgrade": "升级",
+        "dismantle": "分解",
+        "equip": "装备",
+        "feed": "喂食",
+        "operate": "操作"
+      }
+    },
+    "errors": {
+      "user_not_found": {
+        "title": "❌ 错误",
+        "message": "用户不存在，请先使用抽卡功能注册！"
+      },
+      "user_not_found_check": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_info": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_upgrade": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_dismantle": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_fragments": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_equip": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_unequip": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_status": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_claim": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_not_found_feed": "❌ 错误\\n用户不存在，请先使用抽卡功能注册！",
+      "user_data_malformed": "❌ 错误\\n用户信息异常！",
+      "user_data_malformed_claim": "❌ 错误\\n用户数据异常！",
+      "no_pets": {
+        "title": "❌ 没有宠物",
+        "message": "你还没有任何宠物！使用 `/egg claim` 来领取宠物吧！"
+      },
+      "pet_not_found_or_unauthorized": "❌ 错误\\n{user} 找不到这只宠物或者它不属于你！",
+      "template_not_found": "❌ 错误\\n宠物模板不存在！",
+      "rarity_config_not_found": "❌ 错误\\n稀有度配置不存在！",
+      "cannot_get_resources": "❌ 错误\\n{user} 无法获取你的资源信息！",
+      "max_stars_reached": {
+        "title": "⭐ 已满星",
+        "message": "{user} 你的 {pet_name} 已经达到最大星级了！"
+      },
+      "insufficient_points": {
+        "title": "💰 积分不足",
+        "message": "{user} 升星需要 {required_points} 积分，你只有 {points} 积分！"
+      },
+      "insufficient_fragments": {
+        "title": "🧩 碎片不足",
+        "message": "{user} 升星需要 {required_fragments} 个 {rarity} 碎片，你只有 {fragments} 个！"
+      },
+      "cannot_dismantle_equipped": {
+        "title": "❌ 错误",
+        "message": "{user} 不能分解正在装备的宠物！请先卸下宠物再进行分解。"
+      },
+      "user_data_error": "用户信息异常！",
+      "pet_not_found_dismantle": "❌ 错误\\n{user} 找不到这只宠物或者它不属于你！",
+      "pet_template_not_found_dismantle": "❌ 错误\\n宠物模板不存在！",
+      "pet_not_or_deleted": "❌ 错误\\n{user} 宠物不存在或已被分解！",
+      "dismantle_failed": "❌ 错误\\n{user} 分解宠物时出错了！",
+      "pet_not_found_equip": "❌ 错误\\n{user} 找不到这只宠物或者它不属于你！",
+      "pet_template_not_found_equip": "❌ 错误\\n宠物模板不存在！",
+      "already_equipped": {
+        "title": "⚠️ 已装备",
+        "message": "{user} 你已经装备了 **{pet_name}**！"
+      },
+      "equip_failed": "❌ 错误\\n{user} 装备宠物时出错了！",
+      "equipped_pet_info_malformed": "❌ 错误\\n{user} 装备的宠物信息异常！",
+      "no_equipped_pet": {
+        "title": "❌ 没有装备宠物",
+        "message": "{user} 你当前没有装备任何宠物！"
+      },
+      "unequip_failed": "❌ 错误\\n{user} 卸下宠物时出错了！",
+      "equipped_pet_not_found": "❌ 宠物不存在\\n{user} 装备的宠物不存在！",
+      "pet_template_not_found_status": "❌ 错误\\n宠物模板不存在！",
+      "pet_not_found_or_unauthorized_feed": "❌ 错误\\n宠物不存在或不属于你！",
+      "pet_not_owned": "❌ 错误\\n这只宠物不属于你！",
+      "feed_failed": "❌ 错误\\n{user} 喂食宠物时出错了！",
+      "not_your_interface": "这不是你的宠物管理界面！"
+    },
+    "list": {
+      "title": "🐾 我的宠物",
+      "no_pets": "{user} 你还没有任何宠物呢！快去抽蛋孵化吧！",
+      "query_error": "{user} 查询宠物列表时出错：{error}",
+      "star_display_none": "无星",
+      "star_label": "星级",
+      "query": {
+        "title": "宠物查询"
+      },
+      "footer": {
+        "total_pets": "总共 {total} 只宠物"
+      }
+    },
+    "info": {
+      "title": "🐾 宠物详情",
+      "query_error": "{user} 查询宠物信息时出错：{error}",
+      "star_display_none": "无星",
+      "flavor_fallback_none": "无",
+      "flavor_fallback_no_preference": "无偏好",
+      "possessive_suffix": " 的",
+      "fields": {
+        "id": "宠物ID：",
+        "rarity": "稀有度：",
+        "stars": "星级：",
+        "level": "等级：",
+        "experience": "经验：",
+        "satiety": "饱食度：",
+        "favorite": "喜欢：",
+        "dislike": "讨厌：",
+        "total_experience": "总经验：",
+        "obtained_date": "获得时间："
+      },
+      "no_stars": "无星",
+      "upgrade_cost": "**升星费用：**\\n{fragments} 个 {rarity} 碎片 + {points} 积分",
+      "max_stars_reached": "**已达到最大星级！**"
+    },
+    "dismantle": {
+      "query_error": "{user} 查询宠物信息时出错了！",
+      "confirm": {
+        "title": "⚠️ 确认分解",
+        "description": "{user} 你确定要分解 **{pet_name}** 吗？\\n\\n",
+        "benefits": "**分解收益：**\\n",
+        "benefits_fragments": "🧩 {fragments} 个 {rarity} 碎片\\n",
+        "benefits_points": "💰 {points} 积分\\n\\n",
+        "warning": "**注意：分解后无法恢复！**",
+        "processing": "✅ 分解确认..."
+      },
+      "success": {
+        "title": "💥 分解成功",
+        "description": "{user} 你的 **{pet_name}** 已被分解！\\n\\n**获得：**\\n🧩 {fragments} 个 {rarity} 碎片\\n💰 {points} 积分"
+      },
+      "cancelled": {
+        "title": "✅ 已取消",
+        "message": "{user} 分解操作已取消。"
+      },
+      "error_deleting": "{user} 宠物不存在或已被分解！",
+      "error_executing": "{user} 分解宠物时出错了！"
+    },
+    "equip": {
+      "pet_not_found": {
+        "title": "❌ 错误",
+        "message": "{user} 找不到这只宠物或者它不属于你！"
+      },
+      "query_error": "{user} 装备宠物时出错了！",
+      "claim_pending_points": {
+        "title": "⚠️ 请先领取积分",
+        "description": "{user} 你有 **{points}** 点待领取的宠物积分！\\n\\n请先使用 `/pet claim` 领取积分，然后再更换宠物。"
+      },
+      "success": {
+        "title": "🎒 装备成功！",
+        "description": "{user} 成功装备了 **{pet_name}**！\\n\\n{rarity_color} **稀有度：** {rarity}\\n{stars} **星级：** {star_count}\\n💰 **每小时积分：** {hourly_points}\\n\\n你的宠物现在会自动为你获取积分！"
+      }
+    },
+    "unequip": {
+      "query_error": "{user} 卸下宠物时出错了！",
+      "user_data_error": "用户信息异常！",
+      "claim_pending_points": {
+        "title": "⚠️ 请先领取积分",
+        "description": "{user} 你有 **{points}** 点待领取的宠物积分！\\n\\n请先使用 `/pet claim` 领取积分，然后再卸下宠物。"
+      },
+      "success": {
+        "title": "📤 卸下成功！",
+        "description": "{user} 成功卸下了 **{pet_name}**！\\n\\n你可以装备其他宠物来继续获取积分。"
+      }
+    },
+    "status": {
+      "query_error": "{user} 查看装备状态时发生错误！",
+      "user_data_error": "用户数据异常！",
+      "pet_not_found": {
+        "title": "❌ 宠物不存在",
+        "message": "{user} 装备的宠物不存在！"
+      },
+      "no_pet_equipped": {
+        "title": "👀 装备状态",
+        "description": "{user} 你当前没有装备任何宠物！\\n\\n💰 **当前积分：** {points}\\n\\n使用 `/pet equip` 来装备一只宠物开始获取积分吧！"
+      },
+      "title": "👀 装备状态",
+      "equipment_info": "{user} 的宠物装备状态：\\n\\n🐾 **装备宠物：** {pet_name}\\n{rarity_color} **稀有度：** {rarity}\\n{stars} **星级：** {star_count}\\n🔢 **等级：** {level}\\n💰 **每小时积分：** {hourly_points}\\n⏰ **待领取积分：** {pending_points}\\n💎 **当前总积分：** {points}\\n\\n💡 使用 `/pet claim` 来领取你的宠物积分！"
+    },
+    "claim": {
+      "query_error": "{user} 领取积分时发生错误！",
+      "user_data_error": "用户数据异常！",
+      "debug_error": "领取积分时发生错误：{error}",
+      "no_equipped_pet": {
+        "title": "❌ 没有装备宠物",
+        "description": "{user} 你当前没有装备任何宠物！\\n\\n💰 **当前积分：** {points}\\n\\n使用 `/pet equip` 来装备一只宠物开始获取积分吧！"
+      },
+      "no_points_to_claim": {
+        "title": "💰 没有可领取的积分",
+        "description": "{user} 当前没有可领取的积分！\\n\\n🐾 **装备宠物：** {pet_name}\\n{rarity_color} **稀有度：** {rarity}\\n{stars} **星级：** {star_count}\\n💎 **当前积分：** {points}\\n\\n💡 宠物会随着时间自动累积积分，请稍后再来领取！"
+      },
+      "success": {
+        "title": "💰 积分领取成功！",
+        "description": "{user} 成功领取了宠物积分！\\n\\n🐾 **装备宠物：** {pet_name}\\n{rarity_color} **稀有度：** {rarity}\\n{stars} **星级：** {star_count}\\n✨ **领取积分：** +{points}\\n💎 **当前总积分：** {total}\\n\\n🎉 继续让你的宠物为你赚取更多积分吧！"
+      }
+    },
+    "feed": {
+      "title": "🍽️ 宠物喂食",
+      "pet_not_found": "宠物不存在或不属于你！",
+      "pet_not_owned_feed": "这只宠物不属于你！",
+      "preparing_food": "🍽️ 正在为你的宠物准备最优食粮...",
+      "already_full": "⚠️ **宠物已经吃饱了！**\\n请等待饱食度重置后再来喂食。",
+      "instructions": {
+        "title": "🍴 **选择食粮进行喂食：**\\n",
+        "match_bonus": "• 匹配口味偏好可获得额外经验\\n",
+        "dislike_penalty": "• 讨厌的口味会减少经验获得\\n",
+        "satiety_reset": "• 饱食度每日重置2次（美东时间0点和12点）"
+      },
+      "display": {
+        "level": "📊 **等级：** {level}\\n",
+        "experience": "✨ **经验：** {current}/{needed}\\n",
+        "experience_bar": "📈 {bar} {percent}%\\n\\n",
+        "satiety": "🍽️ **饱食度：** {satiety}/100\\n",
+        "satiety_bar": "📊 {bar} {satiety}%\\n\\n",
+        "favorite": "💖 **喜欢：** {flavor}\\n",
+        "dislike": "💔 **讨厌：** {flavor}\\n\\n",
+        "ate": "{user} 的 **{pet_name}** 吃了 **{food_name}**！\\n\\n"
+      },
+      "select_food": {
+        "placeholder": "选择要投喂的食粮...",
+        "stock_format": "库存:{quantity} | {xp}经验 | +5-8饱食度"
+      },
+      "no_food_stock": "没有食粮库存",
+      "go_shop_to_buy": "去杂货铺购买食粮吧！",
+      "execution_error": "喂食过程中发生错误！",
+      "execution_debug_error": "喂食执行错误: {error}",
+      "satiety_full_notice": "宠物已经吃饱了！饱食度会在美东时间0点和12点重置。",
+      "no_available_food": "❌ 没有可用的食粮！请先去杂货铺购买。",
+      "insufficient_food_stock": "❌ 食粮库存不足！",
+      "failure": {
+        "title": "❌ 喂食失败"
+      },
+      "success": {
+        "title": "🍴 喂食成功！",
+        "description": {
+          "xp_gained": "✨ **获得经验：** +{xp}\\n",
+          "flavor_match": "💖 **口味匹配：** 额外30%经验！\\n",
+          "dislike_penalty": "💔 **不喜欢：** 经验减少10%\\n",
+          "satiety_increase": "🍽️ **饱食度：** +{gained} → {new}/100\\n",
+          "level_up": "🎉 **恭喜！宠物升级了！**\\n",
+          "new_level": "🆙 **新等级：** {level}\\n"
+        }
+      },
+      "error": {
+        "title": "❌ 错误",
+        "message": "喂食过程中发生错误！"
+      }
+    },
+    "fragments": {
+      "title": "🧩 我的碎片",
+      "no_fragments": "{user} 你还没有任何碎片呢！分解宠物可以获得碎片！",
+      "display": "{color} **{rarity} 碎片：** {amount} 个\\n",
+      "description": "{user} 的碎片\\n {description}",
+      "query_error": "{user} 查询碎片库存时出错了！"
+    },
+    "auto_feed": {
+      "error": "❌ 错误\\n喂食过程中发生错误：{error}",
+      "pet_not_exist": "❌ 宠物不存在\\n指定的宠物不存在或不属于你！",
+      "no_equipped_pet": "❌ 没有装备宠物\\n你当前没有装备任何宠物！请先装备一只宠物。",
+      "command": {
+        "choices": {
+          "mode": {
+            "optimal_xp": "最优经验 - 选择经验效率最高的食粮",
+            "flavor_match": "口味匹配 - 优先匹配宠物偏好口味",
+            "economic": "节约模式 - 使用最便宜的可用食粮",
+            "clear_inventory": "清空库存 - 优先消耗数量多的食粮"
+          }
+        }
+      },
+      "mode_names": {
+        "optimal_xp": "🏆 最优经验",
+        "flavor_match": "💖 口味匹配",
+        "economic": "💰 节约模式",
+        "clear_inventory": "📦 清空库存"
+      },
+      "completed": {
+        "title": "🍽️ 一键喂食完成",
+        "description": "{user} 一键喂食完成！",
+        "statistics": {
+          "title": "📊 喂食统计：",
+          "mode": "• 喂食模式：{mode}",
+          "feed_count": "• 喂食次数：{count}次",
+          "xp_gained": "• 经验获得：+{xp} XP",
+          "satiety_change": "• 饱食度：{original} → {new}"
+        },
+        "used_food": {
+          "title": "🍯 使用的食粮：",
+          "flavor_matches": " (匹配偏好 +30% 经验 x{count})"
+        },
+        "level_up": {
+          "title": "🎉 恭喜升级！",
+          "description": "⭐ **等级变化：** Lv.{original} → Lv.{new}！"
+        },
+        "pet_status": {
+          "title": "🐾 宠物： **{name}**",
+          "level": "🆙 当前等级：** Lv.{level}**"
+        },
+        "satiety_full_notice": "💡 **提示：** 宠物已经吃饱了！饱食度会在美东时间0点和12点重置。"
+      }
+    }
+  },
+  "forge": {
+    "command": {
+      "description": "🔨 锻造台 - 合成宠物碎片",
+      "params": {
+        "action": "选择操作类型",
+        "from_rarity": "源稀有度（要消耗的碎片）",
+        "to_rarity": "目标稀有度（要获得的碎片）",
+        "quantity": "合成次数（默认1次）"
+      },
+      "choices": {
+        "action": {
+          "view": "查看",
+          "craft": "合成"
+        },
+        "from_rarity": {
+          "C": "普通 (C)",
+          "R": "稀有 (R)",
+          "SR": "史诗 (SR)"
+        },
+        "to_rarity": {
+          "R": "稀有 (R)",
+          "SR": "史诗 (SR)",
+          "SSR": "传说 (SSR)"
+        }
+      }
+    },
+    "rarity_mapping": {
+      "C": "普通",
+      "R": "稀有",
+      "SR": "史诗",
+      "SSR": "传说"
+    },
+    "actions": {
+      "view": "查看",
+      "craft": "合成"
+    },
+    "errors": {
+      "error_title": "❌ 错误",
+      "get_user_fragments_failed": "获取用户碎片库存失败: {error}",
+      "invalid_recipe": "无效的合成配方",
+      "insufficient_fragments": "碎片不足，需要 {required} 个 {rarity} 碎片",
+      "insufficient_points": "积分不足，需要 {required} 积分",
+      "user_data_not_found": "用户数据不存在",
+      "no_fragments_of_type": "没有 {rarity} 碎片",
+      "insufficient_fragments_detail": "碎片不足，需要 {required} 个，只有 {current} 个",
+      "insufficient_points_detail": "积分不足，需要 {required} 积分，只有 {current} 积分",
+      "execute_failed": "执行合成操作失败: {error}",
+      "synthesis_failed": "合成失败: {error}",
+      "invalid_action_type": "无效的操作类型！",
+      "user_not_registered": "用户不存在，请先使用抽卡功能注册！",
+      "cannot_get_user_data": "无法获取用户数据！",
+      "cannot_get_data_craft": "无法获取用户数据！",
+      "user_not_found_craft": "用户不存在，请先使用抽卡功能注册！",
+      "missing_rarity_params": "请指定源稀有度和目标稀有度！",
+      "invalid_quantity": "合成次数必须大于0！",
+      "invalid_crafting_path": "无效的合成路径！只能按照 C→R→SR→SSR 的顺序合成。",
+      "cannot_craft": {
+        "title": "❌ 无法合成"
+      },
+      "quantity_exceeded": {
+        "title": "❌ 数量超限",
+        "description": "最多只能合成 {max} 次，但你请求了 {requested} 次！"
+      },
+      "crafting_failed": "❌ 错误\\n合成过程中发生错误：{error}",
+      "forge_unavailable": "❌ 错误\\n锻造台暂时不可用，请稍后再试！"
+    },
+    "success": {
+      "message": "成功合成 {quantity} 个 {rarity} 碎片"
+    },
+    "view": {
+      "user_forge": {
+        "title": "{user} 的锻造台\\n\\n"
+      },
+      "fragments": {
+        "title": "**📦 碎片库存：**\\n",
+        "no_fragments": "**📦 碎片库存：** 无\\n"
+      },
+      "current_points": "\\n💰 **当前积分：** {points}\\n\\n",
+      "crafting_rules": {
+        "title": "**🔨 合成规则：**\\n",
+        "c_to_r": "• C碎片 → R碎片：10:1 + 50积分\\n",
+        "r_to_sr": "• R碎片 → SR碎片：5:1 + 80积分\\n",
+        "sr_to_ssr": "• SR碎片 → SSR碎片：3:1 + 100积分\\n\\n"
+      },
+      "usage": {
+        "title": "**📋 使用方法：**\\n",
+        "example_command": "`/forge action:合成碎片 from_rarity:C to_rarity:R quantity:1`\\n",
+        "example_description": "例如：将10个C碎片合成1个R碎片\\n\\n"
+      },
+      "available_crafts": {
+        "title": "**✅ 可进行的合成：**\\n"
+      },
+      "no_available_crafts": "**❌ 暂无可进行的合成**\\n需要更多碎片才能进行合成！",
+      "no_fragments_tip": "**❌ 没有碎片**\\n分解宠物可以获得碎片！",
+      "title": "🔨 锻造台"
+    },
+    "craft": {
+      "success": {
+        "title": "🎉 {user} 合成成功！\\n\\n",
+        "embed_title": "🔨 锻造成功",
+        "result": {
+          "title": "**合成结果：**\\n",
+          "description": "{from_color} {from_name}碎片 → {to_color} {to_name}碎片\\n\\n",
+          "consumed": "**消耗：**\\n",
+          "gained": "**获得：**\\n"
+        }
+      },
+      "failure": {
+        "title": "❌ 合成失败"
+      }
+    }
+  },
+  "debug": {
+    "shop": {
+      "add_role_failed": "添加身份组失败：{error}",
+      "get_role_list_failed": "获取身份组列表失败：{error}",
+      "add_item_failed": "添加商品失败：{error}"
+    },
+    "pet": {
+      "add_fragment_failed": "添加碎片时出错：{error}",
+      "setup_pet_select_failed": "设置宠物选择菜单时出错：{error}",
+      "feeding_failed": "喂食失败：{error}"
+    },
+    "leaderboard": {
+      "fetch_data_failed": "获取排行榜数据出错：{error}",
+      "generate_image_failed": "生成排行榜图片失败：{error}"
+    }
+  },
+  "help": {
+    "title": "🎰 Daily Draw Bot 帮助",
+    "description": "欢迎使用每日抽奖机器人！",
+    "sections": {
+      "system": {
+        "name": "ℹ️ 系统提示",
+        "value": "**斜杠命令:**\n`/help` - 显示帮助信息"
+      },
+      "draw": {
+        "name": "🎲 抽奖系统",
+        "value": "**传统指令:**\n`!draw <次数>` - 每日抽奖（免费1次，付费最多{max_paid_draws}次/天，每次{wheel_cost}积分）（次数不填默认为1次）\n`!check [用户]` - 查看积分和抽奖状态\n`!giftpoints <用户> <积分>` - 赠送积分给其他用户\n\n**抽奖规则:**\n- 🎉 **免费抽奖**：每天1次，完全免费\n- 🎰 **付费抽奖**：每天最多{max_paid_draws}次，每次消耗{wheel_cost}积分\n- ⏰ **重置时间**：每天0点自动重置抽奖次数\n- 💰 **奖励范围**：10-1000积分，平均回报率103.8%"
+      },
+      "egg": {
+        "name": "🥚 蛋系统",
+        "value": "**斜杠命令:**\n`/egg action:draw` - 抽取宠物蛋（单抽250积分，十连2250积分）\n`/egg action:list` - 查看拥有的蛋库存\n`/egg action:hatch` - 选择蛋进行孵化\n`/egg action:claim` - 领取已完成孵化的宠物"
+      },
+      "pet": {
+        "name": "🐾 宠物系统",
+        "value": "**斜杠命令:**\n`/pet action:list [页码]` - 查看宠物列表（分页显示）\n`/pet action:info` - 查看指定宠物详细信息\n`/pet action:upgrade` - 升级宠物星级（需要碎片和积分）\n`/pet action:dismantle` - 分解宠物获得碎片和积分\n`/pet action:fragments` - 查看拥有的宠物碎片库存\n`/pet action:equip` - 装备宠物开始自动获取积分\n`/pet action:unequip` - 卸下当前装备的宠物\n`/pet action:status` - 查看当前装备状态和待领取积分\n`/pet action:claim` - 领取宠物自动获得的积分\n`/pet action:feed` - 喂食宠物获得经验\n\n**自动喂食:**\n`/feed auto [pet] [mode] [quantity]` - 一键喂食宠物"
+      },
+      "shop": {
+        "name": "🏪 杂货铺系统",
+        "value": "**斜杠命令:**\n`/shop action:view menu` - 查看今日杂货铺商品\n`/shop action:buy item:<商品名> quantity:<数量>` - 购买指定食粮\n`/inventory item_type:food` - 查看食粮库存"
+      },
+      "forge": {
+        "name": "🔨 锻造系统",
+        "value": "**斜杠命令:**\n`/forge action:view` - 查看碎片库存和合成规则\n`/forge action:craft from_rarity:<源稀有度> to_rarity:<目标稀有度> quantity:<数量>` - 合成宠物碎片\n\n**合成规则:**\n- C碎片 → R碎片：10:1 + 50积分\n- R碎片 → SR碎片：5:1 + 80积分\n- SR碎片 → SSR碎片：3:1 + 100积分"
+      },
+      "roles": {
+        "name": "🏷️ 身份组系统",
+        "value": "**斜杠命令:**\n`/tag action:shop` - 查看身份组商店\n`/tag action:buy role_name:<身份组名>` - 购买指定身份组"
+      },
+      "quiz": {
+        "name": "🎮 答题系统",
+        "value": "**传统指令:**\n`!quizlist [语言]` - 查看题库类别\n  • `!quizlist` 或 `!quizlist all` - 显示所有语言\n  • `!quizlist chinese` - 只显示中文题库\n  • `!quizlist english` - 只显示英文题库\n\n**提示:**\n- 答对每题可获得20积分\n- 等待管理员开启答题！"
+      },
+      "blackjack": {
+        "name": "🎰 二十一点游戏",
+        "value": "**斜杠命令:**\n`/blackjack play <bet>` - 开始二十一点游戏\n  • `bet`: 下注金额（数字或 `all`）\n  • 示例：`/blackjack play 100` 或 `/blackjack play all`\n`/blackjack stats` - 查看游戏统计数据\n\n**游戏功能:**\n- 🎴✋ **基础操作**：要牌、停牌\n- 🎲 **加倍下注**：首次发牌后加倍（Double Down）\n- ✂️ **分牌**：对子可以分成两手牌（Split）\n- 🎲✂️ **DAS规则**：分牌后可以加倍（降低庄家优势0.14%）\n- 🛡️ **保险**：庄家明牌A时可购买保险\n- 🏳️ **投降**：手牌极差时止损\n\n**特色:**\n- ✅ 标准赌场规则（庄家17点停牌）\n- ✅ BlackJack特殊奖励（2.5倍赔率）\n- ✅ 完整游戏记录和统计"
+      },
+      "leaderboard": {
+        "name": "🏆 排行榜系统",
+        "value": "**斜杠命令:**\n`/leaderboard [type]` - 查看服务器排行榜（显示前10名）\n\n**排行榜类型:**\n- `points` - 积分排行榜（默认）\n- `pets` - 宠物数量排行榜\n- `hatched eggs` - 已孵化蛋数量排行榜\n- `blackjack wins` - 21点胜场排行榜\n\n**示例:**\n• `/leaderboard` - 查看积分排行榜\n• `/leaderboard type:pets` - 查看宠物排行榜\n• `/leaderboard type:hatched eggs` - 查看已孵化蛋排行榜\n• `/leaderboard type:blackjack wins` - 查看21点胜场排行榜"
+      },
+      "admin": {
+        "name": "⚙️ 管理员命令",
+        "value": "**系统管理:**\n`/language` - 设置服务器语言\n`!rewardinfo` - 显示奖品概率信息\n`!checksubscription` - 检查服务器订阅状态\n\n**身份组管理:**\n`!addtag <价格> <身份组>` - 添加可购买身份组\n`!removetag <身份组>` - 删除身份组商店中的身份组\n`!updatetagprice <身份组> <新价格>` - 更新身份组价格\n`!listtags` - 查看所有已添加的身份组\n\n**答题管理:**\n`!quiz \"<类别>\" <题目数>` - 开始答题游戏\n  • 支持完全匹配：`!quiz 动漫 5`\n  • 支持模糊匹配：`!quiz study 5` (匹配所有 study:xxx)\n  • 答对每题奖励20积分\n\n**积分管理:**\n`!givepoints <用户> <积分>` - 给予用户积分\n`!setpoints <用户> <积分>` - 设置用户积分"
+      }
+    },
+    "footer": "每日免费抽奖1次，付费抽奖最多{max_paid_draws}次/天，每次消耗{wheel_cost}积分"
+  },
+  "shop_module": {
+    "roles": {
+      "add": {
+        "success": "已添加身份组 `{role}`，价格为 {price} 分。",
+        "error": "添加身份组失败，请稍后重试。"
+      },
+      "list": {
+        "empty": "❌ 当前服务器还没有添加任何身份组。",
+        "title": "🏷️ 服务器身份组商店列表",
+        "description": "以下是当前服务器已添加的所有身份组：",
+        "price": "💰 价格: {price} 分",
+        "price_missing": "💰 价格: {price} 分 ⚠️ 身份组可能已被删除",
+        "error": "获取身份组列表失败，请稍后重试。"
+      },
+      "shop": {
+        "empty": "当前没有可购买的身份组。",
+        "title": "🏷️ 身份组商店",
+        "description": "以下是可购买的身份组：",
+        "price": "💰 {price} 分",
+        "footer": "使用 /tag action:buy role_name:身份组名称 来购买",
+        "error": "获取身份组列表失败，请稍后重试。"
+      },
+      "buy": {
+        "not_found": "未找到该身份组。",
+        "not_available": "该身份组不可购买。",
+        "user_missing": "用户信息获取失败，请稍后重试。",
+        "insufficient": "你的分数不足。",
+        "insufficient_detail": "❌ 你的积分不足！需要 {price} 分，当前只有 {current} 分。",
+        "confirm_prompt": "你确定要购买 `{role}` 吗？请在 10 秒内回复 `Y`。",
+        "confirm_embed_title": "🛒 购买确认",
+        "confirm_embed_desc": "你确定要购买 `{role}` 吗？\n\n💰 价格: {price} 分\n💳 你的积分: {current} 分\n📊 剩余积分: {remaining} 分",
+        "cancelled": "已取消购买。",
+        "timeout": "超时，已取消购买。",
+        "timeout_edit": "⏰ 购买超时已取消。",
+        "cancel_edit": "❌ 已取消购买。",
+        "not_request": "❌ 这不是你的购买请求！",
+        "button_confirm": "confirm",
+        "button_cancel": "cancel",
+        "success": "✅ 你已购买并获得 `{role}` 身份组。",
+        "success_embed_title": "✅ 购买成功",
+        "success_embed_desc": "你已成功购买并获得 `{role}` 身份组！",
+        "error": "购买身份组失败，请稍后重试。"
+      },
+      "remove": {
+        "success": "✅ 已从商店中移除身份组 `{role}`。",
+        "not_found": "❌ 未找到身份组 `{role}`，可能它不在商店中。",
+        "error": "删除身份组失败，请稍后重试。"
+      },
+      "update": {
+        "success": "✅ 已将身份组 `{role}` 的价格更新为 {price} 分。",
+        "not_found": "❌ 未找到身份组 `{role}`，请先使用 `!addtag` 添加。",
+        "error": "更新身份组价格失败，请稍后重试。"
+      },
+      "slash": {
+        "missing_name": "❌ 购买身份组时必须提供身份组名称！",
+        "action_description": "身份组商店相关操作",
+        "param_action": "选择操作",
+        "param_role": "身份组名称（购买时使用）",
+        "choice_shop": "商店",
+        "choice_buy": "购买"
+      },
+      "pagination": {
+        "unknown_role": "（未知角色）ID:{role_id}",
+        "description": "价格：{price} 分\\n\\n第 {index} / {total} 个",
+        "button_prev": "◀️ previous",
+        "button_next": "▶️ next",
+        "no_permission": "你无法控制这个分页！"
+      }
+    },
+    "items": {
+      "command": {
+        "description": "杂货铺操作",
+        "param_action": "操作类型",
+        "param_item": "要购买的食粮名称（仅购买时需要）",
+        "param_quantity": "购买数量（默认为1）",
+        "choice_menu": "查看菜单",
+        "choice_buy": "购买",
+        "invalid_action_title": "❌ 错误",
+        "invalid_action_desc": "无效的操作类型！"
+      },
+      "inventory_command": {
+        "description": "查看你的食粮库存",
+        "param_item_type": "查看的物品类型",
+        "choice_food": "食物"
+      },
+      "menu": {
+        "title": "🏪 杂货铺",
+        "header": "🎯 今日特选食粮 🎯\\n\\n💰 你的积分： {points}\\n🛒 今日已购买： {purchased}/{limit} 份",
+        "empty_notice": "\\n\\n📦 今日暂无商品，请明天再来！\\n\\n📝 购买说明\\n• 食粮用于喂养宠物获得经验\\n• 每人每日最多购买{limit}份食粮\\n营业时间：全天24小时 | 每日0点刷新商品",
+        "item_block": "\\n{rarity_icon} {name} {flavor_icon}\\n💫 稀有度：{rarity}\\n🏷️ 价格：{price} 积分\\n✨ 基础经验：{xp} (±{xp_flow})\\n",
+        "item_description": "📖 {description}\\n",
+        "tail": "\\n📝 购买说明\\n• 食粮用于喂养宠物获得经验\\n• 每人每日最多购买{limit}份食粮\\n\\n营业时间：全天24小时 | 每日0点刷新商品",
+        "footer": "💡 使用 /shop buy <商品名> <数量> 进行购买"
+      },
+      "errors": {
+        "title": "❌ 错误",
+        "user_missing": "用户不存在，请先使用抽卡功能注册！",
+        "require_item": "购买时必须指定商品名称！",
+        "quantity_positive": "购买数量必须大于0！",
+        "quantity_max": "单次购买数量不能超过99个！",
+        "unsupported_type": "❌ 目前只支持查看食粮库存！"
+      },
+      "not_found": {
+        "title": "❌ 商品不存在",
+        "description": "今日杂货铺没有名为 **{item}** 的商品！\\n请使用 `/shop menu` 查看可购买的商品。"
+      },
+      "purchase": {
+        "success_title": "✅ 购买成功",
+        "success_description": "{mention} 成功购买 {quantity} 个 {rarity_icon} **{name}** {flavor_icon}！\\n花费 {cost} 积分，剩余 {balance} 积分。\\n今日已购买 {purchased}/{limit} 份食粮。",
+        "failure_title": "❌ 购买失败"
+      },
+      "inventory": {
+        "title": "🎒 我的食粮库存",
+        "empty_description": "{mention} 你的食粮库存是空的！\\n\\n去杂货铺买点食粮来喂养宠物吧！",
+        "intro": "{mention} 的食粮库存：",
+        "entry_line": "\\n{rarity_icon} **{name}** {flavor_icon} × {quantity}",
+        "entry_stats": "\\n   ✨ 经验: +{xp}",
+        "entry_description": "\\n   📖 {description}",
+        "footer": "总计 {types} 种食粮，{total} 个"
+      },
+      "autocomplete": {
+        "entry": "{rarity_icon} {name} {flavor_icon} - {price}积分"
+      }
+    }
+  },
+  "quiz": {
+    "list": {
+      "invalid_language": "❌ 无效的语言参数！请使用：{options}",
+      "no_data": "暂无题库。",
+      "header": "📋 **题库类别**\\n",
+      "section_chinese": "🇨🇳 **中文题库：**\\n{categories}\\n",
+      "section_english": "🇺🇸 **英文题库：**\\n{categories}",
+      "none_for_language": "暂无 {language} 题库。",
+      "error": "获取题库类别失败，请稍后重试。",
+      "language_label": {
+        "all": "全部",
+        "chinese": "中文",
+        "english": "英文"
+      }
+    },
+    "match": {
+      "found": "✨ 找到匹配类别：{categories}",
+      "none": "❌ 没有找到类别 `{category}` 的题目。\\n💡 使用 `!quizlist` 查看所有可用类别。",
+      "error": "获取题目失败，请稍后重试。"
+    },
+    "game": {
+      "question": "**第 {index}/{total} 题:**\\n\\n**{question}**\\nA. {a}\\nB. {b}\\nC. {c}\\nD. {d}\\n🎮 游戏开始，你只有 60 秒的时间作答！",
+      "warning": "⏰ 仅剩下 10 秒！",
+      "correct": "✅ {mention} 答对了！正确答案是 {answer}，奖励 20 分",
+      "wrong": "❌ {mention} 答错了！你已经没有再答的机会啦",
+      "timeout": "⏰ 时间到，正确答案是 {answer}",
+      "end": "答题结束！"
+    }
+  },
+  "leaderboard": {
+    "command": {
+      "description": "查看服务器排行榜",
+      "param_type": "选择排行榜类型",
+      "choice_points": "积分排行榜",
+      "choice_pets": "宠物数量排行榜",
+      "choice_hatched": "孵化蛋排行榜",
+      "choice_blackjack": "二十一点胜场排行榜"
+    },
+    "status": {
+      "no_data_type": "当前服务器还没有{label}数据。",
+      "no_members": "当前服务器中没有符合条件的成员数据。",
+      "error": "查询排名数据时出错：{error}",
+      "fetch_error": "获取排行榜数据出错：{error}"
+    },
+    "types": {
+      "points": {
+        "title": "积分排行榜",
+        "label": "积分",
+        "format": "{value} 分"
+      },
+      "pets": {
+        "title": "宠物数量排行榜",
+        "label": "宠物数量",
+        "format": "{value} 只"
+      },
+      "hatched_eggs": {
+        "title": "孵化蛋排行榜",
+        "label": "孵化蛋",
+        "format": "{value} 枚"
+      },
+      "blackjack": {
+        "title": "二十一点胜场排行榜",
+        "label": "胜场",
+        "format": "{value} 胜"
+      }
+    }
+  },
+  "blackjack": {
+    "game_title": "🎰 二十一点游戏",
+    "buttons": {
+      "hit": "要牌",
+      "stand": "停牌",
+      "double_down": "加倍",
+      "split": "分牌",
+      "insurance": "保险",
+      "surrender": "投降"
+    },
+    "messages": {
+      "not_your_game": "这不是你的游戏！",
+      "cannot_double_down": "❌ 当前无法加倍下注！",
+      "cannot_split": "❌ 当前无法分牌！",
+      "cannot_buy_insurance": "❌ 当前无法购买保险！",
+      "cannot_surrender": "❌ 当前无法投降！",
+      "insufficient_points_double": "❌ 积分不足！加倍需要额外 {amount} 积分。",
+      "insufficient_points_split": "❌ 积分不足！分牌需要额外 {amount} 积分。",
+      "insufficient_points_insurance": "❌ 积分不足！购买保险需要 {amount} 积分。",
+      "deduct_points_failed": "❌ 扣除积分失败，请稍后重试。",
+      "insurance_success": "🛡️ **保险成功！**\n\n庄家是BlackJack，保险赔付 `{amount}` 积分！",
+      "insurance_bought": "🛡️ **已购买保险**\n\n保险费用: `{cost}` 积分",
+      "surrender_result": "🏳️ **投降！**\n\n返还 `{return_amount}` 积分\n损失 `{loss_amount}` 积分"
+    },
+    "embed": {
+      "dealer_section": "**🤖 庄家的牌**",
+      "player_section": "**👤 你的牌**",
+      "doubled_status": " **[已加倍]**",
+      "hand_status": " ← 当前",
+      "hand_info": "手牌 {index}{status}\n\n{cards}\n点数: `{value}` | 下注: `{bet}` 积分\n\n",
+      "points": "点数: `{value}`",
+      "total_bet": "**💰 总下注金额:** `{amount}` 积分",
+      "insurance_info": "\n\n**🛡️ 保险:** `{amount}` 积分",
+      "footer": "使用按钮选择你的行动 | 2分钟内有效",
+      "dealer_turn": "庄家正在要牌...",
+      "game_over": "游戏结束 | 感谢游玩",
+      "split_progress": "正在处理手牌 {current}/{total}"
+    },
+    "results": {
+      "bust": "💥 爆牌",
+      "dealer_bust": "🎉 庄家爆牌",
+      "win": "🎉 赢了",
+      "lose": "😢 输了",
+      "tie": "🤝 平局",
+      "player_bust": "💥 **爆牌了！**\n\n你输了 `{amount}` 积分",
+      "dealer_bust_win": "🎉 **庄家爆牌！**\n\n你赢了 `{amount}` 积分",
+      "player_win": "🎉 **你赢了！**\n\n你赢了 `{amount}` 积分",
+      "player_lose": "😢 **你输了！**\n\n你输了 `{amount}` 积分",
+      "tie_result": "🤝 **平局！**\n\n返还 `{amount}` 积分",
+      "blackjack": "🎰 **BlackJack!**\n\n你开局就是21点！\n\n你赢了 `{profit}` 积分",
+      "dealer_blackjack": "😢 **庄家BlackJack!**\n\n庄家开局就是21点！\n\n你输了 `{amount}` 积分",
+      "both_blackjack": "🤝 **双方BlackJack平局！**\n\n双方都是21点！\n\n返还 `{amount}` 积分",
+      "split_results": "**📊 每手牌结果：**\n\n",
+      "hand_result": "手牌 {index}: {cards} (`{value}`点)\n{result}\n\n",
+      "total_profit": "总计赢了 `{amount}` 积分 ✨",
+      "total_loss": "总计输了 `{amount}` 积分",
+      "total_tie": "总计打平",
+      "win_loss_record": "胜: {wins} | 负: {losses} | 平: {ties}",
+      "game_result": "**🎮 游戏结果**"
+    },
+    "command": {
+      "description": "🎰 二十一点游戏 - 和AI庄家对决",
+      "bet_param": "下注金额 (输入数字或 'all' 下注全部)",
+      "insufficient_points": "❌ 你没有足够的积分开始游戏！",
+      "invalid_bet_amount": "❌ 无效的下注金额！请输入数字或 'all'",
+      "bet_must_be_positive": "❌ 下注金额必须大于0！",
+      "not_enough_points": "❌ 积分不足！你当前有 {current} 积分，需要 {required} 积分才能开始游戏。",
+      "deduct_bet_failed": "❌ 下注失败，请稍后重试。",
+      "user_info_failed": "❌ 获取用户信息失败，请稍后重试。"
+    },
+    "stats": {
+      "title": "📊 二十一点游戏统计",
+      "description": "**{user}** 的游戏数据",
+      "basic_stats": "🎮 基本数据",
+      "total_games": "**总局数:** `{count}` 局",
+      "wins": "**胜场:** `{count}` 场 ({rate:.1f}%)",
+      "losses": "**败场:** `{count}` 场 ({rate:.1f}%)",
+      "ties": "**平局:** `{count}` 场 ({rate:.1f}%)",
+      "surrenders": "**投降:** `{count}` 场",
+      "blackjack_count": "**BlackJack:** `{count}` 次 🎰",
+      "points_stats": "💰 积分统计",
+      "total_profit": "**总盈亏:** `{amount}` 积分 {emoji}",
+      "max_win": "**最大单局盈利:** `+{amount}` 积分 ✨",
+      "max_loss": "**最大单局亏损:** `{amount}` 积分 💸",
+      "avg_bet": "**平均下注:** `{amount:.1f}` 积分",
+      "advanced_stats": "🎲 高级操作",
+      "double_down_count": "**Double Down 次数:** `{count}` 次",
+      "split_count": "**Split 次数:** `{count}` 次",
+      "insurance_count": "**使用保险次数:** `{count}` 次",
+      "footer": "继续游戏并提升你的技巧！🎰",
+      "no_user_found": "❌ 找不到你的用户信息！请先玩一局二十一点游戏。",
+      "no_games": "❌ 你还没有玩过二十一点游戏！使用 `/blackjack` 开始你的第一局游戏。",
+      "query_failed": "❌ 查询统计数据时发生错误，请稍后重试。"
+    }
+  }
+}
