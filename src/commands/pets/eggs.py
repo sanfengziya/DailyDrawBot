@@ -41,7 +41,7 @@ class EggCommands(commands.Cog):
         supabase = get_connection()
 
         try:
-            result = supabase.table("pet_templates").select("id, en_name, rarity").execute()
+            result = supabase.table("pet_templates").select("id, en_name, cn_name, rarity").execute()
 
             # 组织数据为字典格式
             pet_names = {}
@@ -400,7 +400,7 @@ async def handle_egg_claim(interaction: discord.Interaction):
             max_stars = rarity_config_response.data[0]['max_stars'] if rarity_config_response.data else EggCommands.MAX_STARS[pet_rarity]
 
             # 从pet_templates表获取pet_template_id（需要通过cn_name和en_name查找）
-            pet_template_response = supabase.table('pet_templates').select('id, en_name').eq('rarity', pet_rarity).execute()
+            pet_template_response = supabase.table('pet_templates').select('id, en_name, cn_name').eq('rarity', pet_rarity).execute()
             pet_template_id = None
             for template in pet_template_response.data:
                 if get_localized_pet_name(template, locale) == pet_name:

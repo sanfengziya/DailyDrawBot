@@ -44,6 +44,27 @@ def is_supported(locale: str) -> bool:
     return locale in SUPPORTED_LOCALES
 
 
+def normalize_locale(locale: str) -> str:
+    """Normalize locale code to supported format."""
+    if not locale:
+        return get_default_locale()
+
+    # Map short language codes to full locale codes
+    locale_mappings = {
+        "zh": "zh-CN",
+        "en": "en-US"
+    }
+
+    if locale in SUPPORTED_LOCALES:
+        return locale
+    elif locale in locale_mappings:
+        normalized = locale_mappings[locale]
+        if normalized in SUPPORTED_LOCALES:
+            return normalized
+
+    return get_default_locale()
+
+
 def get_supported_locales() -> Iterable[str]:
     return SUPPORTED_LOCALES.keys()
 
@@ -154,8 +175,10 @@ def get_guild_locale(guild_id: Optional[int]) -> str:
     except Exception as exc:  # pragma: no cover - defensive logging
         print(f"获取服务器语言配置失败: {exc}")
 
-    if not locale or not is_supported(locale):
+    if not locale:
         locale = get_default_locale()
+    else:
+        locale = normalize_locale(locale)
 
     with _lock:
         _GUILD_LOCALE_CACHE[guild_id] = (locale, datetime.utcnow())
@@ -164,8 +187,10 @@ def get_guild_locale(guild_id: Optional[int]) -> str:
 
 def set_guild_locale(guild_id: int, locale: str) -> bool:
     """Persist guild locale preference and update cache."""
-    if not is_supported(locale):
+    normalized_locale = normalize_locale(locale)
+    if not is_supported(normalized_locale):
         return False
+    locale = normalized_locale
 
     try:
         from src.db.database import upsert_guild_language

@@ -107,7 +107,7 @@ class PetCommands(commands.Cog):
             level = pet_data['level']
             
             # 获取宠物模板信息
-            template_response = supabase.table('pet_templates').select('id, en_name, rarity').eq('id', pet_template_id).execute()
+            template_response = supabase.table('pet_templates').select('id, en_name, cn_name, rarity').eq('id', pet_template_id).execute()
             if not template_response.data:
                 return 0
             
@@ -163,7 +163,7 @@ class PetSelectView(discord.ui.View):
             
             # 获取所有宠物模板信息
             template_ids = list(set([pet['pet_template_id'] for pet in pets_response.data]))
-            templates_response = supabase.table('pet_templates').select('id, en_name, rarity').in_('id', template_ids).execute()
+            templates_response = supabase.table('pet_templates').select('id, en_name, cn_name, rarity').in_('id', template_ids).execute()
 
             # 创建模板映射
             template_map = {template['id']: template for template in templates_response.data}
@@ -454,7 +454,7 @@ async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
         pet_data = pet_response.data[0]
         
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('en_name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        template_response = supabase.table('pet_templates').select('en_name, cn_name, rarity').eq('id', pet_data['pet_template_id']).execute()
         if not template_response.data:
             embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
@@ -612,7 +612,7 @@ async def handle_pet_upgrade(interaction: discord.Interaction, pet_id: int):
         pet_data = pet_response.data[0]
         
         # 获取宠物模板信息
-        template_response = supabase.table('pet_templates').select('en_name, rarity').eq('id', pet_data['pet_template_id']).execute()
+        template_response = supabase.table('pet_templates').select('en_name, cn_name, rarity').eq('id', pet_data['pet_template_id']).execute()
         if not template_response.data:
             embed = create_embed(t("pet.upgrade.errors.template_not_found.title", locale=locale), t("pet.upgrade.errors.template_not_found.description", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed)
