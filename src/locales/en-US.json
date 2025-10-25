@@ -300,13 +300,6 @@
     "stars": {
       "no_stars": "No stars"
     },
-    "flavor_descriptions": {
-      "SWEET": "🍯 Sweet",
-      "SALTY": "🧂 Salty",
-      "SOUR": "🍋 Sour",
-      "SPICY": "🌶️ Spicy",
-      "UMAMI": "🍄 Umami"
-    },
     "no_preference": "No preference",
     "none": "None",
     "info_labels": {

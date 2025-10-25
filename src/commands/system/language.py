@@ -107,7 +107,7 @@ async def language_command(interaction: discord.Interaction, locale: app_command
     success, key, params, response_locale = _apply_language_change(guild.id, selected_locale)
     message = t(key, locale=response_locale, **params)
 
-    await interaction.response.send_message(message, ephemeral=True)
+    await interaction.response.send_message(message)
 
 
 def setup(bot: commands.Bot) -> None:

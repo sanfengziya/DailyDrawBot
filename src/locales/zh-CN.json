@@ -300,13 +300,6 @@
     "stars": {
       "no_stars": "无星"
     },
-    "flavor_descriptions": {
-      "SWEET": "🍯 甜味",
-      "SALTY": "🧂 咸味",
-      "SOUR": "🍋 酸味",
-      "SPICY": "🌶️ 辣味",
-      "UMAMI": "🍄 鲜味"
-    },
     "no_preference": "无偏好",
     "none": "无",
     "info_labels": {
