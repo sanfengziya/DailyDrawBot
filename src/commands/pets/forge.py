@@ -207,7 +207,7 @@ async def handle_forge_view(interaction: discord.Interaction):
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", t("forge.errors.user_not_registered", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.user_not_registered", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -217,7 +217,7 @@ async def handle_forge_view(interaction: discord.Interaction):
         user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
 
         if not user_response.data:
-            embed = create_embed("❌ 错误", t("forge.errors.cannot_get_user_data", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.cannot_get_user_data", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -239,7 +239,7 @@ async def handle_forge_view(interaction: discord.Interaction):
                     color = ForgeCommands.RARITY_COLORS[rarity]
                     name = forge_commands.get_rarity_name(rarity, locale)
                     amount = fragments[rarity]
-                    description += f"{color} {name}碎片：{amount} 个\n"
+                    description += t("forge.view.fragments.display_item", locale=locale, color=color, name=name, amount=amount)
         else:
             description += t("forge.view.fragments.no_fragments", locale=locale)
 
@@ -280,7 +280,7 @@ async def handle_forge_view(interaction: discord.Interaction):
     except Exception as e:
         locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         print(f"查看锻造台错误: {e}")
-        embed = create_embed("❌ 错误", t("forge.errors.forge_unavailable", locale=locale), discord.Color.red())
+        embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.forge_unavailable", locale=locale), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
@@ -294,25 +294,25 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
         if not user_internal_id:
-            embed = create_embed("❌ 错误", t("forge.errors.user_not_found_craft", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.user_not_found_craft", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 验证参数
         if not from_rarity or not to_rarity:
-            embed = create_embed("❌ 错误", t("forge.errors.missing_rarity_params", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.missing_rarity_params", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         if quantity < 1:
-            embed = create_embed("❌ 错误", t("forge.errors.invalid_quantity", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.invalid_quantity", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # 验证合成路径
         valid_paths = [('C', 'R'), ('R', 'SR'), ('SR', 'SSR')]
         if (from_rarity, to_rarity) not in valid_paths:
-            embed = create_embed("❌ 错误", t("forge.errors.invalid_crafting_path", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.invalid_crafting_path", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -322,7 +322,7 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         user_response = supabase.table('users').select('points').eq('id', user_internal_id).execute()
 
         if not user_response.data:
-            embed = create_embed("❌ 错误", t("forge.errors.cannot_get_data_craft", locale=locale), discord.Color.red())
+            embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.cannot_get_data_craft", locale=locale), discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -336,7 +336,7 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
         max_crafts, error_msg = forge_commands.calculate_max_crafts(from_rarity, to_rarity, fragments, user_points, locale)
 
         if max_crafts == 0:
-            embed = create_embed("❌ 无法合成", error_msg, discord.Color.red())
+            embed = create_embed(t("forge.errors.cannot_craft.title", locale=locale), error_msg, discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -376,10 +376,10 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
             description += t("forge.craft.success.result.title", locale=locale)
             description += t("forge.craft.success.result.description", locale=locale, from_color=from_color, from_name=from_name, to_color=to_color, to_name=to_name)
             description += t("forge.craft.success.result.consumed", locale=locale)
-            description += f"• {from_color} {from_name}碎片：{total_fragments_consumed} 个\n"
-            description += f"• 💰 积分：{total_points_consumed} 点\n\n"
+            description += t("forge.craft.success.result.fragments_consumed", locale=locale, color=from_color, name=from_name, amount=total_fragments_consumed)
+            description += t("forge.craft.success.result.points_consumed", locale=locale, points=total_points_consumed)
             description += t("forge.craft.success.result.gained", locale=locale)
-            description += f"• {to_color} {to_name}碎片：{quantity} 个"
+            description += t("forge.craft.success.result.fragments_gained", locale=locale, color=to_color, name=to_name, quantity=quantity)
 
             embed = create_embed(t("forge.craft.success.embed_title", locale=locale), description, discord.Color.green())
         else:
@@ -390,7 +390,7 @@ async def handle_forge_craft(interaction: discord.Interaction, from_rarity: str,
     except Exception as e:
         locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
         print(f"合成碎片错误: {e}")
-        embed = create_embed("❌ 错误", t("forge.errors.crafting_failed", locale=locale, error=str(e)), discord.Color.red())
+        embed = create_embed(t("forge.errors.error_title", locale=locale), t("forge.errors.crafting_failed", locale=locale, error=str(e)), discord.Color.red())
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:

@@ -782,7 +782,8 @@
       },
       "fragments": {
         "title": "**📦 Fragment Inventory:**\n",
-        "no_fragments": "**📦 Fragment Inventory:** None\n"
+        "no_fragments": "**📦 Fragment Inventory:** None\n",
+        "display_item": "{color} {name} fragments: {amount}\n"
       },
       "current_points": "\n💰 **Current Points:** {points}\n\n",
       "crafting_rules": {
@@ -811,7 +812,10 @@
           "title": "**Crafting Result:**\n",
           "description": "{from_color} {from_name} fragments → {to_color} {to_name} fragments\n\n",
           "consumed": "**Consumed:**\n",
-          "gained": "**Gained:**\n"
+          "gained": "**Gained:**\n",
+          "fragments_consumed": "• {color} {name} fragments: {amount}\n",
+          "points_consumed": "• 💰 Points: {points}\n\n",
+          "fragments_gained": "• {color} {name} fragments: {quantity}"
         }
       },
       "failure": {

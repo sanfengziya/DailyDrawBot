@@ -417,11 +417,11 @@ async def handle_pet_list(interaction: discord.Interaction, page: int = 1):
         return
     
     embed = create_embed(
-        title=t("pet.ui.list_title", locale=locale, default="宠物查询"),
-        description=f"{interaction.user.mention} {t('pet.ui.possessive', locale=locale, default='的宠物')} (第 {page}/{total_pages} 页)\n {description}",
+        title=t("pet.ui.list_title", locale=locale),
+        description=f"{interaction.user.mention} {t('pet.ui.possessive', locale=locale)} (第 {page}/{total_pages} 页)\n {description}",
         color=discord.Color.blue()
     )
-    embed.set_footer(text=f"{t('pet.ui.total_pets', locale=locale, default='总共')} {total_pets} {t('pet.ui.pets_count', locale=locale, default='只宠物')}")
+    embed.set_footer(text=f"{t('pet.ui.total_pets', locale=locale)} {total_pets} {t('pet.ui.pets_count', locale=locale)}")
     await interaction.response.send_message(embed=embed)
 
 async def handle_pet_info(interaction: discord.Interaction, pet_id: int):
@@ -1655,7 +1655,7 @@ async def execute_feeding(interaction: discord.Interaction, user_id: int, pet_id
         # 如果饱食度满了，添加提示
         if result['new_satiety'] >= 100:
             embed.add_field(
-                name=t("common.notice", locale=locale, default="⚠️ 提示"),
+                name=t("common.notice", locale=locale),
                 value=t("pet.feed.satiety_full_notice", locale=locale),
                 inline=False
             )
@@ -1805,7 +1805,7 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
             pet_response = supabase.table('user_pets').select('id').eq('id', int(pet_id)).eq('user_id', user_internal_id).execute()
             if not pet_response.data:
                 embed = create_embed(
-                    t("pet.auto_feed.errors.pet_not_exist_title", locale=locale, default="❌ 宠物不存在"),
+                    t("pet.auto_feed.errors.pet_not_exist_title", locale=locale),
                     t("pet.auto_feed.pet_not_exist", locale=locale, user=interaction.user.mention),
                     discord.Color.red()
                 )
@@ -1818,7 +1818,7 @@ async def handle_auto_feeding(interaction: discord.Interaction, mode: str, quant
 
             if not user_response.data or not user_response.data[0]['equipped_pet_id']:
                 embed = create_embed(
-                    t("pet.auto_feed.errors.no_equipped_title", locale=locale, default="❌ 没有装备宠物"),
+                    t("pet.auto_feed.errors.no_equipped_title", locale=locale),
                     t("pet.auto_feed.no_equipped_pet", locale=locale, user=interaction.user.mention),
                     discord.Color.red()
                 )

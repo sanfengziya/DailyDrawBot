@@ -782,7 +782,8 @@
       },
       "fragments": {
         "title": "**📦 碎片库存：**\\n",
-        "no_fragments": "**📦 碎片库存：** 无\\n"
+        "no_fragments": "**📦 碎片库存：** 无\\n",
+        "display_item": "{color} {name}碎片：{amount} 个\\n"
       },
       "current_points": "\\n💰 **当前积分：** {points}\\n\\n",
       "crafting_rules": {
@@ -811,7 +812,10 @@
           "title": "**合成结果：**\\n",
           "description": "{from_color} {from_name}碎片 → {to_color} {to_name}碎片\\n\\n",
           "consumed": "**消耗：**\\n",
-          "gained": "**获得：**\\n"
+          "gained": "**获得：**\\n",
+          "fragments_consumed": "• {color} {name}碎片：{amount} 个\\n",
+          "points_consumed": "• 💰 积分：{points} 点\\n\\n",
+          "fragments_gained": "• {color} {name}碎片：{quantity} 个"
         }
       },
       "failure": {
