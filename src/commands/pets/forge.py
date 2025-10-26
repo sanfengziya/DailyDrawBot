@@ -146,35 +146,87 @@ class ForgeCommands(commands.Cog):
             print(f"{t('forge.errors.execute_failed', locale=locale, error=e)}")
             return False, t("forge.errors.synthesis_failed", locale=locale, error=str(e))
 
-# 创建锻造选项
-def _create_forge_choices():
-    """创建锻造选项，使用英文作为默认名称并添加本地化支持"""
-    from src.utils.i18n import get_all_localizations
-    
-    # Action choices
-    action_choices = []
-    for action in ["view", "craft"]:
-        choice = app_commands.Choice(name=action.title(), value=action)
-        choice.name_localizations = get_all_localizations(f"forge.command.choices.action.{action}")
-        action_choices.append(choice)
-    
-    # From rarity choices
-    from_rarity_choices = []
-    for rarity in ["C", "R", "SR"]:
-        choice = app_commands.Choice(name=f"Common ({rarity})" if rarity == "C" else f"Rare ({rarity})" if rarity == "R" else f"Epic ({rarity})", value=rarity)
-        choice.name_localizations = get_all_localizations(f"forge.command.choices.from_rarity.{rarity}")
-        from_rarity_choices.append(choice)
-    
-    # To rarity choices
-    to_rarity_choices = []
-    for rarity in ["R", "SR", "SSR"]:
-        choice = app_commands.Choice(name=f"Rare ({rarity})" if rarity == "R" else f"Epic ({rarity})" if rarity == "SR" else f"Legendary ({rarity})", value=rarity)
-        choice.name_localizations = get_all_localizations(f"forge.command.choices.to_rarity.{rarity}")
-        to_rarity_choices.append(choice)
-    
-    return action_choices, from_rarity_choices, to_rarity_choices
+# 创建锻造选项（现在使用autocomplete，不再需要固定的choices函数）
 
-_forge_action_choices, _forge_from_rarity_choices, _forge_to_rarity_choices = _create_forge_choices()
+async def forge_action_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为forge命令的action参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    actions = [
+        ("view", "forge.command.choices.action.view"),
+        ("craft", "forge.command.choices.action.craft")
+    ]
+
+    choices = []
+    for action_value, translation_key in actions:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=action_value.title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in action_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=action_value))
+
+    return choices
+
+async def forge_from_rarity_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为forge命令的from_rarity参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    rarities = [
+        ("C", "forge.command.choices.from_rarity.C"),
+        ("R", "forge.command.choices.from_rarity.R"),
+        ("SR", "forge.command.choices.from_rarity.SR")
+    ]
+
+    choices = []
+    for rarity_value, translation_key in rarities:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=f"Common ({rarity_value})" if rarity_value == "C" else f"Rare ({rarity_value})" if rarity_value == "R" else f"Epic ({rarity_value})")
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in rarity_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=rarity_value))
+
+    return choices
+
+async def forge_to_rarity_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为forge命令的to_rarity参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    rarities = [
+        ("R", "forge.command.choices.to_rarity.R"),
+        ("SR", "forge.command.choices.to_rarity.SR"),
+        ("SSR", "forge.command.choices.to_rarity.SSR")
+    ]
+
+    choices = []
+    for rarity_value, translation_key in rarities:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=f"Rare ({rarity_value})" if rarity_value == "R" else f"Epic ({rarity_value})" if rarity_value == "SR" else f"Legendary ({rarity_value})")
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in rarity_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=rarity_value))
+
+    return choices
 
 # 主锻造命令
 @app_commands.command(name="forge", description="Fragment forge - convert and combine fragments")
@@ -184,9 +236,7 @@ _forge_action_choices, _forge_from_rarity_choices, _forge_to_rarity_choices = _c
     to_rarity="Target fragment rarity",
     quantity="Number of fragments to convert (default: 1)"
 )
-@app_commands.choices(action=_forge_action_choices)
-@app_commands.choices(from_rarity=_forge_from_rarity_choices)
-@app_commands.choices(to_rarity=_forge_to_rarity_choices)
+@app_commands.autocomplete(action=forge_action_autocomplete, from_rarity=forge_from_rarity_autocomplete, to_rarity=forge_to_rarity_autocomplete)
 @app_commands.guild_only()
 async def forge(interaction: discord.Interaction, action: str, from_rarity: str = None, to_rarity: str = None, quantity: int = 1):
     """锻造台主命令"""

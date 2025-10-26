@@ -246,22 +246,40 @@ class PetSelect(discord.ui.Select):
         elif self.action == "feed":
             await handle_pet_feed(interaction, pet_id)
 
-# 主宠物命令定义
-def _create_pet_action_choices():
-    """创建宠物action选项，使用英文作为默认名称并添加本地化支持"""
-    from src.utils.i18n import get_all_localizations
-    
-    actions = ["list", "info", "upgrade", "dismantle", "fragments", "equip", "unequip", "status", "claim", "feed"]
+# 主宠物命令定义（现在使用autocomplete，不再需要固定的choices函数）
+
+async def pet_action_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为pet命令的action参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    actions = [
+        ("list", "pet.command.choices.list"),
+        ("info", "pet.command.choices.info"),
+        ("upgrade", "pet.command.choices.upgrade"),
+        ("dismantle", "pet.command.choices.dismantle"),
+        ("fragments", "pet.command.choices.fragments"),
+        ("equip", "pet.command.choices.equip"),
+        ("unequip", "pet.command.choices.unequip"),
+        ("status", "pet.command.choices.status"),
+        ("claim", "pet.command.choices.claim"),
+        ("feed", "pet.command.choices.feed")
+    ]
+
     choices = []
-    
-    for action_value in actions:
-        choice = app_commands.Choice(
-            name=action_value.replace("_", " ").title() if action_value != "list" else "View List",
-            value=action_value
-        )
-        choice.name_localizations = get_all_localizations(f"pet.command.choices.{action_value}")
-        choices.append(choice)
-    
+    for action_value, translation_key in actions:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=action_value.replace("_", " ").title() if action_value != "list" else "View List")
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in action_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=action_value))
+
     return choices
 
 @app_commands.command(name="pet", description="Pet system - view, upgrade, and manage pets")
@@ -270,7 +288,7 @@ def _create_pet_action_choices():
     action="Select action type",
     page="Page number (for list view, default: 1)"
 )
-@app_commands.choices(action=_create_pet_action_choices())
+@app_commands.autocomplete(action=pet_action_autocomplete)
 async def pet(interaction: discord.Interaction, action: str, page: int = 1):
     """宠物系统主命令"""
     locale = get_context_locale(interaction)
@@ -1744,25 +1762,34 @@ async def pet_autocomplete(interaction: discord.Interaction, current: str) -> li
         traceback.print_exc()
         return []
 
-# 创建喂食模式选项
-def _create_feed_mode_choices():
-    """创建喂食模式选项，使用英文作为默认名称并添加本地化支持"""
-    from src.utils.i18n import get_all_localizations
-    
-    modes = ["optimal_xp", "flavor_match", "economic", "clear_inventory"]
-    mode_names = {
-        "optimal_xp": "Optimal XP - Best experience efficiency",
-        "flavor_match": "Flavor Match - Match pet's flavor preference",
-        "economic": "Economic - Use cheapest available food",
-        "clear_inventory": "Clear Inventory - Prioritize abundant food"
-    }
-    
+# 创建喂食模式选项（现在使用autocomplete，不再需要固定的choices函数）
+
+async def feed_mode_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为auto_feed命令的mode参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    modes = [
+        ("optimal_xp", "pet.auto_feed.command.choices.mode.optimal_xp"),
+        ("flavor_match", "pet.auto_feed.command.choices.mode.flavor_match"),
+        ("economic", "pet.auto_feed.command.choices.mode.economic"),
+        ("clear_inventory", "pet.auto_feed.command.choices.mode.clear_inventory")
+    ]
+
     choices = []
-    for mode_value in modes:
-        choice = app_commands.Choice(name=mode_names[mode_value], value=mode_value)
-        choice.name_localizations = get_all_localizations(f"pet.auto_feed.command.choices.mode.{mode_value}")
-        choices.append(choice)
-    
+    for mode_value, translation_key in modes:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=mode_value.replace("_", " ").title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in mode_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=mode_value))
+
     return choices
 
 # 一键喂食命令
@@ -1772,8 +1799,7 @@ def _create_feed_mode_choices():
     mode="Feeding mode (strategy selection)",
     quantity="Number of times to feed (optional, default: until full)"
 )
-@app_commands.autocomplete(pet=pet_autocomplete)
-@app_commands.choices(mode=_create_feed_mode_choices())
+@app_commands.autocomplete(pet=pet_autocomplete, mode=feed_mode_autocomplete)
 @app_commands.guild_only()
 async def auto_feed(interaction: discord.Interaction, pet: str = None, mode: str = "optimal_xp", quantity: int = None):
     """一键喂食指定宠物或装备的宠物"""

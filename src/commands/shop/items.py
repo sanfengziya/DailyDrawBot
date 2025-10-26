@@ -191,19 +191,31 @@ async def item_autocomplete(
         # 如果出错，返回空列表
         return []
 
-# 使用英文作为默认名称，通过 name_localizations 支持其他语言
-choice_menu = app_commands.Choice(
-    name="view menu",
-    value="menu"
-)
-choice_menu.name_localizations = get_all_localizations("shop_module.items.command.choice_menu")
+async def shop_action_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为shop命令的action参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
 
-choice_buy = app_commands.Choice(
-    name="buy",
-    value="buy"
-)
-choice_buy.name_localizations = get_all_localizations("shop_module.items.command.choice_buy")
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
 
+    actions = [
+        ("menu", "shop_module.items.command.choice_menu"),
+        ("buy", "shop_module.items.command.choice_buy")
+    ]
+
+    choices = []
+    for action_value, translation_key in actions:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=action_value.title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in action_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=action_value))
+
+    return choices
 
 @app_commands.command(name="shop", description="Shop - view items and make purchases")
 @app_commands.guild_only()
@@ -212,8 +224,7 @@ choice_buy.name_localizations = get_all_localizations("shop_module.items.command
     item="Select item to purchase",
     quantity="Purchase quantity (default: 1)"
 )
-@app_commands.choices(action=[choice_menu, choice_buy])
-@app_commands.autocomplete(item=item_autocomplete)
+@app_commands.autocomplete(action=shop_action_autocomplete, item=item_autocomplete)
 async def shop(interaction: discord.Interaction, action: str, item: str = None, quantity: int = 1):
     """杂货铺主命令"""
     # 先defer响应避免超时

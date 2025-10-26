@@ -105,24 +105,39 @@ class EggCommands(commands.Cog):
             return []
 
 # 创建蛋action选项
-def _create_egg_action_choices():
-    """创建蛋action选项，使用英文作为默认名称并添加本地化支持"""
-    from src.utils.i18n import get_all_localizations
-    
-    actions = ["draw", "list", "hatch", "claim"]
+
+async def egg_action_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为egg命令的action参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    actions = [
+        ("draw", "egg.command.choices.draw"),
+        ("list", "egg.command.choices.list"),
+        ("hatch", "egg.command.choices.hatch"),
+        ("claim", "egg.command.choices.claim")
+    ]
+
     choices = []
-    
-    for action_value in actions:
-        choice = app_commands.Choice(name=action_value.title(), value=action_value)
-        choice.name_localizations = get_all_localizations(f"egg.command.choices.{action_value}")
-        choices.append(choice)
-    
+    for action_value, translation_key in actions:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=action_value.title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in action_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=action_value))
+
     return choices
 
 # 斜杠命令定义
 @app_commands.command(name="egg", description="Egg system - draw, hatch, and view eggs")
 @app_commands.describe(action="Select action type")
-@app_commands.choices(action=_create_egg_action_choices())
+@app_commands.autocomplete(action=egg_action_autocomplete)
 @app_commands.guild_only()
 async def egg(interaction: discord.Interaction, action: str):
     """蛋系统主命令"""

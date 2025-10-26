@@ -319,38 +319,41 @@ async def leaderboard(interaction: discord.Interaction, type: str = "points"):
     buffer.seek(0)
     await interaction.followup.send(file=File(fp=buffer, filename="ranking.png"))
 
+async def leaderboard_type_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为leaderboard命令的type参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    types = [
+        ("points", "leaderboard.command.choice_points"),
+        ("pets", "leaderboard.command.choice_pets"),
+        ("hatched_eggs", "leaderboard.command.choice_hatched"),
+        ("blackjack_wins", "leaderboard.command.choice_blackjack")
+    ]
+
+    choices = []
+    for type_value, translation_key in types:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=type_value.replace("_", " ").title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in type_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=type_value))
+
+    return choices
+
 def setup(bot):
     """注册斜杠命令"""
-    # 使用英文作为默认名称，通过 name_localizations 支持其他语言
-    choice_points = app_commands.Choice(
-        name="Points Ranking",
-        value="points"
-    )
-    choice_points.name_localizations = get_all_localizations("leaderboard.command.choice_points")
-
-    choice_pets = app_commands.Choice(
-        name="Pet Count Ranking",
-        value="pets"
-    )
-    choice_pets.name_localizations = get_all_localizations("leaderboard.command.choice_pets")
-
-    choice_hatched = app_commands.Choice(
-        name="Hatched Egg Ranking",
-        value="hatched_eggs"
-    )
-    choice_hatched.name_localizations = get_all_localizations("leaderboard.command.choice_hatched")
-
-    choice_blackjack = app_commands.Choice(
-        name="Blackjack Wins Ranking",
-        value="blackjack_wins"
-    )
-    choice_blackjack.name_localizations = get_all_localizations("leaderboard.command.choice_blackjack")
-
     @bot.tree.command(name="leaderboard", description="View server rankings")
     @app_commands.describe(
         type="Select ranking type"
     )
-    @app_commands.choices(type=[choice_points, choice_pets, choice_hatched, choice_blackjack])
+    @app_commands.autocomplete(type=leaderboard_type_autocomplete)
     async def leaderboard_command(interaction: discord.Interaction, type: str = "points"):
         await leaderboard(interaction, type)
 

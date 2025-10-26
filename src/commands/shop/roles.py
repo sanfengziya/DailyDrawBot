@@ -340,35 +340,48 @@ async def tag_buy(interaction: discord.Interaction, role_name: str):
         print(t("debug.shop.add_item_failed", locale=get_guild_locale(interaction.guild.id), error=str(e)))
         await interaction.response.send_message(t("shop_module.roles.buy.error", locale=locale), ephemeral=True)
 
+async def tag_action_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """为tag命令的action参数提供基于服务器语言的自动补全"""
+    from src.utils.i18n import t, get_guild_locale
+
+    # 获取服务器语言设置
+    server_locale = get_guild_locale(interaction.guild.id)
+
+    actions = [
+        ("shop", "shop_module.roles.slash.choice_shop"),
+        ("buy", "shop_module.roles.slash.choice_buy")
+    ]
+
+    choices = []
+    for action_value, translation_key in actions:
+        # 使用服务器语言获取翻译
+        localized_name = t(translation_key, locale=server_locale,
+                         default=action_value.title())
+
+        # 如果用户有输入，进行过滤
+        if current and current.lower() not in localized_name.lower() and current.lower() not in action_value.lower():
+            continue
+
+        choices.append(app_commands.Choice(name=localized_name, value=action_value))
+
+    return choices
+
 def setup(bot):
     """注册/tag slash命令组"""
-
-    # 使用英文作为默认名称，通过 name_localizations 支持其他语言
-    choice_shop = app_commands.Choice(
-        name="shop",
-        value="shop"
-    )
-    choice_shop.name_localizations = get_all_localizations("shop_module.roles.slash.choice_shop")
-
-    choice_buy = app_commands.Choice(
-        name="buy",
-        value="buy"
-    )
-    choice_buy.name_localizations = get_all_localizations("shop_module.roles.slash.choice_buy")
 
     @bot.tree.command(name="tag", description="Role shop - view and purchase server roles")
     @app_commands.describe(
         action="Select action type",
         role_name="Select role to purchase"
     )
-    @app_commands.choices(action=[choice_shop, choice_buy])
-    async def tag_command(interaction: discord.Interaction, action: app_commands.Choice[str], role_name: str = None):
+    @app_commands.autocomplete(action=tag_action_autocomplete)
+    async def tag_command(interaction: discord.Interaction, action: str, role_name: str = None):
         """统一的/tag命令入口"""
         locale = get_guild_locale(interaction.guild.id if interaction.guild else None)
 
-        if action.value == "shop":
+        if action == "shop":
             await tag_shop(interaction)
-        elif action.value == "buy":
+        elif action == "buy":
             if not role_name:
                 await interaction.response.send_message(t("shop_module.roles.slash.missing_name", locale=locale), ephemeral=True)
                 return
