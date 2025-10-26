@@ -1413,7 +1413,7 @@ async def handle_pet_feed(interaction: discord.Interaction, pet_id: int):
     locale = get_guild_locale(interaction.guild.id)
     
     # 获取宠物喂食信息
-    pet_info = get_pet_feeding_info(pet_id)
+    pet_info = get_pet_feeding_info(pet_id, locale)
     if not pet_info:
         embed = create_embed(t("pet.errors.user_not_found.title", locale=locale), t("pet.errors.pet_not_found_or_unauthorized_feed", locale=locale), discord.Color.red())
         await interaction.response.send_message(embed=embed, ephemeral=True)

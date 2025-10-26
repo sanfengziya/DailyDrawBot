@@ -539,7 +539,7 @@ class FoodShopManager:
             print(f"❌ 完整刷新测试失败: {e}")
             return False
 
-def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
+def get_pet_feeding_info(pet_id: int, locale: str = None) -> Optional[Dict]:
     """获取宠物喂食相关信息"""
     from src.db.database import get_supabase_client
 
@@ -549,7 +549,7 @@ def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
     response = supabase.table('user_pets').select('''
         id, user_id, level, xp_current, xp_total,
         favorite_flavor, dislike_flavor, satiety, last_feeding,
-        pet_templates(id, en_name, rarity)
+        pet_templates(id, en_name, cn_name, rarity)
     ''').eq('id', pet_id).execute()
 
     if not response.data:
@@ -561,7 +561,8 @@ def get_pet_feeding_info(pet_id: int) -> Optional[Dict]:
     level, current_level_xp, next_level_requirement = FeedingSystem.calculate_current_level_xp(pet_data['xp_total'])
 
     # 获取本地化的宠物名称
-    locale = get_default_locale()  # 使用默认语言环境
+    if locale is None:
+        locale = get_default_locale()
     pet_template_data = pet_data['pet_templates']
     pet_name = get_localized_pet_name(pet_template_data, locale)
 
@@ -594,8 +595,12 @@ def feed_pet(pet_id: int, food_template_id: int, locale: str = None) -> Dict:
 
     supabase = get_supabase_client()
 
+    # 使用传入的locale或默认locale
+    if locale is None:
+        locale = get_default_locale()
+
     # 获取宠物信息
-    pet_info = get_pet_feeding_info(pet_id)
+    pet_info = get_pet_feeding_info(pet_id, locale)
     if not pet_info:
         return {'success': False, 'message': '宠物不存在'}
 
@@ -648,10 +653,6 @@ def feed_pet(pet_id: int, food_template_id: int, locale: str = None) -> Dict:
         flavor_bonus = "favorite"
     elif pet_info['dislike_flavor'] and food_data['flavor'] == pet_info['dislike_flavor']:
         flavor_bonus = "dislike"
-
-    # 使用传入的locale或默认locale
-    if locale is None:
-        locale = get_default_locale()
     
     return {
         'success': True,
@@ -814,8 +815,12 @@ class AutoFeedingSystem:
         """
         from src.db.database import get_supabase_client
 
+        # 使用传入的locale或默认locale
+        if locale is None:
+            locale = get_default_locale()
+
         # 获取宠物信息
-        pet_info = get_pet_feeding_info(pet_id)
+        pet_info = get_pet_feeding_info(pet_id, locale)
         if not pet_info:
             return {'success': False, 'message': '宠物不存在！'}
 
