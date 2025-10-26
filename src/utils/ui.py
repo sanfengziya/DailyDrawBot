@@ -50,7 +50,7 @@ class RolePageView(discord.ui.View):
         )
         return embed
 
-    @discord.ui.button(label="◀️ 上一页", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="◀️ previous", style=discord.ButtonStyle.secondary)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message(
@@ -60,7 +60,7 @@ class RolePageView(discord.ui.View):
         self.index = (self.index - 1) % len(self.rows)
         await interaction.response.edit_message(embed=self.get_embed(self.index), view=self)
 
-    @discord.ui.button(label="▶️ 下一页", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="▶️ next", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message(

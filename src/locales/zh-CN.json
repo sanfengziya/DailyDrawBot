@@ -954,8 +954,8 @@
       "pagination": {
         "unknown_role": "（未知角色）ID:{role_id}",
         "description": "价格：{price} 分\\n\\n第 {index} / {total} 个",
-        "button_prev": "◀️ previous",
-        "button_next": "▶️ next",
+        "button_prev": "◀️ 上一页",
+        "button_next": "▶️ 下一页",
         "no_permission": "你无法控制这个分页！"
       }
     },
