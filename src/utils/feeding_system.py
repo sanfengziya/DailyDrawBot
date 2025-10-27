@@ -315,10 +315,10 @@ class FoodShopManager:
 
     # 稀有度分布配置
     RARITY_DISTRIBUTION = {
-        'C': 0.45,    # 48%
-        'R': 0.35,    # 40%
-        'SR': 0.15,   # 10%
-        'SSR': 0.5   # 2%
+        'C': 0.40,    # 40%
+        'R': 0.30,    # 30%
+        'SR': 0.20,   # 20%
+        'SSR': 0.10   # 10%
     }
 
     # 每日商品数量
@@ -376,11 +376,10 @@ class FoodShopManager:
         print(f"📊 稀有度分布: C={len(rarity_groups['C'])}, R={len(rarity_groups['R'])}, SR={len(rarity_groups['SR'])}, SSR={len(rarity_groups['SSR'])}")
 
         selected_items = []
-        used_flavors = set()
         generation_attempts = 0
         max_attempts = 50  # 防止无限循环
 
-        # 生成5个商品，尽量保证口味多样性
+        # 生成5个商品，允许口味重复
         while len(selected_items) < FoodShopManager.DAILY_ITEMS_COUNT and generation_attempts < max_attempts:
             generation_attempts += 1
 
@@ -400,12 +399,8 @@ class FoodShopManager:
             if not available_foods:
                 continue
 
-            # 优先选择新口味
-            new_flavor_foods = [f for f in available_foods if f['flavor'] not in used_flavors]
-            if new_flavor_foods:
-                selected_food = random.choice(new_flavor_foods)
-            else:
-                selected_food = random.choice(available_foods)
+            # 随机选择食粮（允许口味重复）
+            selected_food = random.choice(available_foods)
 
             # 验证选中的食粮
             if not selected_food.get('id'):
@@ -417,7 +412,6 @@ class FoodShopManager:
                 'food_data': selected_food
             })
 
-            used_flavors.add(selected_food['flavor'])
             print(f"✅ 选择了{selected_rarity}级食粮: {get_localized_food_name(selected_food, get_default_locale())} ({selected_food['flavor']})")
 
         if len(selected_items) != FoodShopManager.DAILY_ITEMS_COUNT:
@@ -425,7 +419,14 @@ class FoodShopManager:
             if len(selected_items) == 0:
                 return []
 
-        print(f"🎯 商品生成完成，共{len(selected_items)}个商品，口味种类: {len(used_flavors)}")
+        # 统计口味分布
+        flavor_counts = {}
+        for item in selected_items:
+            flavor = item['food_data']['flavor']
+            flavor_counts[flavor] = flavor_counts.get(flavor, 0) + 1
+
+        flavor_distribution = ", ".join([f"{flavor}({count}个)" for flavor, count in flavor_counts.items()])
+        print(f"🎯 商品生成完成，共{len(selected_items)}个商品，口味分布: {flavor_distribution}")
         return selected_items
 
     @staticmethod
