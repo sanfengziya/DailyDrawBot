@@ -1,5 +1,5 @@
 import discord
-from src.config.config import MAX_PAID_DRAWS_PER_DAY, WHEEL_COST
+from src.config.config import MAX_PAID_DRAWS_PER_DAY, DRAW_COST
 from src.utils.i18n import get_guild_locale, t
 
 async def help_command(interaction: discord.Interaction):
@@ -41,7 +41,7 @@ def create_help_embed(interaction: discord.Interaction):
                 f"help.sections.{key}.value",
                 locale=locale,
                 max_paid_draws=MAX_PAID_DRAWS_PER_DAY,
-                wheel_cost=WHEEL_COST
+                wheel_cost=DRAW_COST
             ),
             inline=False
         )
@@ -58,7 +58,7 @@ def create_help_embed(interaction: discord.Interaction):
             "help.footer",
             locale=locale,
             max_paid_draws=MAX_PAID_DRAWS_PER_DAY,
-            wheel_cost=WHEEL_COST
+            wheel_cost=DRAW_COST
         )
     )
     return embed

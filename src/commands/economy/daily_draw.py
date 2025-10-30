@@ -4,7 +4,7 @@ import datetime
 from src.db.database import get_connection
 from src.utils.helpers import now_est, get_weighted_reward
 from src.utils.i18n import get_guild_locale, get_reward_message, t
-from src.config.config import WHEEL_COST, MAX_PAID_DRAWS_PER_DAY
+from src.config.config import DRAW_COST, MAX_PAID_DRAWS_PER_DAY
 from src.utils.cache import UserCache
 from src.utils.draw_limiter import DrawLimiter
 
@@ -62,7 +62,7 @@ async def draw(ctx, count: int = 1):
     else:
         # 付费抽奖
         paid_draws_today = await DrawLimiter.get_paid_draw_count(guild_id, discord_user_id)
-        total_cost = count * WHEEL_COST
+        total_cost = count * DRAW_COST
 
         # 检查付费抽奖次数是否足够
         if paid_draws_today + count > MAX_PAID_DRAWS_PER_DAY:
@@ -144,7 +144,7 @@ async def draw(ctx, count: int = 1):
 
             # 扣除积分
             try:
-                await UserCache.update_points(guild_id, discord_user_id, user_id, -WHEEL_COST)
+                await UserCache.update_points(guild_id, discord_user_id, user_id, -DRAW_COST)
             except Exception as e:
                 # 扣除积分失败，回滚计数（异步）
                 from src.db.redis_client import redis_client

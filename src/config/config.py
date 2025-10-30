@@ -12,7 +12,7 @@ if TOKEN is None:
 PREFIX = os.getenv("PREFIX", "!")
 
 # 抽奖配置
-WHEEL_COST = 100  # 每次抽奖的费用
+DRAW_COST = 100  # 每次抽奖的费用
 MAX_PAID_DRAWS_PER_DAY = 30 # 每天允许的最大付费抽奖次数
 
 # 多语言配置
