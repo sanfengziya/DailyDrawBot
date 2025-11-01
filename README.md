@@ -1,527 +1,529 @@
 # Daily Draw Bot
 
-一个功能丰富的Discord多功能机器人，包含每日抽奖、完整宠物养成系统、多种商店、答题游戏和积分经济系统。
+**🌐 Language:** [English](README.md) | [中文](README_ZH.md)
 
-## 🌟 核心功能
+A feature-rich Discord multi-functional bot with daily lottery, complete pet raising system, multiple shops, quiz games, and points economy system.
 
-### 🎰 经济系统
-- **每日抽奖系统** - 免费1次+付费20次的每日抽奖机制
-- **积分管理** - 完整的积分赠送、转账、管理系统
-- **排行榜** - 实时积分排行和财富统计
+## 🌟 Core Features
 
-### 🐾 宠物养成系统
-- **宠物蛋系统** - 多稀有度宠物蛋抽取（C/R/SR/SSR）
-- **宠物管理** - 喂养、升级、装备、互动系统
-- **碎片锻造** - 宠物碎片收集和合成机制
-- **星级进化** - 宠物升星和属性成长系统
+### 🎰 Economy System
+- **Daily Lottery System** - Free 1 draw + 30 paid draws daily mechanism
+- **Points Management** - Complete points gifting, transfer, and management system
+- **Leaderboards** - Real-time points ranking and wealth statistics
 
-### 🛍️ 商店系统
-- **身份组商店** - Discord角色购买和管理
-- **物品商店** - 消耗品和道具商店
-- **订阅系统** - 高级功能和特权订阅
+### 🐾 Pet Raising System
+- **Pet Egg System** - Multi-rarity pet egg drawing (C/R/SR/SSR)
+- **Pet Management** - Feeding, upgrading, equipping, and interaction system
+- **Fragment Forge** - Pet fragment collection and synthesis mechanism
+- **Star Evolution** - Pet star upgrading and attribute growth system
 
-### 🎮 游戏系统
-- **答题游戏** - 多类别题库的教育问答游戏
-- **概率系统** - 公平的随机奖励机制
+### 🛍️ Shop System
+- **Role Shop** - Discord role purchasing and management
+- **Item Shop** - Consumables and props shop
+- **Subscription System** - Premium features and privilege subscriptions
 
-### 🌍 多语言支持
-- **国际化** - 支持中文(zh-CN)和英文(en-US)
-- **动态切换** - 管理员可实时切换服务器语言
+### 🎮 Game System
+- **Quiz Game** - Educational quiz game with multi-category question bank
+- **Probability System** - Fair random reward mechanism
 
-## 🏗️ 技术架构
+### 🌍 Multi-language Support
+- **Internationalization** - Supports Chinese (zh-CN) and English (en-US)
+- **Dynamic Switching** - Admins can switch server language in real-time
 
-### 技术栈
-- **Python 3.12+** - 主要编程语言
-- **Discord.py 2.4+** - Discord API框架
-- **Supabase** - 云端PostgreSQL数据库
-- **Redis** - 缓存和会话管理
+## 🏗️ Technical Architecture
 
-### 项目结构
+### Tech Stack
+- **Python 3.12+** - Main programming language
+- **Discord.py 2.4+** - Discord API framework
+- **Supabase** - Cloud PostgreSQL database
+- **Redis** - Cache and session management
+
+### Project Structure
 
 ```
 Daily Draw/
-├── bot.py                          # 应用入口点
-├── requirements.txt                # Python依赖
-├── Procfile                        # 部署配置
-└── src/                            # 源代码目录
+├── bot.py                          # Application entry point
+├── requirements.txt                # Python dependencies
+├── Procfile                        # Deployment configuration
+└── src/                            # Source code directory
     ├── __init__.py
-    ├── main.py                     # 机器人主程序
-    ├── config/                     # 配置模块
+    ├── main.py                     # Bot main program
+    ├── config/                     # Configuration module
     │   ├── __init__.py
-    │   └── config.py               # 全局配置和环境变量
-    ├── db/                         # 数据库层
+    │   └── config.py               # Global configuration and environment variables
+    ├── db/                         # Database layer
     │   ├── __init__.py
-    │   └── database.py             # Supabase客户端和查询助手
-    ├── utils/                      # 工具模块
+    │   └── database.py             # Supabase client and query helpers
+    ├── utils/                      # Utility modules
     │   ├── __init__.py
-    │   ├── helpers.py              # 时区、概率、ID工具
-    │   └── ui.py                   # Discord UI组件
-    ├── locales/                    # 多语言包
-    │   ├── zh-CN.json              # 中文语言包
-    │   └── en-US.json              # 英文语言包
-    └── commands/                   # 命令系统（模块化）
+    │   ├── helpers.py              # Timezone, probability, ID utilities
+    │   └── ui.py                   # Discord UI components
+    ├── locales/                    # Multi-language packages
+    │   ├── zh-CN.json              # Chinese language pack
+    │   └── en-US.json              # English language pack
+    └── commands/                   # Command system (modular)
         ├── __init__.py
-        ├── economy/                # 经济系统
+        ├── economy/                # Economy system
         │   ├── __init__.py
-        │   ├── daily_draw.py       # 每日抽奖 (!draw, /draw)
-        │   ├── balance.py          # 积分查询 (!check, /balance)
-        │   └── points.py           # 积分管理 (!giftpoints, /give)
-        ├── pets/                   # 宠物系统
+        │   ├── daily_draw.py       # Daily lottery (!draw, /draw)
+        │   ├── balance.py          # Points inquiry (!check, /balance)
+        │   └── points.py           # Points management (!giftpoints, /give)
+        ├── pets/                   # Pet system
         │   ├── __init__.py
-        │   ├── eggs.py             # 宠物蛋抽取 (/egg)
-        │   ├── management.py       # 宠物管理 (/pet)
-        │   └── forge.py            # 碎片锻造 (/forge)
-        ├── shop/                   # 商店系统
+        │   ├── eggs.py             # Pet egg drawing (/egg)
+        │   ├── management.py       # Pet management (/pet)
+        │   └── forge.py            # Fragment forge (/forge)
+        ├── shop/                   # Shop system
         │   ├── __init__.py
-        │   ├── roles.py            # 身份组商店 (!roleshop, /tag)
-        │   └── items.py            # 物品商店 (/shop)
-        ├── games/                  # 游戏系统
+        │   ├── roles.py            # Role shop (!roleshop, /tag)
+        │   └── items.py            # Item shop (/shop)
+        ├── games/                  # Game system
         │   ├── __init__.py
-        │   └── quiz.py             # 答题游戏 (!quiz, /quiz)
-        ├── rankings/               # 排行榜系统
+        │   └── quiz.py             # Quiz game (!quiz, /quiz)
+        ├── rankings/               # Ranking system
         │   ├── __init__.py
-        │   └── leaderboard.py      # 积分排行榜 (!ranking)
-        └── system/                 # 系统功能
+        │   └── leaderboard.py      # Points leaderboard (!ranking)
+        └── system/                 # System functions
             ├── __init__.py
-            ├── help.py             # 帮助系统 (/help)
-            └── admin.py            # 管理员工具 (!admin)
+            ├── help.py             # Help system (/help)
+            └── admin.py            # Admin tools (!admin)
 ```
 
-## ⚙️ 配置要求
+## ⚙️ Configuration Requirements
 
-### 必需环境变量
+### Required Environment Variables
 ```env
-TOKEN=discord_bot_token                   # Discord机器人令牌
-SUPABASE_URL=your_supabase_project_url    # Supabase项目URL
-SUPABASE_KEY=your_supabase_anon_key       # Supabase匿名密钥
-REDIS_URL=your_redis_server_url           # Redis连接URL（生产环境必需）
+TOKEN=discord_bot_token                   # Discord bot token
+SUPABASE_URL=your_supabase_project_url    # Supabase project URL
+SUPABASE_KEY=your_supabase_anon_key       # Supabase anonymous key
+REDIS_URL=your_redis_server_url           # Redis connection URL (required for production)
 ```
 
-### 数据库架构
-项目使用Supabase（PostgreSQL 17.6）作为后端数据库，包含22个数据表：
+### Database Architecture
+The project uses Supabase (PostgreSQL 17.6) as the backend database, containing 22 data tables:
 
-## 📋 数据表详细结构
+## 📋 Detailed Database Structure
 
-### 👥 核心用户表
+### 👥 Core User Tables
 #### `users`
-**用途：** 存储用户基本信息、积分和游戏状态
+**Purpose:** Store user basic information, points, and game status
 ```sql
-主要字段：
-- id (bigint, PK) - 内部用户ID
-- discord_user_id (bigint) - Discord用户ID
-- guild_id (bigint) - 服务器ID
-- points (integer) - 当前积分
-- paid_draws_today (integer) - 今日付费抽奖次数
-- last_draw_date (date) - 最后抽奖日期
-- equipped_pet_id (bigint) - 装备的宠物ID
-- egg_pity_counter (integer) - 蛋抽卡保底计数器(0-49)
-- legendary_egg_pity_counter (integer) - 传说蛋保底计数器
+Main fields:
+- id (bigint, PK) - Internal user ID
+- discord_user_id (bigint) - Discord user ID
+- guild_id (bigint) - Server ID
+- points (integer) - Current points
+- paid_draws_today (integer) - Today's paid draw count
+- last_draw_date (date) - Last draw date
+- equipped_pet_id (bigint) - Equipped pet ID
+- egg_pity_counter (integer) - Egg draw pity counter (0-49)
+- legendary_egg_pity_counter (integer) - Legendary egg pity counter
 ```
 
-### 🐾 宠物系统表
+### 🐾 Pet System Tables
 #### `pet_templates`
-**用途：** 宠物模板库，定义宠物属性
+**Purpose:** Pet template library, defining pet attributes
 ```sql
-主要字段：
-- id (bigint, PK) - 宠物模板ID
-- cn_name (varchar, unique) - 中文名称
-- en_name (varchar) - 英文名称
-- rarity (rarity_enum) - 稀有度：C/R/SR/SSR
-- cn_description/en_description (text) - 宠物描述
+Main fields:
+- id (bigint, PK) - Pet template ID
+- cn_name (varchar, unique) - Chinese name
+- en_name (varchar) - English name
+- rarity (rarity_enum) - Rarity: C/R/SR/SSR
+- cn_description/en_description (text) - Pet description
 ```
 
 #### `user_pets`
-**用途：** 用户拥有的宠物实例
+**Purpose:** User-owned pet instances
 ```sql
-主要字段：
-- id (bigint, PK) - 宠物实例ID
-- user_id (bigint, FK) - 拥有者ID
-- pet_template_id (bigint, FK) - 宠物模板ID
-- level (integer) - 等级 (>=1)
-- stars (integer) - 星级
-- xp_current/xp_total (integer) - 经验值
-- satiety (integer) - 饱食度 (0-100)
-- favorite_flavor/dislike_flavor (flavor_enum) - 喜好口味
-- last_feeding (timestamptz) - 最后喂食时间
+Main fields:
+- id (bigint, PK) - Pet instance ID
+- user_id (bigint, FK) - Owner ID
+- pet_template_id (bigint, FK) - Pet template ID
+- level (integer) - Level (>=1)
+- stars (integer) - Star rating
+- xp_current/xp_total (integer) - Experience points
+- satiety (integer) - Satiety (0-100)
+- favorite_flavor/dislike_flavor (flavor_enum) - Flavor preferences
+- last_feeding (timestamptz) - Last feeding time
 ```
 
 #### `user_eggs`
-**用途：** 用户宠物蛋库存和孵化状态
+**Purpose:** User pet egg inventory and hatching status
 ```sql
-主要字段：
-- id (bigint, PK) - 蛋ID
-- user_id (bigint, FK) - 拥有者ID
-- rarity (rarity_enum) - 蛋稀有度：C/R/SR/SSR
-- status (egg_status_enum) - 状态：pending/hatching/completed/claimed
-- hatch_started_at (timestamptz) - 开始孵化时间
-- hatch_completed_at (timestamptz) - 完成孵化时间
+Main fields:
+- id (bigint, PK) - Egg ID
+- user_id (bigint, FK) - Owner ID
+- rarity (rarity_enum) - Egg rarity: C/R/SR/SSR
+- status (egg_status_enum) - Status: pending/hatching/completed/claimed
+- hatch_started_at (timestamptz) - Hatch start time
+- hatch_completed_at (timestamptz) - Hatch completion time
 ```
 
 #### `user_pet_fragments`
-**用途：** 用户宠物碎片库存
+**Purpose:** User pet fragment inventory
 ```sql
-主要字段：
-- id (bigint, PK) - 碎片ID
-- user_id (bigint, FK) - 拥有者ID
-- rarity (rarity_enum) - 碎片稀有度
-- amount (integer) - 碎片数量
+Main fields:
+- id (bigint, PK) - Fragment ID
+- user_id (bigint, FK) - Owner ID
+- rarity (rarity_enum) - Fragment rarity
+- amount (integer) - Fragment quantity
 ```
 
-### 🍜 杂货铺系统表
+### 🍜 Food Shop System Tables
 #### `food_templates`
-**用途：** 食粮模板定义
+**Purpose:** Food template definitions
 ```sql
-主要字段：
-- id (bigint, PK) - 食粮模板ID
-- cn_name/en_name (varchar) - 食粮名称
-- rarity (rarity_enum) - 稀有度
-- flavor (flavor_enum) - 口味：SWEET/SALTY/SOUR/SPICY/UMAMI
-- base_xp/xp_flow (integer) - 基础经验值
-- price (integer) - 价格
+Main fields:
+- id (bigint, PK) - Food template ID
+- cn_name/en_name (varchar) - Food name
+- rarity (rarity_enum) - Rarity
+- flavor (flavor_enum) - Flavor: SWEET/SALTY/SOUR/SPICY/UMAMI
+- base_xp/xp_flow (integer) - Base experience points
+- price (integer) - Price
 ```
 
 #### `user_food_inventory`
-**用途：** 用户食粮库存
+**Purpose:** User food inventory
 ```sql
-主要字段：
-- id (bigint, PK) - 库存ID
-- user_id (bigint, FK) - 用户ID
-- food_template_id (bigint, FK) - 食粮模板ID
-- quantity (integer) - 数量 (>=0)
+Main fields:
+- id (bigint, PK) - Inventory ID
+- user_id (bigint, FK) - User ID
+- food_template_id (bigint, FK) - Food template ID
+- quantity (integer) - Quantity (>=0)
 ```
 
 #### `daily_shop_catalog`
-**用途：** 每日商店商品目录
+**Purpose:** Daily shop product catalog
 ```sql
-主要字段：
-- refresh_date (date) - 刷新日期
-- food_template_id (bigint, FK) - 食粮ID
+Main fields:
+- refresh_date (date) - Refresh date
+- food_template_id (bigint, FK) - Food ID
 ```
 
-### 🎰 游戏系统表
+### 🎰 Game System Tables
 #### `quiz_questions`
-**用途：** 题库
+**Purpose:** Question bank
 ```sql
-主要字段：
-- id (bigint, PK) - 题目ID
-- category (varchar) - 题目类别
-- language (quiz_language_enum) - 语言：chinese/english
-- question (text) - 题目内容
-- option_a/b/c/d (varchar) - 选项
-- answer (char) - 正确答案 (A/B/C/D)
+Main fields:
+- id (bigint, PK) - Question ID
+- category (varchar) - Question category
+- language (quiz_language_enum) - Language: chinese/english
+- question (text) - Question content
+- option_a/b/c/d (varchar) - Options
+- answer (char) - Correct answer (A/B/C/D)
 ```
 
 #### `blackjack_games`
-**用途：** 二十一点游戏历史记录
+**Purpose:** Blackjack game history records
 ```sql
-主要字段：
-- id (bigint, PK) - 游戏ID
-- user_id (bigint, FK) - 玩家ID
-- bet_amount (integer) - 下注金额
-- result (blackjack_result_enum) - 结果：win/lose/tie/blackjack/surrender/dealer_blackjack
-- profit (integer) - 净盈亏
-- player_hand/dealer_hand (jsonb) - 玩家/庄家手牌
-- had_insurance/is_split/is_doubled (boolean) - 游戏选项
+Main fields:
+- id (bigint, PK) - Game ID
+- user_id (bigint, FK) - Player ID
+- bet_amount (integer) - Bet amount
+- result (blackjack_result_enum) - Result: win/lose/tie/blackjack/surrender/dealer_blackjack
+- profit (integer) - Net profit/loss
+- player_hand/dealer_hand (jsonb) - Player/dealer hands
+- had_insurance/is_split/is_doubled (boolean) - Game options
 ```
 
 #### `user_game_statistics`
-**用途：** 用户游戏统计
+**Purpose:** User game statistics
 ```sql
-主要字段：
-- id (varchar, PK) - 统计ID
-- user_id (bigint, FK) - 用户ID
-- game_type (game_type_enum) - 游戏类型：quiz/memory/reaction/puzzle/snake/tetris
-- best_score (integer) - 最高分
-- games_played (integer) - 游戏次数
+Main fields:
+- id (varchar, PK) - Statistics ID
+- user_id (bigint, FK) - User ID
+- game_type (game_type_enum) - Game type: quiz/memory/reaction/puzzle/snake/tetris
+- best_score (integer) - Best score
+- games_played (integer) - Games played count
 ```
 
-### 🏷️ 商店系统表
+### 🏷️ Shop System Tables
 #### `tags`
-**用途：** 身份组商店
+**Purpose:** Role shop
 ```sql
-主要字段：
-- id (bigint, PK) - 身份组ID
-- guild_id (text) - 服务器ID
-- role_id (text) - Discord身份组ID
-- price (integer) - 价格(积分)
+Main fields:
+- id (bigint, PK) - Role ID
+- guild_id (text) - Server ID
+- role_id (text) - Discord role ID
+- price (integer) - Price (points)
 ```
 
-### ⚙️ 系统配置表
+### ⚙️ System Configuration Tables
 #### `guild_settings`
-**用途：** 服务器设置
+**Purpose:** Server settings
 ```sql
-主要字段：
-- guild_id (bigint, PK) - 服务器ID
-- language (language_enum) - 语言：en/zh/ja/ko/es/fr/de
+Main fields:
+- guild_id (bigint, PK) - Server ID
+- language (language_enum) - Language: en/zh/ja/ko/es/fr/de
 ```
 
 #### `egg_draw_probabilities`
-**用途：** 蛋抽取概率配置
+**Purpose:** Egg draw probability configuration
 ```sql
-主要字段：
-- rarity (rarity_enum) - 稀有度
-- probability (numeric) - 概率值
+Main fields:
+- rarity (rarity_enum) - Rarity
+- probability (numeric) - Probability value
 ```
 
 #### `egg_hatch_probabilities`
-**用途：** 蛋孵化概率配置
+**Purpose:** Egg hatching probability configuration
 ```sql
-主要字段：
-- egg_rarity (rarity_enum) - 蛋稀有度
-- pet_rarity (rarity_enum) - 孵化宠物稀有度
-- probability (numeric) - 概率值
+Main fields:
+- egg_rarity (rarity_enum) - Egg rarity
+- pet_rarity (rarity_enum) - Hatched pet rarity
+- probability (numeric) - Probability value
 ```
 
 #### `pet_rarity_configs`
-**用途：** 宠物稀有度配置
+**Purpose:** Pet rarity configuration
 ```sql
-主要字段：
-- rarity (rarity_enum) - 稀有度
-- min_initial_stars/max_initial_stars (integer) - 初始星级范围
-- max_stars (integer) - 最大星级
+Main fields:
+- rarity (rarity_enum) - Rarity
+- min_initial_stars/max_initial_stars (integer) - Initial star range
+- max_stars (integer) - Maximum stars
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
 ```bash
-# 克隆项目
+# Clone the project
 git clone <repository-url>
 cd Daily Draw
 
-# 创建虚拟环境
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
+# or venv\Scripts\activate  # Windows
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 
-# 配置环境变量
+# Configure environment variables
 cp .env.example .env
-# 编辑 .env 文件填入你的配置
+# Edit .env file with your configuration
 
-# 运行机器人
+# Run the bot
 python bot.py
 ```
 
-## 🎮 命令大全
+## 🎮 Command List
 
-### 💰 经济系统命令
-**传统命令：**
-- `!draw [次数]` - 每日抽奖（免费1次，付费最多20次/天，每次100积分）
-- `!check [用户]` - 查看积分和抽奖状态
-- `!giftpoints <用户> <积分>` - 赠送积分给其他用户
+### 💰 Economy System Commands
+**Traditional Commands:**
+- `!draw [count]` - Daily draw (1 free, max 30 paid/day, 100 points each)
+- `!check [user]` - Check points and draw status
+- `!giftpoints <user> <points>` - Gift points to other users
 
-**抽奖规则：**
-- 🎉 **免费抽奖**：每天1次，完全免费
-- 🎰 **付费抽奖**：每天最多20次，每次消耗100积分
-- ⏰ **重置时间**：每天0点自动重置抽奖次数
-- 💰 **奖励范围**：10-1000积分，平均回报率103.8%
+**Draw Rules:**
+- 🎉 **Free Draw**: 1 time daily, completely free
+- 🎰 **Paid Draw**: Max 30 times daily, 100 points each
+- ⏰ **Reset Time**: Automatically resets at 0:00 daily
+- 💰 **Reward Range**: 10-1000 points, average return rate 103.8%
 
-### 🥚 蛋系统
-**斜杠命令：**
-- `/egg action:draw` - 抽取宠物蛋（单抽250积分，十连2250积分）
-- `/egg action:list` - 查看拥有的蛋库存
-- `/egg action:hatch` - 选择蛋进行孵化
-- `/egg action:claim` - 领取已完成孵化的宠物
+### 🥚 Egg System
+**Slash Commands:**
+- `/egg action:draw` - Draw pet eggs (single 250 points, 10-draw 2250 points)
+- `/egg action:list` - View owned egg inventory
+- `/egg action:hatch` - Select egg for hatching
+- `/egg action:claim` - Claim completed hatched pets
 
-### 🐾 宠物系统
-**斜杠命令：**
-- `/pet action:list [页码]` - 查看宠物列表（分页显示）
-- `/pet action:info` - 查看指定宠物详细信息
-- `/pet action:upgrade` - 升级宠物星级（需要碎片和积分）
-- `/pet action:dismantle` - 分解宠物获得碎片和积分
-- `/pet action:fragments` - 查看拥有的宠物碎片库存
-- `/pet action:equip` - 装备宠物开始自动获取积分
-- `/pet action:unequip` - 卸下当前装备的宠物
-- `/pet action:status` - 查看当前装备状态和待领取积分
-- `/pet action:claim` - 领取宠物自动获得的积分
-- `/pet action:feed` - 喂食宠物获得经验
+### 🐾 Pet System
+**Slash Commands:**
+- `/pet action:list [page]` - View pet list (paginated)
+- `/pet action:info` - View detailed pet information
+- `/pet action:upgrade` - Upgrade pet star level (requires fragments and points)
+- `/pet action:dismantle` - Dismantle pet for fragments and points
+- `/pet action:fragments` - View owned pet fragment inventory
+- `/pet action:equip` - Equip pet to start auto-earning points
+- `/pet action:unequip` - Unequip current equipped pet
+- `/pet action:status` - View current equipment status and pending points
+- `/pet action:claim` - Claim auto-earned points from pets
+- `/pet action:feed` - Feed pets to gain experience
 
-**自动喂食：**
-- `/feed auto [pet] [mode] [quantity]` - 一键喂食宠物
+**Auto Feeding:**
+- `/feed auto [pet] [mode] [quantity]` - One-click pet feeding
 
-### 🏪 杂货铺系统
-**斜杠命令：**
-- `/shop action:view menu` - 查看今日杂货铺商品
-- `/shop action:buy item:<商品名> quantity:<数量>` - 购买指定食粮
-- `/inventory item_type:food` - 查看食粮库存
+### 🏪 Food Shop System
+**Slash Commands:**
+- `/shop action:view menu` - View today's food shop items
+- `/shop action:buy item:<item_name> quantity:<quantity>` - Buy specified food
+- `/inventory item_type:food` - View food inventory
 
-### 🔨 锻造系统
-**斜杠命令：**
-- `/forge action:view` - 查看碎片库存和合成规则
-- `/forge action:craft from_rarity:<源稀有度> to_rarity:<目标稀有度> quantity:<数量>` - 合成宠物碎片
+### 🔨 Forge System
+**Slash Commands:**
+- `/forge action:view` - View fragment inventory and synthesis rules
+- `/forge action:craft from_rarity:<source_rarity> to_rarity:<target_rarity> quantity:<quantity>` - Synthesize pet fragments
 
-**合成规则：**
-- C碎片 → R碎片：10:1 + 50积分
-- R碎片 → SR碎片：5:1 + 80积分
-- SR碎片 → SSR碎片：3:1 + 100积分
+**Synthesis Rules:**
+- C fragments → R fragments: 10:1 + 50 points
+- R fragments → SR fragments: 5:1 + 80 points
+- SR fragments → SSR fragments: 3:1 + 100 points
 
-### 🏷️ 身份组系统
-**斜杠命令：**
-- `/tag action:shop` - 查看身份组商店
-- `/tag action:buy role_name:<身份组名>` - 购买指定身份组
+### 🏷️ Role System
+**Slash Commands:**
+- `/tag action:shop` - View role shop
+- `/tag action:buy role_name:<role_name>` - Buy specified role
 
-### 🎮 答题系统
-**传统命令：**
-- `!quizlist [语言]` - 查看题库类别
-  • `!quizlist` 或 `!quizlist all` - 显示所有语言
-  • `!quizlist chinese` - 只显示中文题库
-  • `!quizlist english` - 只显示英文题库
+### 🎮 Quiz System
+**Traditional Commands:**
+- `!quizlist [language]` - View question bank categories
+  • `!quizlist` or `!quizlist all` - Show all languages
+  • `!quizlist chinese` - Show Chinese question banks only
+  • `!quizlist english` - Show English question banks only
 
-**提示：**
-- 答对每题可获得20积分
-- 等待管理员开启答题！
+**Tips:**
+- 20 points reward for each correct answer
+- Wait for admin to start quiz!
 
-### 🎰 二十一点游戏
-**斜杠命令：**
-- `/blackjack play <下注金额>` - 开始二十一点游戏
-  • 下注金额可以是数字或 `all`（全部积分）
-  • 示例：`/blackjack play 100` 或 `/blackjack play all`
-- `/blackjack stats` - 查看游戏统计数据
+### 🎰 Blackjack Game
+**Slash Commands:**
+- `/blackjack play <bet_amount>` - Start blackjack game
+  • Bet amount can be a number or `all` (all points)
+  • Example: `/blackjack play 100` or `/blackjack play all`
+- `/blackjack stats` - View game statistics
 
-**游戏功能：**
-- 🎴✋ **基础操作**：要牌、停牌
-- 🎲 **加倍下注**：首次发牌后加倍（Double Down）
-- ✂️ **分牌**：对子可以分成两手牌（Split）
-- 🎲✂️ **DAS规则**：分牌后可以加倍（降低庄家优势0.14%）
-- 🛡️ **保险**：庄家明牌A时可购买保险
-- 🏳️ **投降**：手牌极差时止损
+**Game Features:**
+- 🎴✋ **Basic Actions**: Hit, Stand
+- 🎲 **Double Down**: Double bet after first deal
+- ✂️ **Split**: Split pairs into two hands
+- 🎲✂️ **DAS Rule**: Double after split (reduces house edge by 0.14%)
+- 🛡️ **Insurance**: Buy insurance when dealer shows Ace
+- 🏳️ **Surrender**: Surrender with very bad hand
 
-**特色：**
-- ✅ 标准赌场规则（庄家17点停牌）
-- ✅ BlackJack特殊奖励（2.5倍赔率）
-- ✅ 完整游戏记录和统计
+**Special Features:**
+- ✅ Standard casino rules (dealer stands on 17)
+- ✅ Blackjack special reward (2.5x payout)
+- ✅ Complete game records and statistics
 
-### 🏆 排行榜系统
-**斜杠命令：**
-- `/leaderboard [type]` - 查看服务器排行榜（显示前10名）
+### 🏆 Leaderboard System
+**Slash Commands:**
+- `/leaderboard [type]` - View server leaderboard (shows top 10)
 
-**排行榜类型：**
-- `points` - 积分排行榜（默认）
-- `pets` - 宠物数量排行榜
-- `hatched eggs` - 已孵化蛋数量排行榜
-- `blackjack wins` - 21点胜场排行榜
+**Leaderboard Types:**
+- `points` - Points leaderboard (default)
+- `pets` - Pet count leaderboard
+- `hatched eggs` - Hatched eggs count leaderboard
+- `blackjack wins` - Blackjack wins leaderboard
 
-**示例：**
-• `/leaderboard` - 查看积分排行榜
-• `/leaderboard type:pets` - 查看宠物排行榜
-• `/leaderboard type:hatched eggs` - 查看已孵化蛋排行榜
-• `/leaderboard type:blackjack wins` - 查看21点胜场排行榜
+**Examples:**
+• `/leaderboard` - View points leaderboard
+• `/leaderboard type:pets` - View pet leaderboard
+• `/leaderboard type:hatched eggs` - View hatched eggs leaderboard
+• `/leaderboard type:blackjack wins` - View blackjack wins leaderboard
 
-### ⚙️ 管理员命令
-**系统管理：**
-- `/language` - 设置服务器语言
-- `!rewardinfo` - 显示奖品概率信息
-- `!checksubscription` - 检查服务器订阅状态
+### ⚙️ Admin Commands
+**System Management:**
+- `/language` - Set server language
+- `!rewardinfo` - Display prize probability information
+- `!checksubscription` - Check server subscription status
 
-**身份组管理：**
-- `!addtag <价格> <身份组>` - 添加可购买身份组
-- `!removetag <身份组>` - 删除身份组商店中的身份组
-- `!updatetagprice <身份组> <新价格>` - 更新身份组价格
-- `!listtags` - 查看所有已添加的身份组
+**Role Management:**
+- `!addtag <price> <role>` - Add purchasable role
+- `!removetag <role>` - Remove role from shop
+- `!updatetagprice <role> <new_price>` - Update role price
+- `!listtags` - View all added roles
 
-**答题管理：**
-- `!quiz "<类别>" <题目数>` - 开始答题游戏
-  • 支持完全匹配：`!quiz 动漫 5`
-  • 支持模糊匹配：`!quiz study 5` (匹配所有 study:xxx)
-  • 答对每题奖励20积分
+**Quiz Management:**
+- `!quiz "<category>" <question_count>` - Start quiz game
+  • Supports exact match: `!quiz 动漫 5`
+  • Supports fuzzy match: `!quiz study 5` (matches all study:xxx)
+  • 20 points reward for each correct answer
 
-**积分管理：**
-- `!givepoints <用户> <积分>` - 给予用户积分
-- `!setpoints <用户> <积分>` - 设置用户积分
+**Points Management:**
+- `!givepoints <user> <points>` - Give points to user
+- `!setpoints <user> <points>` - Set user points
 
-## 🌍 国际化支持
+## 🌍 Internationalization Support
 
-### 多语言架构
-- **语言包位置**：`src/locales/`
-- **支持语言**：中文(zh-CN)、英文(en-US)
-- **动态切换**：管理员可实时切换服务器语言
-- **扩展性**：可按相同格式添加新语言
+### Multi-language Architecture
+- **Language Pack Location**: `src/locales/`
+- **Supported Languages**: Chinese (zh-CN), English (en-US)
+- **Dynamic Switching**: Admins can switch server language in real-time
+- **Extensibility**: Can add new languages following the same format
 
-### 语言管理
-- 环境变量 `DEFAULT_LOCALE` 设置默认语言
-- `/settings language` 命令切换服务器语言
-- 所有用户界面文本已完全本地化
-- 新功能开发时请同步更新语言包
+### Language Management
+- Environment variable `DEFAULT_LOCALE` sets default language
+- `/settings language` command switches server language
+- All user interface texts are fully localized
+- Please update language packs simultaneously when developing new features
 
-## 🛠️ 开发指南
+## 🛠️ Development Guide
 
-### 添加新功能
-1. **选择模块**：确定功能分类（economy/pets/shop/games/rankings/system）
-2. **创建命令**：在对应模块文件中添加功能函数
-3. **更新导出**：在模块的 `__init__.py` 中导出新函数
-4. **注册命令**：在 `src/main.py` 中注册传统命令和斜杠命令
-5. **添加翻译**：在 `src/locales/` 中添加多语言支持
-6. **测试功能**：使用内置测试命令验证功能
+### Adding New Features
+1. **Choose Module**: Determine feature category (economy/pets/shop/games/rankings/system)
+2. **Create Command**: Add function to corresponding module file
+3. **Update Export**: Export new function in module's `__init__.py`
+4. **Register Command**: Register traditional and slash commands in `src/main.py`
+5. **Add Translation**: Add multi-language support in `src/locales/`
+6. **Test Feature**: Use built-in test commands to verify functionality
 
-### 命令系统架构
-- **混合命令**：同时支持 `!command` 和 `/command`
-- **权限控制**：使用 `@commands.has_permissions()` 管理权限
-- **错误处理**：统一的错误处理和用户反馈机制
-- **异步操作**：所有数据库操作使用 async/await
+### Command System Architecture
+- **Hybrid Commands**: Support both `!command` and `/command`
+- **Permission Control**: Use `@commands.has_permissions()` for permissions
+- **Error Handling**: Unified error handling and user feedback mechanism
+- **Async Operations**: All database operations use async/await
 
-### 数据库操作
+### Database Operations
 ```python
-# 获取数据库连接
+# Get database connection
 from src.db.database import get_connection
 supabase = get_connection()
 
-# 用户操作示例
+# User operation example
 from src.utils.helpers import get_missing_user_id
 user_id = await get_missing_user_id(discord_user.id)
 ```
 
-### UI组件使用
+### UI Component Usage
 ```python
-# 创建交互式选择菜单
+# Create interactive selection menu
 from src.utils.ui import create_pet_selector, create_confirmation
-view = create_pet_selector(pets, "选择一只宠物")
+view = create_pet_selector(pets, "Select a pet")
 await ctx.send_message(view=view)
 ```
 
-## 📊 项目统计
+## 📊 Project Statistics
 
-**系统特性：**
-- ✅ 模块化架构设计
-- ✅ 完整的权限管理
-- ✅ Redis缓存优化
-- ✅ 多语言国际化
-- ✅ 全面的错误处理
-- ✅ 丰富的管理工具
+**System Features:**
+- ✅ Modular architecture design
+- ✅ Complete permission management
+- ✅ Redis cache optimization
+- ✅ Multi-language internationalization
+- ✅ Comprehensive error handling
+- ✅ Rich management tools
 
-## 🔧 故障排除
+## 🔧 Troubleshooting
 
-### 常见问题
-1. **机器人无法启动**：检查环境变量配置和Discord令牌
-2. **数据库连接失败**：验证Supabase URL和密钥
-3. **Redis连接错误**：生产环境必须配置Redis URL
-4. **命令无响应**：检查机器人是否有服务器权限
+### Common Issues
+1. **Bot fails to start**: Check environment variable configuration and Discord token
+2. **Database connection failure**: Verify Supabase URL and key
+3. **Redis connection error**: Redis URL must be configured in production environment
+4. **Commands not responding**: Check if bot has server permissions
 
-### 日志调试
+### Log Debugging
 ```bash
-# 查看机器人运行日志
-python bot.py  # 日志会输出到控制台
+# View bot running logs
+python bot.py  # Logs will be output to console
 ```
 
-## 📝 许可证
+## 📝 License
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 贡献指南
+## 🤝 Contributing Guidelines
 
-1. Fork 本项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+1. Fork this project
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Create Pull Request
 
-## 📞 支持
+## 📞 Support
 
-如有问题或建议，请：
-- 创建 [Issue](../../issues)
-- 联系项目维护者
+For questions or suggestions, please:
+- Create an [Issue](../../issues)
+- Contact project maintainers
 
 ---
 
-**⭐ 如果这个项目对你有帮助，请给它一个星标！**
+**⭐ If this project helps you, please give it a star!**
