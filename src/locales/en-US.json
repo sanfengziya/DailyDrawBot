@@ -380,6 +380,7 @@
         "info": "View Details",
         "upgrade": "Upgrade Stars",
         "dismantle": "Dismantle",
+        "batch_dismantle": "Batch Dismantle",
         "fragments": "View Fragments",
         "equip": "Equip",
         "unequip": "Unequip",
@@ -401,12 +402,15 @@
         "select_info": "select pet to view details...",
         "select_upgrade": "select pet to upgrade stars...",
         "select_dismantle": "select pet to dismantle...",
+        "select_batch_dismantle": "select pets to batch dismantle (max 20)...",
         "select_equip": "select pet to equip...",
         "select_feed": "select pet to feed...",
         "select_food": "select food to feed..."
       },
       "buttons": {
         "confirm_dismantle": "confirm dismantle",
+        "confirm_batch_dismantle": "confirm batch dismantle",
+        "apply_filters": "apply filters",
         "cancel": "cancel",
         "confirm": "Confirm",
         "ok": "OK"
@@ -531,7 +535,10 @@
         "benefits_fragments": "🧩 {fragments} {rarity} fragments\\n",
         "benefits_points": "💰 {points} points\\n\\n",
         "warning": "**Note: Cannot be restored after dismantling!**",
-        "processing": "✅ Dismantling confirmation..."
+        "processing": "✅ Dismantling confirmation...",
+        "batch_completed": "✅ Batch dismantle completed!",
+        "batch_failed": "❌ Batch dismantle failed!",
+        "batch_error": "❌ Batch dismantle execution error!"
       },
       "success": {
         "title": "💥 Dismantle Successful",
@@ -543,6 +550,121 @@
       },
       "error_deleting": "{user} pet does not exist or has been dismantled!",
       "error_executing": "{user} error dismantling pet!"
+    },
+    "batch_dismantle": {
+      "errors": {
+        "too_many_pets": {
+          "title": "❌ Too Many Pets",
+          "message": "You can only select up to {count} pets for batch dismantling at once!"
+        },
+        "equipped_included": {
+          "title": "❌ Equipped Pet Included",
+          "message": "Batch dismantling cannot include equipped pets! Please unequip the pet first."
+        },
+        "no_valid_pets": {
+          "title": "❌ No Valid Pets",
+          "message": "No valid pets available for dismantling!"
+        },
+        "invalid_pets": "Selected pets are invalid or do not belong to you!",
+        "selection_error": "Error in batch dismantle selection: {error}",
+        "execution_error": "Error executing batch dismantle: {error}",
+        "all_failed": {
+          "title": "❌ All Failed",
+          "message": "All pet dismantling operations failed!\\n\\n"
+        },
+        "mode_selection_error": "Error in batch dismantle mode selection: {error}",
+        "manual_selection_error": "Error showing manual selection mode: {error}",
+        "auto_selection_error": "Error showing auto selection mode: {error}",
+        "auto_execution_error": "Error executing auto selection: {error}"
+      },
+      "mode": {
+        "title": "🔧 Batch Dismantle Mode Selection",
+        "description": "Please select a batch dismantle mode:",
+        "placeholder": "Select dismantle mode...",
+        "options": {
+          "description": "**Available Modes:**"
+        },
+        "manual": {
+          "label": "🎯 Manual Selection Mode",
+          "description_short": "Manually select pets to dismantle",
+          "description": "🎯 **Manual Selection Mode**: Manually select pets to dismantle from your pet list (max 20 pets)"
+        },
+        "auto": {
+          "label": "⚡ Auto Filter Mode",
+          "description_short": "Automatically select pets based on criteria",
+          "description": "⚡ **Auto Filter Mode**: Automatically select pets for dismantling based on rarity and star criteria"
+        }
+      },
+      "manual": {
+        "description": "Please select pets to batch dismantle from below:"
+      },
+      "auto": {
+        "title": "⚡ Auto Batch Dismantle Filter",
+        "description": "Set filter criteria to automatically select qualifying pets for dismantling",
+        "instructions": "**Filter Criteria:**\\n• Rarity Filter: Select pet rarity range to dismantle\\n• Star Filter: Select maximum star level to dismantle\\n• System will automatically skip equipped pets\\n• Maximum 20 qualifying pets will be selected",
+        "current_filters": "**Current Filter Conditions:**",
+        "filter_label": {
+          "rarity": "Rarity",
+          "star": "Stars"
+        },
+        "no_matches": {
+          "title": "⚠️ No Matching Pets",
+          "message": "No pets found matching the current filter criteria!"
+        }
+      },
+      "filter": {
+        "rarity": {
+          "placeholder": "Select rarity filter",
+          "all": "All rarities",
+          "all_desc": "No rarity restriction",
+          "c_only": "C only",
+          "c_desc": "C rarity pets only",
+          "r_only": "R only",
+          "r_desc": "R rarity pets only",
+          "sr_only": "SR only",
+          "sr_desc": "SR rarity pets only",
+          "ssr_only": "SSR only",
+          "ssr_desc": "SSR rarity pets only",
+          "below_sr": "Below SR",
+          "below_sr_desc": "Below SR rarity (C,R)",
+          "below_ssr": "Below SSR",
+          "below_ssr_desc": "Below SSR rarity (C,R,SR)"
+        },
+        "star": {
+          "placeholder": "Select star filter",
+          "all": "All stars",
+          "all_desc": "No star restriction",
+          "max_0": "Max 0 stars",
+          "max_0_desc": "0 stars and below",
+          "max_1": "Max 1 star",
+          "max_1_desc": "1 star and below",
+          "max_2": "Max 2 stars",
+          "max_2_desc": "2 stars and below",
+          "max_3": "Max 3 stars",
+          "max_3_desc": "3 stars and below"
+        }
+      },
+      "confirm": {
+        "title": "⚠️ Confirm Batch Dismantle",
+        "description": "{user} are you sure you want to dismantle the following **{count}** pets?\\n\\n",
+        "selected_pets": "**Selected Pets:**",
+        "more_pets": "• ... and {remaining} more pets",
+        "benefits": "**Estimated Benefits:**",
+        "points": "💰 {points} points\\n\\n",
+        "warning": "**⚠️ Note: Cannot be restored after dismantling! Please confirm carefully!**"
+      },
+      "cancelled": {
+        "title": "✅ Batch Dismantle Cancelled",
+        "message": "{user} batch dismantle operation has been cancelled."
+      },
+      "completed": {
+        "title": "💥 Batch Dismantle Completed",
+        "description": "{user} batch dismantle completed! Successfully dismantled {success_count}/{total_count} pets.",
+        "description_all_success": "{user} batch dismantle completed! Successfully dismantled {success_count} pets.",
+        "dismantled_pets": "**Dismantled Pets:**",
+        "more_pets": "• ... and {remaining} more pets",
+        "errors": "**Failed Dismantles:**"
+      }
     },
     "equip": {
       "pet_not_found": {

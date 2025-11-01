@@ -215,10 +215,20 @@ class PetSelect(discord.ui.Select):
         self.action = action
         self.guild_id = guild_id
         locale = get_guild_locale(guild_id)
-        super().__init__(
-            placeholder=t("pet.ui.placeholders.select_" + action, locale=locale, default=f"选择要{self.get_action_name(locale)}的宠物..."),
-            options=options
-        )
+
+        # 如果是批量分解，使用多选模式
+        if action == "batch_dismantle":
+            super().__init__(
+                placeholder=t("pet.ui.placeholders.select_batch_dismantle", locale=locale, default="选择要批量分解的宠物 (最多20个)..."),
+                options=options,
+                min_values=1,
+                max_values=min(len(options), 20)  # 最多选择20个
+            )
+        else:
+            super().__init__(
+                placeholder=t("pet.ui.placeholders.select_" + action, locale=locale, default=f"选择要{self.get_action_name(locale)}的宠物..."),
+                options=options
+            )
 
     def get_action_name(self, locale=None):
         if locale is None:
@@ -227,24 +237,31 @@ class PetSelect(discord.ui.Select):
             "info": t("pet.command.choices.info", locale=locale),
             "upgrade": t("pet.command.choices.upgrade", locale=locale),
             "dismantle": t("pet.command.choices.dismantle", locale=locale),
+            "batch_dismantle": t("pet.command.choices.batch_dismantle", locale=locale),
             "equip": t("pet.command.choices.equip", locale=locale),
             "feed": t("pet.command.choices.feed", locale=locale)
         }
         return action_names.get(self.action, t("pet.ui.actions.operate", locale=locale))
     
     async def callback(self, interaction: discord.Interaction):
-        pet_id = int(self.values[0])
-        
-        if self.action == "info":
-            await handle_pet_info(interaction, pet_id)
-        elif self.action == "upgrade":
-            await handle_pet_upgrade(interaction, pet_id)
-        elif self.action == "dismantle":
-            await handle_pet_dismantle(interaction, pet_id)
-        elif self.action == "equip":
-            await handle_pet_equip(interaction, pet_id)
-        elif self.action == "feed":
-            await handle_pet_feed(interaction, pet_id)
+        if self.action == "batch_dismantle":
+            # 批量分解模式，传递多个宠物ID
+            pet_ids = [int(pet_id) for pet_id in self.values]
+            await handle_batch_dismantle_selection(interaction, pet_ids)
+        else:
+            # 单选模式，传递单个宠物ID
+            pet_id = int(self.values[0])
+
+            if self.action == "info":
+                await handle_pet_info(interaction, pet_id)
+            elif self.action == "upgrade":
+                await handle_pet_upgrade(interaction, pet_id)
+            elif self.action == "dismantle":
+                await handle_pet_dismantle(interaction, pet_id)
+            elif self.action == "equip":
+                await handle_pet_equip(interaction, pet_id)
+            elif self.action == "feed":
+                await handle_pet_feed(interaction, pet_id)
 
 # 主宠物命令定义（现在使用autocomplete，不再需要固定的choices函数）
 
@@ -260,6 +277,7 @@ async def pet_action_autocomplete(interaction: discord.Interaction, current: str
         ("info", "pet.command.choices.info"),
         ("upgrade", "pet.command.choices.upgrade"),
         ("dismantle", "pet.command.choices.dismantle"),
+        ("batch_dismantle", "pet.command.choices.batch_dismantle"),
         ("fragments", "pet.command.choices.fragments"),
         ("equip", "pet.command.choices.equip"),
         ("unequip", "pet.command.choices.unequip"),
@@ -295,6 +313,8 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
 
     if action == "list":
         await handle_pet_list(interaction, page)
+    elif action == "batch_dismantle":
+        await handle_batch_dismantle_mode_selection(interaction)
     elif action in ["info", "upgrade", "dismantle", "equip", "feed"]:
         # 获取用户内部ID
         user_internal_id = get_user_internal_id(interaction)
@@ -321,6 +341,7 @@ async def pet(interaction: discord.Interaction, action: str, page: int = 1):
             "info": t("pet.action_names.info", locale=locale),
             "upgrade": t("pet.action_names.upgrade", locale=locale),
             "dismantle": t("pet.action_names.dismantle", locale=locale),
+            "batch_dismantle": t("pet.command.choices.batch_dismantle", locale=locale),
             "equip": t("pet.action_names.equip", locale=locale),
             "feed": t("pet.action_names.feed", locale=locale)
         }
@@ -1939,6 +1960,918 @@ def create_auto_feeding_result_embed(user_mention: str, result: dict, mode: str,
     embed = create_embed(t("pet.auto_feed.completed.title", locale=locale), description, discord.Color.green())
 
     return embed
+
+async def handle_batch_dismantle_selection(interaction: discord.Interaction, pet_ids: list):
+    """处理批量分解选择"""
+    try:
+        from src.db.database import get_supabase_client
+        supabase = get_supabase_client()
+
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction)
+        if not user_internal_id:
+            embed = create_embed(
+                t("pet.errors.user_not_found.title", locale=get_guild_locale(interaction.guild.id)),
+                t("pet.errors.user_not_found.message", locale=get_guild_locale(interaction.guild.id)),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        locale = get_guild_locale(interaction.guild.id)
+
+        # 检查选择的宠物数量
+        if len(pet_ids) > 20:
+            embed = create_embed(
+                t("pet.batch_dismantle.errors.too_many_pets.title", locale=locale),
+                t("pet.batch_dismantle.errors.too_many_pets.message", locale=locale, count=20),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # 获取装备的宠物ID，防止分解装备的宠物
+        user_response = supabase.table('users').select('equipped_pet_id').eq('id', user_internal_id).execute()
+        equipped_pet_id = user_response.data[0]['equipped_pet_id'] if user_response.data else None
+
+        # 获取选中宠物的详细信息
+        pets_response = supabase.table('user_pets').select('id, pet_template_id, stars').eq('user_id', user_internal_id).in_('id', pet_ids).execute()
+
+        if not pets_response.data or len(pets_response.data) != len(pet_ids):
+            embed = create_embed(
+                t("pet.errors.pet_not_found_or_unauthorized", locale=locale),
+                t("pet.batch_dismantle.errors.invalid_pets", locale=locale),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # 检查是否有装备的宠物
+        invalid_pets = []
+        valid_pets = []
+
+        for pet in pets_response.data:
+            if pet['id'] == equipped_pet_id:
+                invalid_pets.append(pet['id'])
+            else:
+                valid_pets.append(pet)
+
+        if invalid_pets:
+            embed = create_embed(
+                t("pet.batch_dismantle.errors.equipped_included.title", locale=locale),
+                t("pet.batch_dismantle.errors.equipped_included.message", locale=locale),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        if not valid_pets:
+            embed = create_embed(
+                t("pet.batch_dismantle.errors.no_valid_pets.title", locale=locale),
+                t("pet.batch_dismantle.errors.no_valid_pets.message", locale=locale),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # 获取宠物模板信息
+        template_ids = list(set([pet['pet_template_id'] for pet in valid_pets]))
+        templates_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').in_('id', template_ids).execute()
+
+        template_map = {template['id']: template for template in templates_response.data}
+
+        # 计算总收益
+        total_fragments_by_rarity = {'C': 0, 'R': 0, 'SR': 0, 'SSR': 0}
+        total_points = 0
+        pet_details = []
+
+        for pet in valid_pets:
+            template = template_map.get(pet['pet_template_id'])
+            if template:
+                rarity = template['rarity']
+                stars = pet['stars']
+
+                # 计算单个宠物的分解收益
+                base_fragments = 10
+                star_bonus_fragments = stars
+                star_bonus_points = stars * 200
+
+                total_fragments_by_rarity[rarity] += base_fragments + star_bonus_fragments
+                total_points += star_bonus_points
+
+                pet_name = get_localized_pet_name(template, locale)
+                pet_details.append({
+                    'id': pet['id'],
+                    'name': pet_name,
+                    'rarity': rarity,
+                    'stars': stars,
+                    'fragments': base_fragments + star_bonus_fragments,
+                    'points': star_bonus_points
+                })
+
+        # 创建确认界面
+        view = BatchDismantleConfirmView(
+            interaction.guild.id,
+            interaction.user.id,
+            user_internal_id,
+            pet_details,
+            total_fragments_by_rarity,
+            total_points
+        )
+
+        await interaction.response.send_message(embed=view.create_confirm_embed(), view=view, ephemeral=True)
+
+    except Exception as e:
+        locale = get_guild_locale(interaction.guild.id)
+        print(f"Error in batch dismantle selection: {str(e)}")
+        embed = create_embed(
+            t("pet.errors.system_error.title", locale=locale),
+            t("pet.batch_dismantle.errors.selection_error", locale=locale, error=str(e)),
+            discord.Color.red()
+        )
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+class BatchDismantleConfirmView(discord.ui.View):
+    """批量分解确认界面"""
+    def __init__(self, guild_id, discord_user_id, user_internal_id, pet_details, total_fragments_by_rarity, total_points):
+        super().__init__(timeout=60)
+        self.guild_id = guild_id
+        self.discord_user_id = discord_user_id
+        self.user_internal_id = user_internal_id
+        self.pet_details = pet_details
+        self.total_fragments_by_rarity = total_fragments_by_rarity
+        self.total_points = total_points
+        self.user_mention = f"<@{discord_user_id}>"
+
+        # 获取语言环境并设置按钮
+        locale = get_guild_locale(guild_id)
+
+        # 添加确认按钮
+        confirm_button = discord.ui.Button(
+            label=t("pet.ui.buttons.confirm_batch_dismantle", locale=locale),
+            style=discord.ButtonStyle.danger,
+            emoji='💥',
+            custom_id='confirm_batch_dismantle'
+        )
+        confirm_button.callback = self.confirm_callback
+        self.add_item(confirm_button)
+
+        # 添加取消按钮
+        cancel_button = discord.ui.Button(
+            label=t("pet.ui.buttons.cancel", locale=locale),
+            style=discord.ButtonStyle.secondary,
+            emoji='❌',
+            custom_id='cancel_batch_dismantle'
+        )
+        cancel_button.callback = self.cancel_callback
+        self.add_item(cancel_button)
+
+    def create_confirm_embed(self):
+        """创建确认界面的embed"""
+        locale = get_guild_locale(self.guild_id)
+
+        description = t("pet.batch_dismantle.confirm.description", locale=locale,
+                       user=self.user_mention, count=len(self.pet_details))
+        description += "\n\n" + t("pet.batch_dismantle.confirm.selected_pets", locale=locale) + "\n"
+
+        # 显示选中的宠物列表（限制显示数量）
+        rarity_emojis = {'C': '⚪', 'R': '🔵', 'SR': '🟣', 'SSR': '🟡'}
+        display_count = min(10, len(self.pet_details))  # 最多显示10个
+
+        for i, pet in enumerate(self.pet_details[:display_count]):
+            emoji = rarity_emojis.get(pet['rarity'], '⚪')
+            star_display = "⭐" * pet['stars'] if pet['stars'] > 0 else ""
+            description += f"{emoji} {pet['name']} {star_display}\n"
+
+        if len(self.pet_details) > display_count:
+            description += t("pet.batch_dismantle.confirm.more_pets", locale=locale,
+                            remaining=len(self.pet_details) - display_count)
+
+        description += "\n\n" + t("pet.batch_dismantle.confirm.benefits", locale=locale) + "\n"
+
+        # 显示各稀有度碎片数量
+        for rarity in ['SSR', 'SR', 'R', 'C']:
+            if self.total_fragments_by_rarity[rarity] > 0:
+                emoji = rarity_emojis.get(rarity, '⚪')
+                description += f"{emoji} {rarity}碎片: +{self.total_fragments_by_rarity[rarity]}个\n"
+
+        if self.total_points > 0:
+            description += t("pet.batch_dismantle.confirm.points", locale=locale, points=self.total_points)
+
+        description += "\n\n" + t("pet.batch_dismantle.confirm.warning", locale=locale)
+
+        embed = create_embed(
+            t("pet.batch_dismantle.confirm.title", locale=locale),
+            description,
+            discord.Color.orange()
+        )
+
+        return embed
+
+    async def confirm_callback(self, interaction: discord.Interaction):
+        """确认批量分解的回调"""
+        # 验证用户身份
+        if interaction.user.id != self.discord_user_id:
+            await interaction.response.send_message(
+                t("pet.errors.unauthorized_operation", locale=get_guild_locale(interaction.guild.id)),
+                ephemeral=True
+            )
+            return
+
+        await self.execute_batch_dismantle(interaction)
+
+    async def cancel_callback(self, interaction: discord.Interaction):
+        """取消批量分解的回调"""
+        # 验证用户身份
+        if interaction.user.id != self.discord_user_id:
+            await interaction.response.send_message(
+                t("pet.errors.unauthorized_operation", locale=get_guild_locale(interaction.guild.id)),
+                ephemeral=True
+            )
+            return
+
+        locale = get_guild_locale(interaction.guild.id)
+        embed = create_embed(
+            t("pet.batch_dismantle.cancelled.title", locale=locale),
+            t("pet.batch_dismantle.cancelled.message", locale=locale, user=self.user_mention),
+            discord.Color.blue()
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    async def execute_batch_dismantle(self, interaction: discord.Interaction):
+        """执行批量分解"""
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+
+            locale = get_guild_locale(interaction.guild.id)
+
+            # 获取PetCommands实例来使用add_fragments方法
+            pet_commands = PetCommands(None)
+
+            # 开始事务性操作
+            dismantled_pets = []
+            errors = []
+
+            # 验证所有宠物仍然可以被分解（防止并发操作）
+            user_response = supabase.table('users').select('equipped_pet_id').eq('id', self.user_internal_id).execute()
+            current_equipped_pet_id = user_response.data[0]['equipped_pet_id'] if user_response.data else None
+
+            for pet in self.pet_details:
+                if pet['id'] == current_equipped_pet_id:
+                    errors.append(f"{pet['name']} - 已装备")
+                    continue
+
+                try:
+                    # 删除宠物记录
+                    supabase.table('user_pets').delete().eq('id', pet['id']).eq('user_id', self.user_internal_id).execute()
+
+                    # 添加碎片
+                    pet_commands.add_fragments(self.user_internal_id, pet['rarity'], pet['fragments'])
+
+                    dismantled_pets.append(pet)
+
+                except Exception as e:
+                    errors.append(f"{pet['name']} - 分解失败: {str(e)}")
+
+            # 如果所有操作都失败了
+            if not dismantled_pets:
+                embed = create_embed(
+                    t("pet.batch_dismantle.errors.all_failed.title", locale=locale),
+                    t("pet.batch_dismantle.errors.all_failed.message", locale=locale) + "\n" + "\n".join(errors),
+                    discord.Color.red()
+                )
+                # 先编辑原消息（移除按钮）
+                await interaction.response.edit_message(
+                    content=t("pet.dismantle.confirm.batch_failed", locale=locale),
+                    embed=None,
+                    view=None
+                )
+                # 发送公开错误消息
+                await interaction.followup.send(embed=embed)
+                return
+
+            # 创建结果embed
+            embed = self.create_result_embed(dismantled_pets, errors)
+            # 先编辑原消息（移除按钮）
+            await interaction.response.edit_message(
+                content=t("pet.dismantle.confirm.batch_completed", locale=locale),
+                embed=None,
+                view=None
+            )
+            # 发送公开结果消息
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            locale = get_guild_locale(interaction.guild.id)
+            print(f"Error executing batch dismantle: {str(e)}")
+            embed = create_embed(
+                t("pet.errors.system_error.title", locale=locale),
+                t("pet.batch_dismantle.errors.execution_error", locale=locale, error=str(e)),
+                discord.Color.red()
+            )
+            # 先编辑原消息（移除按钮）
+            await interaction.response.edit_message(
+                content=t("pet.dismantle.confirm.batch_error", locale=locale),
+                embed=None,
+                view=None
+            )
+            # 发送公开错误消息
+            await interaction.followup.send(embed=embed)
+
+    def create_result_embed(self, dismantled_pets, errors):
+        """创建分解结果的embed"""
+        locale = get_guild_locale(self.guild_id)
+
+        # 智能显示：如果有失败的宠物则显示总数，否则只显示成功数量
+        success_count = len(dismantled_pets)
+        total_count = len(self.pet_details)
+
+        if success_count == total_count:
+            # 全部成功，不显示总数
+            description = t("pet.batch_dismantle.completed.description_all_success", locale=locale,
+                           user=self.user_mention, success_count=success_count)
+        else:
+            # 部分失败，显示总数
+            description = t("pet.batch_dismantle.completed.description", locale=locale,
+                           user=self.user_mention, success_count=success_count, total_count=total_count)
+
+        if dismantled_pets:
+            description += "\n\n" + t("pet.batch_dismantle.completed.dismantled_pets", locale=locale) + "\n"
+
+            rarity_emojis = {'C': '⚪', 'R': '🔵', 'SR': '🟣', 'SSR': '🟡'}
+            display_count = min(8, len(dismantled_pets))
+
+            for pet in dismantled_pets[:display_count]:
+                emoji = rarity_emojis.get(pet['rarity'], '⚪')
+                star_display = "⭐" * pet['stars'] if pet['stars'] > 0 else ""
+                description += f"{emoji} {pet['name']} {star_display}\n"
+
+            if len(dismantled_pets) > display_count:
+                description += t("pet.batch_dismantle.completed.more_pets", locale=locale,
+                                remaining=len(dismantled_pets) - display_count)
+
+        if errors:
+            description += "\n\n" + t("pet.batch_dismantle.completed.errors", locale=locale) + "\n"
+            for error in errors[:3]:  # 最多显示3个错误
+                description += f"• {error}\n"
+            if len(errors) > 3:
+                description += f"• ... 还有{len(errors) - 3}个错误"
+
+        embed = create_embed(
+            t("pet.batch_dismantle.completed.title", locale=locale),
+            description,
+            discord.Color.green() if not errors else discord.Color.orange()
+        )
+
+        return embed
+
+
+async def handle_batch_dismantle_mode_selection(interaction: discord.Interaction):
+    """处理批量分解模式选择"""
+    try:
+        # 获取用户内部ID
+        user_internal_id = get_user_internal_id(interaction)
+        if not user_internal_id:
+            embed = create_embed(
+                t("pet.errors.user_not_found.title", locale=get_context_locale(interaction)),
+                t("pet.errors.user_not_found.message", locale=get_context_locale(interaction)),
+                discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        locale = get_context_locale(interaction)
+
+        # 创建模式选择界面
+        view = BatchDismantleModeView(interaction.user.id, user_internal_id, interaction.guild.id)
+        embed = view.create_mode_selection_embed()
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    except Exception as e:
+        locale = get_context_locale(interaction)
+        print(f"Error in batch dismantle mode selection: {str(e)}")
+        embed = create_embed(
+            t("pet.errors.system_error.title", locale=locale),
+            t("pet.batch_dismantle.errors.mode_selection_error", locale=locale, error=str(e)),
+            discord.Color.red()
+        )
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+class BatchDismantleModeView(discord.ui.View):
+    """批量分解模式选择界面"""
+    def __init__(self, discord_user_id, user_internal_id, guild_id):
+        super().__init__(timeout=60)
+        self.discord_user_id = discord_user_id
+        self.user_internal_id = user_internal_id
+        self.guild_id = guild_id
+
+        # 添加模式选择按钮
+        self.add_item(BatchDismantleModeSelect(self.guild_id))
+
+    def create_mode_selection_embed(self):
+        """创建模式选择界面的embed"""
+        locale = get_guild_locale(self.guild_id)
+
+        description = t("pet.batch_dismantle.mode.description", locale=locale)
+        description += "\n\n" + t("pet.batch_dismantle.mode.options.description", locale=locale)
+        description += "\n\n" + t("pet.batch_dismantle.mode.manual.description", locale=locale)
+        description += "\n\n" + t("pet.batch_dismantle.mode.auto.description", locale=locale)
+
+        embed = create_embed(
+            t("pet.batch_dismantle.mode.title", locale=locale),
+            description,
+            discord.Color.blue()
+        )
+
+        return embed
+
+    async def handle_mode_selection(self, interaction: discord.Interaction, mode: str):
+        """处理模式选择"""
+        # 验证用户身份
+        if interaction.user.id != self.discord_user_id:
+            await interaction.response.send_message(
+                t("pet.errors.unauthorized_operation", locale=get_context_locale(interaction)),
+                ephemeral=True
+            )
+            return
+
+        if mode == "select":
+            # 手动选择模式 - 显示宠物选择界面
+            await self.show_manual_selection(interaction)
+        elif mode == "auto":
+            # 自动筛选模式 - 显示筛选参数界面
+            await self.show_auto_selection(interaction)
+
+    async def show_manual_selection(self, interaction: discord.Interaction):
+        """显示手动选择界面"""
+        try:
+            guild_id = interaction.guild.id if interaction.guild else None
+            view = PetSelectView(self.user_internal_id, "batch_dismantle", guild_id)
+            has_pets = await view.setup_select()
+
+            if not has_pets:
+                locale = get_context_locale(interaction)
+                embed = create_embed(
+                    t("pet.errors.no_pets.title", locale=locale),
+                    t("pet.errors.no_pets.message", locale=locale),
+                    discord.Color.red()
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+                return
+
+            action_names = {
+                "batch_dismantle": t("pet.command.choices.batch_dismantle", locale=get_context_locale(interaction))
+            }
+
+            embed = create_embed(
+                f"🐾 {action_names['batch_dismantle']}",
+                t("pet.batch_dismantle.manual.description", locale=get_context_locale(interaction)),
+                discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+
+        except Exception as e:
+            locale = get_context_locale(interaction)
+            print(f"Error showing manual selection: {str(e)}")
+            embed = create_embed(
+                t("pet.errors.system_error.title", locale=locale),
+                t("pet.batch_dismantle.errors.manual_selection_error", locale=locale, error=str(e)),
+                discord.Color.red()
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+    async def show_auto_selection(self, interaction: discord.Interaction):
+        """显示自动筛选界面"""
+        try:
+            view = BatchDismantleAutoView(self.discord_user_id, self.user_internal_id, self.guild_id)
+            embed = view.create_auto_selection_embed()
+
+            await interaction.response.edit_message(embed=embed, view=view)
+
+        except Exception as e:
+            locale = get_context_locale(interaction)
+            print(f"Error showing auto selection: {str(e)}")
+            embed = create_embed(
+                t("pet.errors.system_error.title", locale=locale),
+                t("pet.batch_dismantle.errors.auto_selection_error", locale=locale, error=str(e)),
+                discord.Color.red()
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+
+class BatchDismantleModeSelect(discord.ui.Select):
+    """批量分解模式选择下拉菜单"""
+    def __init__(self, guild_id):
+        self.guild_id = guild_id
+        locale = get_guild_locale(guild_id)
+
+        options = [
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.mode.manual.label", locale=locale),
+                description=t("pet.batch_dismantle.mode.manual.description_short", locale=locale),
+                value="select",
+                emoji="🎯"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.mode.auto.label", locale=locale),
+                description=t("pet.batch_dismantle.mode.auto.description_short", locale=locale),
+                value="auto",
+                emoji="⚡"
+            )
+        ]
+
+        super().__init__(
+            placeholder=t("pet.batch_dismantle.mode.placeholder", locale=locale),
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        """处理模式选择回调"""
+        selected_mode = self.values[0]
+        view = self.view  # 获取父视图
+        await view.handle_mode_selection(interaction, selected_mode)
+
+
+class BatchDismantleAutoView(discord.ui.View):
+    """批量分解自动筛选界面"""
+    def __init__(self, discord_user_id, user_internal_id, guild_id):
+        super().__init__(timeout=60)
+        self.discord_user_id = discord_user_id
+        self.user_internal_id = user_internal_id
+        self.guild_id = guild_id
+
+        # 添加筛选选项下拉菜单
+        self.add_item(BatchDismantleRarityFilter(self.guild_id))
+        self.add_item(BatchDismantleStarFilter(self.guild_id))
+
+        # 添加确认按钮
+        locale = get_guild_locale(guild_id)
+        confirm_button = discord.ui.Button(
+            label=t("pet.ui.buttons.apply_filters", locale=locale),
+            style=discord.ButtonStyle.primary,
+            emoji="✅"
+        )
+        confirm_button.callback = self.apply_filters
+        self.add_item(confirm_button)
+
+        # 为下拉菜单添加回调，以便在选择时更新embed
+        for child in self.children:
+            if isinstance(child, (BatchDismantleRarityFilter, BatchDismantleStarFilter)):
+                child.callback = self.on_filter_select
+
+    def create_auto_selection_embed(self, rarity_filter=None, star_filter=None):
+        """创建自动筛选界面的embed"""
+        locale = get_guild_locale(self.guild_id)
+
+        description = t("pet.batch_dismantle.auto.description", locale=locale)
+        description += "\n\n" + t("pet.batch_dismantle.auto.instructions", locale=locale)
+
+        # 添加当前选择的筛选条件
+        if rarity_filter or star_filter:
+            description += "\n\n" + t("pet.batch_dismantle.auto.current_filters", locale=locale)
+
+            if rarity_filter:
+                rarity_text = self.get_rarity_filter_text(rarity_filter, locale)
+                description += f"\n🏷️ {t('pet.batch_dismantle.auto.filter_label.rarity', locale=locale)}: {rarity_text}"
+
+            if star_filter:
+                star_text = self.get_star_filter_text(star_filter, locale)
+                description += f"\n⭐ {t('pet.batch_dismantle.auto.filter_label.star', locale=locale)}: {star_text}"
+
+        embed = create_embed(
+            t("pet.batch_dismantle.auto.title", locale=locale),
+            description,
+            discord.Color.purple()
+        )
+
+        return embed
+
+    def get_rarity_filter_text(self, rarity_filter, locale):
+        """获取稀有度筛选条件的显示文本"""
+        rarity_texts = {
+            'c': t("pet.batch_dismantle.filter.rarity.c_only", locale=locale),
+            'r': t("pet.batch_dismantle.filter.rarity.r_only", locale=locale),
+            'sr': t("pet.batch_dismantle.filter.rarity.sr_only", locale=locale),
+            'ssr': t("pet.batch_dismantle.filter.rarity.ssr_only", locale=locale),
+            'below_sr': t("pet.batch_dismantle.filter.rarity.below_sr", locale=locale),
+            'below_ssr': t("pet.batch_dismantle.filter.rarity.below_ssr", locale=locale),
+        }
+        return rarity_texts.get(rarity_filter, rarity_filter)
+
+    def get_star_filter_text(self, star_filter, locale):
+        """获取星级筛选条件的显示文本"""
+        star_texts = {
+            'max_0': t("pet.batch_dismantle.filter.star.max_0", locale=locale),
+            'max_1': t("pet.batch_dismantle.filter.star.max_1", locale=locale),
+            'max_2': t("pet.batch_dismantle.filter.star.max_2", locale=locale),
+            'max_3': t("pet.batch_dismantle.filter.star.max_3", locale=locale),
+        }
+        return star_texts.get(star_filter, star_filter)
+
+    async def on_filter_select(self, interaction: discord.Interaction):
+        """处理筛选选择回调"""
+        # 验证用户身份
+        if interaction.user.id != self.discord_user_id:
+            await interaction.response.send_message(
+                t("pet.errors.unauthorized_operation", locale=get_context_locale(interaction)),
+                ephemeral=True
+            )
+            return
+
+        # 获取当前选择的筛选条件
+        rarity_filter = None
+        star_filter = None
+
+        for child in self.children:
+            if isinstance(child, BatchDismantleRarityFilter):
+                rarity_filter = child.values[0] if child.values else None
+            elif isinstance(child, BatchDismantleStarFilter):
+                star_filter = child.values[0] if child.values else None
+
+        # 更新embed显示当前选择
+        locale = get_guild_locale(self.guild_id)
+        embed = self.create_auto_selection_embed(rarity_filter, star_filter)
+
+        # 获取当前视图内容并更新
+        if not interaction.response.is_done():
+            await interaction.response.edit_message(embed=embed, view=self)
+        else:
+            await interaction.message.edit(embed=embed, view=self)
+
+    async def apply_filters(self, interaction: discord.Interaction):
+        """应用筛选条件并执行自动批量分解"""
+        # 验证用户身份
+        if interaction.user.id != self.discord_user_id:
+            await interaction.response.send_message(
+                t("pet.errors.unauthorized_operation", locale=get_context_locale(interaction)),
+                ephemeral=True
+            )
+            return
+
+        # 获取筛选条件
+        rarity_filter = None
+        star_filter = None
+
+        for child in self.children:
+            if isinstance(child, BatchDismantleRarityFilter):
+                rarity_filter = child.values[0] if child.values else None
+            elif isinstance(child, BatchDismantleStarFilter):
+                star_filter = child.values[0] if child.values else None
+
+        await self.execute_auto_dismantle(interaction, rarity_filter, star_filter)
+
+    async def execute_auto_dismantle(self, interaction: discord.Interaction, rarity_filter, star_filter):
+        """执行自动筛选和批量分解"""
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+
+            locale = get_context_locale(interaction)
+
+            # 构建查询条件
+            query = supabase.table('user_pets').select('id, pet_template_id, stars').eq('user_id', self.user_internal_id)
+
+            # 获取装备的宠物ID
+            user_response = supabase.table('users').select('equipped_pet_id').eq('id', self.user_internal_id).execute()
+            equipped_pet_id = user_response.data[0]['equipped_pet_id'] if user_response.data else None
+
+            # 获取所有用户宠物
+            pets_response = query.execute()
+
+            if not pets_response.data:
+                embed = create_embed(
+                    t("pet.batch_dismantle.errors.no_pets.title", locale=locale),
+                    t("pet.batch_dismantle.errors.no_pets.message", locale=locale),
+                    discord.Color.red()
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+                return
+
+            # 获取宠物模板信息用于筛选
+            pet_ids = [pet['id'] for pet in pets_response.data]
+            template_ids = [pet['pet_template_id'] for pet in pets_response.data]
+
+            templates_response = supabase.table('pet_templates').select('id, cn_name, en_name, rarity').in_('id', template_ids).execute()
+            template_map = {template['id']: template for template in templates_response.data}
+
+            # 应用筛选条件
+            filtered_pets = []
+            for pet in pets_response.data:
+                # 跳过装备的宠物
+                if pet['id'] == equipped_pet_id:
+                    continue
+
+                template = template_map.get(pet['pet_template_id'])
+                if not template:
+                    continue
+
+                # 应用稀有度筛选
+                if rarity_filter:
+                    if not self.rarity_matches_filter(template['rarity'], rarity_filter):
+                        continue
+
+                # 应用星级筛选
+                if star_filter:
+                    if not self.star_matches_filter(pet['stars'], star_filter):
+                        continue
+
+                filtered_pets.append({
+                    'id': pet['id'],
+                    'pet_template_id': pet['pet_template_id'],
+                    'stars': pet['stars'],
+                    'template': template
+                })
+
+            if not filtered_pets:
+                embed = create_embed(
+                    t("pet.batch_dismantle.auto.no_matches.title", locale=locale),
+                    t("pet.batch_dismantle.auto.no_matches.message", locale=locale),
+                    discord.Color.orange()
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+                return
+
+            # 限制最多20只宠物
+            selected_pets = filtered_pets[:20]
+
+            # 准备批量分解数据
+            pet_details = []
+            total_fragments_by_rarity = {'C': 0, 'R': 0, 'SR': 0, 'SSR': 0}
+            total_points = 0
+
+            for pet in selected_pets:
+                template = pet['template']
+                rarity = template['rarity']
+                stars = pet['stars']
+
+                # 计算分解收益
+                base_fragments = 10
+                star_bonus_fragments = stars
+                star_bonus_points = stars * 200
+
+                total_fragments_by_rarity[rarity] += base_fragments + star_bonus_fragments
+                total_points += star_bonus_points
+
+                pet_name = get_localized_pet_name(template, locale)
+                pet_details.append({
+                    'id': pet['id'],
+                    'name': pet_name,
+                    'rarity': rarity,
+                    'stars': stars,
+                    'fragments': base_fragments + star_bonus_fragments,
+                    'points': star_bonus_points
+                })
+
+            # 创建确认界面
+            view = BatchDismantleConfirmView(
+                interaction.guild.id,
+                interaction.user.id,
+                self.user_internal_id,
+                pet_details,
+                total_fragments_by_rarity,
+                total_points
+            )
+
+            await interaction.response.edit_message(embed=view.create_confirm_embed(), view=view)
+
+        except Exception as e:
+            locale = get_context_locale(interaction)
+            print(f"Error executing auto dismantle: {str(e)}")
+            embed = create_embed(
+                t("pet.errors.system_error.title", locale=locale),
+                t("pet.batch_dismantle.errors.auto_execution_error", locale=locale, error=str(e)),
+                discord.Color.red()
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+    def rarity_matches_filter(self, rarity, rarity_filter):
+        """检查稀有度是否匹配筛选条件"""
+        filters = {
+            'c': ['C'],
+            'r': ['R'],
+            'sr': ['SR'],
+            'ssr': ['SSR'],
+            'below_sr': ['C', 'R'],
+            'below_ssr': ['C', 'R', 'SR']
+        }
+        return rarity in filters.get(rarity_filter, [])
+
+    def star_matches_filter(self, stars, star_filter):
+        """检查星级是否匹配筛选条件"""
+        max_stars = {
+            'max_0': 0,
+            'max_1': 1,
+            'max_2': 2,
+            'max_3': 3
+        }
+        return stars <= max_stars.get(star_filter, float('inf'))
+
+
+class BatchDismantleRarityFilter(discord.ui.Select):
+    """稀有度筛选下拉菜单"""
+    def __init__(self, guild_id):
+        self.guild_id = guild_id
+        locale = get_guild_locale(guild_id)
+
+        options = [
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.all", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.all_desc", locale=locale),
+                value="all"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.c_only", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.c_desc", locale=locale),
+                value="c"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.r_only", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.r_desc", locale=locale),
+                value="r"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.sr_only", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.sr_desc", locale=locale),
+                value="sr"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.ssr_only", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.ssr_desc", locale=locale),
+                value="ssr"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.below_sr", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.below_sr_desc", locale=locale),
+                value="below_sr"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.rarity.below_ssr", locale=locale),
+                description=t("pet.batch_dismantle.filter.rarity.below_ssr_desc", locale=locale),
+                value="below_ssr"
+            )
+        ]
+
+        super().__init__(
+            placeholder=t("pet.batch_dismantle.filter.rarity.placeholder", locale=locale),
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+
+
+class BatchDismantleStarFilter(discord.ui.Select):
+    """星级筛选下拉菜单"""
+    def __init__(self, guild_id):
+        self.guild_id = guild_id
+        locale = get_guild_locale(guild_id)
+
+        options = [
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.star.all", locale=locale),
+                description=t("pet.batch_dismantle.filter.star.all_desc", locale=locale),
+                value="all"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.star.max_0", locale=locale),
+                description=t("pet.batch_dismantle.filter.star.max_0_desc", locale=locale),
+                value="max_0"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.star.max_1", locale=locale),
+                description=t("pet.batch_dismantle.filter.star.max_1_desc", locale=locale),
+                value="max_1"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.star.max_2", locale=locale),
+                description=t("pet.batch_dismantle.filter.star.max_2_desc", locale=locale),
+                value="max_2"
+            ),
+            discord.SelectOption(
+                label=t("pet.batch_dismantle.filter.star.max_3", locale=locale),
+                description=t("pet.batch_dismantle.filter.star.max_3_desc", locale=locale),
+                value="max_3"
+            )
+        ]
+
+        super().__init__(
+            placeholder=t("pet.batch_dismantle.filter.star.placeholder", locale=locale),
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+
 
 def setup(bot):
     """注册斜杠命令"""
