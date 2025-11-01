@@ -82,6 +82,9 @@ class BlackjackGame:
         self.player_hand = [self.deck.pop(), self.deck.pop()]
         self.dealer_hand = [self.deck.pop(), self.deck.pop()]
 
+        # 杜绝庄家开局blackjack的可能，如果庄家开局blackjack，直接让他重抽
+        self.redeale_dealer_cards()
+
     def hit(self, is_player=True):
         """要牌"""
         if len(self.deck) == 0:
@@ -113,6 +116,24 @@ class BlackjackGame:
         elif dealer_value == 21:
             return "dealer_blackjack"
         return None
+
+    def dealer_has_blackjack(self):
+        """检查庄家是否是blackjack"""
+        return self._calculate_hand_value(self.dealer_hand) == 21
+
+    def redeale_dealer_cards(self):
+        """庄家重新发牌，直到不是blackjack为止"""
+        while self.dealer_has_blackjack():
+            # 将庄家的牌放回牌堆底部
+            for card in reversed(self.dealer_hand):
+                self.deck.insert(0, card)
+
+            # 重新给庄家发两张牌
+            self.dealer_hand = [self.deck.pop(), self.deck.pop()]
+
+            # 如果牌堆不够了，重新洗牌
+            if len(self.deck) < 10:
+                self.deck = self._create_deck()
 
     def can_double_down(self):
         """检查是否可以加倍下注（仅限首次发牌后2张牌，包括分牌后的每手牌 - DAS规则）"""
