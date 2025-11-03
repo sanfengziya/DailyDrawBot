@@ -1183,7 +1183,7 @@ async def handle_pet_unequip(interaction: discord.Interaction):
             return
         
         # 获取装备宠物的详细信息
-        pet_response = supabase.table('user_pets').select('stars, pet_templates(en_name, rarity)').eq('id', equipped_pet_id).execute()
+        pet_response = supabase.table('user_pets').select('stars, pet_templates(cn_name, en_name, rarity)').eq('id', equipped_pet_id).execute()
         
         if not pet_response.data:
             embed = create_embed(

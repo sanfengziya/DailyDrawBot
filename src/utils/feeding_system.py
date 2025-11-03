@@ -379,7 +379,10 @@ class FoodShopManager:
         generation_attempts = 0
         max_attempts = 50  # 防止无限循环
 
-        # 生成5个商品，允许口味重复
+        # 记录已选择的食粮ID，避免重复
+        selected_food_ids = set()
+
+        # 生成5个商品，确保每个食物模板只被选择一次
         while len(selected_items) < FoodShopManager.DAILY_ITEMS_COUNT and generation_attempts < max_attempts:
             generation_attempts += 1
 
@@ -394,12 +397,13 @@ class FoodShopManager:
                     selected_rarity = rarity
                     break
 
-            # 从该稀有度中选择食粮
-            available_foods = rarity_groups.get(selected_rarity, [])
+            # 从该稀有度中选择食粮，排除已选择的
+            available_foods = [f for f in rarity_groups.get(selected_rarity, []) if f['id'] not in selected_food_ids]
             if not available_foods:
+                print(f"⚠️ {selected_rarity}级食粮已全部选择，跳过此稀有度")
                 continue
 
-            # 随机选择食粮（允许口味重复）
+            # 随机选择食粮
             selected_food = random.choice(available_foods)
 
             # 验证选中的食粮
@@ -407,6 +411,8 @@ class FoodShopManager:
                 print(f"⚠️ 跳过无效的食粮数据: {selected_food}")
                 continue
 
+            # 添加到已选择集合
+            selected_food_ids.add(selected_food['id'])
             selected_items.append({
                 'food_template_id': selected_food['id'],
                 'food_data': selected_food
@@ -443,14 +449,22 @@ class FoodShopManager:
         try:
             print(f"🏪 开始刷新杂货铺 - {today_str}")
 
-            # 1. 生成新目录条目并验证
+            # 1. 首先检查今日是否已有商店数据，避免重复刷新
+            existing_response = supabase.table('daily_shop_catalog').select('*').eq('refresh_date', today_str).execute()
+            existing_count = len(existing_response.data) if existing_response.data else 0
+
+            if existing_count > 0:
+                print(f"⚠️ 今日商店已存在 {existing_count} 个商品，跳过刷新以避免重复")
+                return []
+
+            # 2. 生成新目录条目并验证
             new_items = FoodShopManager.generate_daily_shop_items()
 
             if not new_items:
                 print("❌ 商品生成失败，跳过刷新以保护现有商店数据")
                 return []
 
-            # 2. 构建新目录数据并验证完整性
+            # 3. 构建新目录数据并验证完整性
             catalog_rows = []
             for item in new_items:
                 if not item.get('food_template_id'):
@@ -468,39 +482,23 @@ class FoodShopManager:
 
             print(f"✅ 商品生成成功，共{len(catalog_rows)}种商品")
 
-            # 3. 备份当前商店数据（用于回滚）
-            backup_response = supabase.table('daily_shop_catalog').select('*').eq('refresh_date', today_str).execute()
-            backup_data = backup_response.data if backup_response.data else []
-            print(f"📦 备份了{len(backup_data)}条现有商店数据")
-
-            # 4. 原子性更新：先删除再插入
+            # 4. 使用 UPSERT 操作避免冲突
             try:
-                # 删除今日旧目录
-                delete_result = supabase.table('daily_shop_catalog').delete().eq('refresh_date', today_str).execute()
-                print(f"🗑️ 清理旧目录完成，删除了{len(delete_result.data) if delete_result.data else 0}条记录")
+                # 使用 upsert 替代 delete+insert，避免竞态条件
+                # ON CONFLICT (refresh_date, food_template_id) DO UPDATE 只更新现有记录
+                upsert_result = supabase.table('daily_shop_catalog').upsert(
+                    catalog_rows,
+                    on_conflict='refresh_date,food_template_id'
+                ).execute()
 
-                # 插入新目录
-                insert_result = supabase.table('daily_shop_catalog').insert(catalog_rows).execute()
+                if not upsert_result.data or len(upsert_result.data) != len(catalog_rows):
+                    raise Exception(f"upsert失败：期望{len(catalog_rows)}条，实际{len(upsert_result.data) if upsert_result.data else 0}条")
 
-                if not insert_result.data or len(insert_result.data) != len(catalog_rows):
-                    raise Exception(f"插入失败：期望{len(catalog_rows)}条，实际{len(insert_result.data) if insert_result.data else 0}条")
-
-                print(f"✅ 新目录插入成功，共{len(insert_result.data)}种商品")
+                print(f"✅ 商店目录更新成功，共{len(upsert_result.data)}种商品")
                 print("🏪 杂货铺刷新完成！")
 
             except Exception as db_error:
                 print(f"❌ 数据库操作失败: {db_error}")
-
-                # 尝试回滚：恢复备份数据
-                if backup_data:
-                    try:
-                        print("🔄 尝试回滚到备份数据...")
-                        supabase.table('daily_shop_catalog').insert(backup_data).execute()
-                        print("✅ 回滚成功，商店数据已恢复")
-                        return []  # 返回空列表表示刷新失败但已回滚
-                    except Exception as rollback_error:
-                        print(f"❌ 回滚失败: {rollback_error}")
-
                 raise db_error
 
             return new_items

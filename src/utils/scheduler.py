@@ -82,7 +82,7 @@ class FeedingScheduler:
         # 刷新时间：美东时间每天0点
         if current_time.hour == 0 and current_time.minute == 0:
 
-            # 避免重复执行
+            # 避免重复执行 - 使用更严格的检查
             last_refresh_key = f"shop_refresh_{current_time.strftime('%Y%m%d')}"
             if hasattr(self, '_last_refresh_times') and last_refresh_key in self._last_refresh_times:
                 return
@@ -90,6 +90,30 @@ class FeedingScheduler:
             if not hasattr(self, '_last_refresh_times'):
                 self._last_refresh_times = set()
 
+            # 再次检查数据库中是否已有今日商店数据
+            try:
+                from src.db.database import get_supabase_client
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+
+                supabase = get_supabase_client()
+                today = current_time.date()
+                today_str = today.isoformat()
+
+                existing_response = supabase.table('daily_shop_catalog').select('*').eq('refresh_date', today_str).execute()
+                existing_count = len(existing_response.data) if existing_response.data else 0
+
+                if existing_count > 0:
+                    print(f"⚠️ 商店已存在 {existing_count} 个商品，跳过刷新")
+                    self._last_refresh_times.add(last_refresh_key)
+                    return
+
+            except Exception as e:
+                print(f"❌ 检查商店状态时出错: {e}")
+                # 如果检查失败，为了安全起见，跳过刷新
+                return
+
+            # 标记已执行
             self._last_refresh_times.add(last_refresh_key)
 
             await self._refresh_daily_shop()
