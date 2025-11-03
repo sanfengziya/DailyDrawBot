@@ -30,14 +30,14 @@ class PetCommands(commands.Cog):
     }
 
     def add_fragments(self, player_id, rarity, amount):
-        """添加碎片到玩家库存"""
+        """添加碎片到玩家库存（同步版本，用于向后兼容）"""
         try:
             from src.db.database import get_supabase_client
             supabase = get_supabase_client()
-            
+
             # 先查询是否存在
             existing = supabase.table('user_pet_fragments').select('amount').eq('user_id', player_id).eq('rarity', rarity).execute()
-            
+
             if existing.data:
                 # 更新现有记录
                 new_amount = existing.data[0]['amount'] + amount
@@ -45,9 +45,35 @@ class PetCommands(commands.Cog):
             else:
                 # 插入新记录
                 supabase.table('user_pet_fragments').insert({'user_id': player_id, 'rarity': rarity, 'amount': amount}).execute()
-                
+
         except Exception as e:
             print(f"Error adding fragments: {str(e)}")
+
+    async def add_fragments_async(self, player_id, rarity, amount):
+        """异步添加碎片到玩家库存"""
+        try:
+            from src.db.database import get_supabase_client
+            supabase = get_supabase_client()
+
+            # 先查询是否存在
+            existing = supabase.table('user_pet_fragments').select('amount').eq('user_id', player_id).eq('rarity', rarity).execute()
+
+            if existing.data:
+                # 更新现有记录
+                current_amount = existing.data[0]['amount']
+                new_amount = current_amount + amount
+                supabase.table('user_pet_fragments').update({'amount': new_amount}).eq('user_id', player_id).eq('rarity', rarity).execute()
+            else:
+                # 插入新记录
+                supabase.table('user_pet_fragments').insert({
+                    'user_id': player_id,
+                    'rarity': rarity,
+                    'amount': amount
+                }).execute()
+
+        except Exception as e:
+            print(f"Error adding fragments async: {str(e)}")
+            raise  # 在异步环境中重新抛出异常以便于处理
     
     def calculate_pet_points(self, rarity, stars, hours, level=1):
         """计算宠物积分获取量（包含等级里程碑奖励）"""
@@ -2216,6 +2242,8 @@ class BatchDismantleConfirmView(discord.ui.View):
             # 开始事务性操作
             dismantled_pets = []
             errors = []
+            total_points_earned = 0
+            total_fragments_by_rarity = {'C': 0, 'R': 0, 'SR': 0, 'SSR': 0}
 
             # 验证所有宠物仍然可以被分解（防止并发操作）
             user_response = supabase.table('users').select('equipped_pet_id').eq('id', self.user_internal_id).execute()
@@ -2230,13 +2258,27 @@ class BatchDismantleConfirmView(discord.ui.View):
                     # 删除宠物记录
                     supabase.table('user_pets').delete().eq('id', pet['id']).eq('user_id', self.user_internal_id).execute()
 
-                    # 添加碎片
-                    pet_commands.add_fragments(self.user_internal_id, pet['rarity'], pet['fragments'])
+                    # 异步添加碎片
+                    await pet_commands.add_fragments_async(self.user_internal_id, pet['rarity'], pet['fragments'])
+
+                    # 累积积分和碎片
+                    total_points_earned += pet.get('points', 0)
+                    total_fragments_by_rarity[pet['rarity']] += pet['fragments']
 
                     dismantled_pets.append(pet)
 
                 except Exception as e:
                     errors.append(f"{pet['name']} - 分解失败: {str(e)}")
+
+            # 添加总积分（如果有）
+            if total_points_earned > 0:
+                from src.utils.cache import UserCache
+                await UserCache.update_points(
+                    interaction.guild.id,
+                    interaction.user.id,
+                    self.user_internal_id,
+                    total_points_earned
+                )
 
             # 如果所有操作都失败了
             if not dismantled_pets:
@@ -2256,7 +2298,7 @@ class BatchDismantleConfirmView(discord.ui.View):
                 return
 
             # 创建结果embed
-            embed = self.create_result_embed(dismantled_pets, errors)
+            embed = self.create_result_embed(dismantled_pets, errors, total_points_earned, total_fragments_by_rarity)
             # 先编辑原消息（移除按钮）
             await interaction.response.edit_message(
                 content=t("pet.dismantle.confirm.batch_completed", locale=locale),
@@ -2283,9 +2325,12 @@ class BatchDismantleConfirmView(discord.ui.View):
             # 发送公开错误消息
             await interaction.followup.send(embed=embed)
 
-    def create_result_embed(self, dismantled_pets, errors):
+    def create_result_embed(self, dismantled_pets, errors, total_points_earned=0, total_fragments_by_rarity=None):
         """创建分解结果的embed"""
         locale = get_guild_locale(self.guild_id)
+
+        if total_fragments_by_rarity is None:
+            total_fragments_by_rarity = {'C': 0, 'R': 0, 'SR': 0, 'SSR': 0}
 
         # 智能显示：如果有失败的宠物则显示总数，否则只显示成功数量
         success_count = len(dismantled_pets)
@@ -2299,6 +2344,24 @@ class BatchDismantleConfirmView(discord.ui.View):
             # 部分失败，显示总数
             description = t("pet.batch_dismantle.completed.description", locale=locale,
                            user=self.user_mention, success_count=success_count, total_count=total_count)
+
+        # 显示获得的积分和碎片
+        if dismantled_pets and (total_points_earned > 0 or any(count > 0 for count in total_fragments_by_rarity.values())):
+            description += "\n\n" + t("pet.batch_dismantle.completed.rewards", locale=locale) + "\n"
+
+            # 显示积分
+            if total_points_earned > 0:
+                description += f"💰 {t('pet.batch_dismantle.completed.points', locale=locale, points=total_points_earned)}\n"
+
+            # 显示碎片
+            rarity_emojis = {'C': '⚪', 'R': '🔵', 'SR': '🟣', 'SSR': '🟡'}
+            rarity_names = {'C': '普通', 'R': '稀有', 'SR': '史诗', 'SSR': '传说'}
+
+            for rarity, count in total_fragments_by_rarity.items():
+                if count > 0:
+                    emoji = rarity_emojis.get(rarity, '⚪')
+                    rarity_name = rarity_names.get(rarity, rarity)
+                    description += f"{emoji} {t('pet.batch_dismantle.completed.fragments', locale=locale, count=count, rarity=rarity_name)}\n"
 
         if dismantled_pets:
             description += "\n\n" + t("pet.batch_dismantle.completed.dismantled_pets", locale=locale) + "\n"

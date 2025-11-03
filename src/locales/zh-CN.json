@@ -661,6 +661,9 @@
         "title": "💥 批量分解完成",
         "description": "{user} 批量分解完成！成功分解 {success_count}/{total_count} 只宠物。",
         "description_all_success": "{user} 批量分解完成！成功分解 {success_count} 只宠物。",
+        "rewards": "**获得奖励：**",
+        "points": "{points} 积分",
+        "fragments": "{count} 个 {rarity} 碎片",
         "dismantled_pets": "**已分解的宠物：**",
         "more_pets": "• ... 还有 {remaining} 只宠物",
         "errors": "**分解失败的宠物：**"

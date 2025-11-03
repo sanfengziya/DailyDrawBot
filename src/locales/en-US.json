@@ -661,6 +661,9 @@
         "title": "💥 Batch Dismantle Completed",
         "description": "{user} batch dismantle completed! Successfully dismantled {success_count}/{total_count} pets.",
         "description_all_success": "{user} batch dismantle completed! Successfully dismantled {success_count} pets.",
+        "rewards": "**Rewards Earned:**",
+        "points": "{points} points",
+        "fragments": "{count} {rarity} fragments",
         "dismantled_pets": "**Dismantled Pets:**",
         "more_pets": "• ... and {remaining} more pets",
         "errors": "**Failed Dismantles:**"
