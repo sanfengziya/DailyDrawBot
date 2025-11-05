@@ -966,7 +966,19 @@
   },
   "help": {
     "title": "🎰 Daily Draw Bot Help",
-    "description": "Welcome to the Daily Draw bot!",
+    "description": "Welcome to Daily Draw Bot! Please select a system to learn about:",
+    "welcome_title": "🎉 Welcome to Daily Draw Bot",
+    "welcome_description": "This is a feature-rich Discord entertainment bot with lottery, pets, games and more. Please select a module you'd like to explore:",
+    "select_placeholder": "Select a system...",
+    "back_button": "Back to Main Menu",
+    "home_menu": {
+      "name": "🏠 Main Menu",
+      "description": "Return to help main menu"
+    },
+    "view_description": "View {system_name} details",
+    "usage_tip": "💡 Use the dropdown to view other systems, or select Main Menu to return",
+    "modules_title": "🎯 Feature Modules",
+    "systems_overview": "📋 **Available Systems Overview:**",
     "sections": {
       "system": {
         "name": "ℹ️ System Tips",
@@ -982,7 +994,7 @@
       },
       "pet": {
         "name": "🐾 Pet System",
-        "value": "**Slash Commands:**\n`/pet action:list [page]` - List pets (paged)\n`/pet action:info` - Inspect a pet\n`/pet action:upgrade` - Promote pet rarity (requires shards & points)\n`/pet action:dismantle` - Dismantle pets for shards\n`/pet action:fragments` - Check shard inventory\n`/pet action:equip` - Equip a pet for passive income\n`/pet action:unequip` - Unequip the active pet\n`/pet action:status` - Review equipped status and pending rewards\n`/pet action:claim` - Claim passive points\n`/pet action:feed` - Feed pets for XP\n\n**Auto Feed:**\n`/feed auto [pet] [mode] [quantity]` - One-click feeding"
+        "value": "**Slash Commands:**\n`/pet action:list [page]` - List pets (paged)\n`/pet action:info` - Inspect a pet\n`/pet action:upgrade` - Promote pet rarity (requires shards & points)\n`/pet action:dismantle` - Dismantle pets for shards\n`/pet action:batch_dismantle` - Batch dismantle multiple pets (up to 20)\n`/pet action:fragments` - Check shard inventory\n`/pet action:equip` - Equip a pet for passive income\n`/pet action:unequip` - Unequip the active pet\n`/pet action:status` - Review equipped status and pending rewards\n`/pet action:claim` - Claim passive points\n`/pet action:feed` - Feed pets for XP\n\n**Auto Feed:**\n`/feed auto [pet] [mode] [quantity]` - One-click feeding"
       },
       "shop": {
         "name": "🏪 Grocery Shop",
