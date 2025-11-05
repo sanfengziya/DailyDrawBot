@@ -998,15 +998,15 @@
       },
       "quiz": {
         "name": "🎮 Quiz System",
-        "value": "**Prefix Commands:**\n`!quizlist [language]` - List quiz categories\n  • `!quizlist` or `!quizlist all` - Show every category\n  • `!quizlist chinese` - Only Chinese quizzes\n  • `!quizlist english` - Only English quizzes\n\n**Tips:**\n- Each correct answer rewards 20 points\n- Await staff to start quiz rounds"
+        "value": "**Prefix Commands:**\n`!quizlist [language]` - List quiz categories\n`!quizlist` or `!quizlist all` - Show every category\n`!quizlist chinese` - Only Chinese quizzes\n`!quizlist english` - Only English quizzes\n\n**Tips:**\n- Each correct answer rewards 20 points\n- Await staff to start quiz rounds"
       },
       "blackjack": {
         "name": "🎰 Blackjack",
-        "value": "**Slash Commands:**\n`/blackjack play <bet>` - Start a blackjack round\n  • `bet`: numeric amount or `all`\n  • Examples: `/blackjack play 100`, `/blackjack play all`\n`/blackjack stats` - Review your blackjack stats\n\n**Gameplay:**\n- 🎴✋ **Actions:** Hit & Stand\n- 🎲 **Double Down:** Double after first hand\n- ✂️ **Split:** Split pairs\n- 🎲✂️ **DAS:** Double after split (reduces house edge)\n- 🛡️ **Insurance:** Available against dealer Ace\n- 🏳️ **Surrender:** Cut losses on bad hands\n\n**Features:**\n- ✅ Dealer stands on 17\n- ✅ Blackjack pays 2.5×\n- ✅ Full game logging & stats"
+        "value": "**Slash Commands:**\n`/blackjack play <bet>` - Start a blackjack round\n`bet`: numeric amount or `all`\nExamples: `/blackjack play 100`, `/blackjack play all`\n`/blackjack stats` - Review your blackjack stats\n\n**Gameplay:**\n- 🎴✋ **Actions:** Hit & Stand\n- 🎲 **Double Down:** Double after first hand\n- ✂️ **Split:** Split pairs\n- 🎲✂️ **DAS:** Double after split (reduces house edge)\n- 🛡️ **Insurance:** Available against dealer Ace\n- 🏳️ **Surrender:** Cut losses on bad hands\n\n**Features:**\n- ✅ Dealer stands on 17\n- ✅ Blackjack pays 2.5×\n- ✅ Full game logging & stats"
       },
       "leaderboard": {
         "name": "🏆 Leaderboards",
-        "value": "**Slash Commands:**\n`/leaderboard [type]` - Show top 10 rankings\n\n**Types:**\n- `points` - Points leaderboard (default)\n- `pets` - Pet count leaderboard\n- `hatched eggs` - Hatched egg leaderboard\n- `blackjack wins` - Blackjack wins leaderboard\n\n**Examples:**\n• `/leaderboard` - Points leaderboard\n• `/leaderboard type:pets` - Pet leaderboard\n• `/leaderboard type:hatched eggs` - Hatched egg leaderboard\n• `/leaderboard type:blackjack wins` - Blackjack leaderboard"
+        "value": "**Slash Commands:**\n`/leaderboard [type]` - Show top 10 rankings\n\n**Types:**\n- `points` - Points leaderboard (default)\n- `pets` - Pet count leaderboard\n- `hatched eggs` - Hatched egg leaderboard\n- `blackjack wins` - Blackjack wins leaderboard\n\n**Examples:**\n`/leaderboard` - Points leaderboard\n`/leaderboard type:pets` - Pet leaderboard\n`/leaderboard type:hatched eggs` - Hatched egg leaderboard\n`/leaderboard type:blackjack wins` - Blackjack leaderboard"
       },
       "admin": {
         "name": "⚙️ Admin Commands",

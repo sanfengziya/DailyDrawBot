@@ -998,15 +998,15 @@
       },
       "quiz": {
         "name": "🎮 答题系统",
-        "value": "**传统指令:**\n`!quizlist [语言]` - 查看题库类别\n  • `!quizlist` 或 `!quizlist all` - 显示所有语言\n  • `!quizlist chinese` - 只显示中文题库\n  • `!quizlist english` - 只显示英文题库\n\n**提示:**\n- 答对每题可获得20积分\n- 等待管理员开启答题！"
+        "value": "**传统指令:**\n`!quizlist [语言]` - 查看题库类别\n`!quizlist` 或 `!quizlist all` - 显示所有语言\n`!quizlist chinese` - 只显示中文题库\n`!quizlist english` - 只显示英文题库\n\n**提示:**\n- 答对每题可获得20积分\n- 等待管理员开启答题！"
       },
       "blackjack": {
         "name": "🎰 二十一点游戏",
-        "value": "**斜杠命令:**\n`/blackjack play <bet>` - 开始二十一点游戏\n  • `bet`: 下注金额（数字或 `all`）\n  • 示例：`/blackjack play 100` 或 `/blackjack play all`\n`/blackjack stats` - 查看游戏统计数据\n\n**游戏功能:**\n- 🎴✋ **基础操作**：要牌、停牌\n- 🎲 **加倍下注**：首次发牌后加倍（Double Down）\n- ✂️ **分牌**：对子可以分成两手牌（Split）\n- 🎲✂️ **DAS规则**：分牌后可以加倍（降低庄家优势0.14%）\n- 🛡️ **保险**：庄家明牌A时可购买保险\n- 🏳️ **投降**：手牌极差时止损\n\n**特色:**\n- ✅ 标准赌场规则（庄家17点停牌）\n- ✅ BlackJack特殊奖励（2.5倍赔率）\n- ✅ 完整游戏记录和统计"
+        "value": "**斜杠命令:**\n`/blackjack play <bet>` - 开始二十一点游戏\n`bet`: 下注金额（数字或 `all`）\n示例：`/blackjack play 100` 或 `/blackjack play all`\n`/blackjack stats` - 查看游戏统计数据\n\n**游戏功能:**\n- 🎴✋ **基础操作**：要牌、停牌\n- 🎲 **加倍下注**：首次发牌后加倍（Double Down）\n- ✂️ **分牌**：对子可以分成两手牌（Split）\n- 🎲✂️ **DAS规则**：分牌后可以加倍（降低庄家优势0.14%）\n- 🛡️ **保险**：庄家明牌A时可购买保险\n- 🏳️ **投降**：手牌极差时止损\n\n**特色:**\n- ✅ 标准赌场规则（庄家17点停牌）\n- ✅ BlackJack特殊奖励（2.5倍赔率）\n- ✅ 完整游戏记录和统计"
       },
       "leaderboard": {
         "name": "🏆 排行榜系统",
-        "value": "**斜杠命令:**\n`/leaderboard [type]` - 查看服务器排行榜（显示前10名）\n\n**排行榜类型:**\n- `points` - 积分排行榜（默认）\n- `pets` - 宠物数量排行榜\n- `hatched eggs` - 已孵化蛋数量排行榜\n- `blackjack wins` - 21点胜场排行榜\n\n**示例:**\n• `/leaderboard` - 查看积分排行榜\n• `/leaderboard type:pets` - 查看宠物排行榜\n• `/leaderboard type:hatched eggs` - 查看已孵化蛋排行榜\n• `/leaderboard type:blackjack wins` - 查看21点胜场排行榜"
+        "value": "**斜杠命令:**\n`/leaderboard [type]` - 查看服务器排行榜（显示前10名）\n\n**排行榜类型:**\n- `points` - 积分排行榜（默认）\n- `pets` - 宠物数量排行榜\n- `hatched eggs` - 已孵化蛋数量排行榜\n- `blackjack wins` - 21点胜场排行榜\n\n**示例:**\n`/leaderboard` - 查看积分排行榜\n`/leaderboard type:pets` - 查看宠物排行榜\n`/leaderboard type:hatched eggs` - 查看已孵化蛋排行榜\n`/leaderboard type:blackjack wins` - 查看21点胜场排行榜"
       },
       "admin": {
         "name": "⚙️ 管理员命令",
