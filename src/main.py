@@ -9,7 +9,7 @@ from src.config.config import TOKEN, PREFIX
 from src.commands.economy import draw, check, giftpoints, givepoints, setpoints
 from src.commands.pets import eggs as egg_commands, management as pet_commands, forge as forge_commands
 from src.commands.shop import roles as shop_roles, items as shop_commands
-from src.commands.games import quiz as quiz_commands, blackjack as blackjack_commands
+from src.commands.games import quiz as quiz_commands, blackjack as blackjack_commands, texas_holdem as texas_commands
 from src.commands.rankings import leaderboard as ranking_commands
 from src.commands.system import help_module as help_commands, admin as debug_commands, language as language_commands
 from src.db.database import is_guild_subscribed
@@ -98,6 +98,7 @@ async def on_ready():
         ('forge_commands', forge_commands.setup),
         ('role_commands', shop_roles.setup),
         ('blackjack_commands', blackjack_commands.setup),
+        ('texas_commands', texas_commands.setup),
         ('ranking_commands', ranking_commands.setup),
         ('language_commands', language_commands.setup)
     ]

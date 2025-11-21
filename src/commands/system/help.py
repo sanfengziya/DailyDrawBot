@@ -32,6 +32,7 @@ class HelpSelect(Select):
             ("roles", "🏷️ 身份组系统"),
             ("quiz", "🎮 答题系统"),
             ("blackjack", "🎰 二十一点游戏"),
+            ("texas", "🃏 德州扑克"),
             ("leaderboard", "🏆 排行榜系统"),
         ]
 
@@ -137,6 +138,7 @@ def create_welcome_embed(interaction: discord.Interaction):
         ("roles", "🏷️ 身份组系统"),
         ("quiz", "🎮 答题系统"),
         ("blackjack", "🎰 二十一点游戏"),
+        ("texas", "🃏 德州扑克"),
         ("leaderboard", "🏆 排行榜系统"),
     ]
 

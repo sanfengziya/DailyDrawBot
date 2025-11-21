@@ -1016,6 +1016,10 @@
         "name": "🎰 Blackjack",
         "value": "**Slash Commands:**\n`/blackjack play <bet>` - Start a blackjack round\n`bet`: numeric amount or `all`\nExamples: `/blackjack play 100`, `/blackjack play all`\n`/blackjack stats` - Review your blackjack stats\n\n**Gameplay:**\n- 🎴✋ **Actions:** Hit & Stand\n- 🎲 **Double Down:** Double after first hand\n- ✂️ **Split:** Split pairs\n- 🎲✂️ **DAS:** Double after split (reduces house edge)\n- 🛡️ **Insurance:** Available against dealer Ace\n- 🏳️ **Surrender:** Cut losses on bad hands\n\n**Features:**\n- ✅ Dealer stands on 17\n- ✅ Blackjack pays 2.5×\n- ✅ Full game logging & stats"
       },
+      "texas": {
+        "name": "🃏 Texas Hold'em",
+        "value": "**Slash Commands:**\n`/texas_holdem bet:<amount|all> ai:<1-3> difficulty:<easy|medium|hard>` - Play against AI\n`/texas_holdem_stats` - View your Hold'em stats\n\n**Tips:**\n- Bets use your points; `all` means all-in\n- Difficulty tunes AI aggression/fold behaviour\n- Buttons: Fold / Check/Call / Raise / All-In"
+      },
       "leaderboard": {
         "name": "🏆 Leaderboards",
         "value": "**Slash Commands:**\n`/leaderboard [type]` - Show top 10 rankings\n\n**Types:**\n- `points` - Points leaderboard (default)\n- `pets` - Pet count leaderboard\n- `hatched eggs` - Hatched egg leaderboard\n- `blackjack wins` - Blackjack wins leaderboard\n\n**Examples:**\n`/leaderboard` - Points leaderboard\n`/leaderboard type:pets` - Pet leaderboard\n`/leaderboard type:hatched eggs` - Hatched egg leaderboard\n`/leaderboard type:blackjack wins` - Blackjack leaderboard"
@@ -1312,6 +1316,109 @@
       "no_user_found": "❌ User info not found! Please play a game of blackjack first.",
       "no_games": "❌ You haven't played any blackjack games yet! Use `/blackjack` to start your first game.",
       "query_failed": "❌ Error occurred while querying statistics. Please try again later."
+    }
+  },
+  "texas_holdem": {
+    "ai": {
+      "default_name": "AI Player {index}"
+    },
+    "actions": {
+      "post_blind": "Posted blind",
+      "folded": "Folded",
+      "raise": "Raise +{amount} pts",
+      "all_in": "All-in",
+      "call": "Call",
+      "start": "🎮 Game started! Your move!",
+      "prompt": "Your turn to act.",
+      "raised": "You raised {amount}. Watching AI reactions...",
+      "checked": "You checked/called. Waiting for the next street..."
+    },
+    "embed": {
+      "title": "🎰 Texas Hold'em",
+      "pot": "🏆 Pot",
+      "current_bet": "💰 Current Bet",
+      "player_field": "You",
+      "ai_field": "AI Opponents",
+      "community": "🎰 Community Cards",
+      "phase": "📍 Phase",
+      "community_unknown": "Cards are still hidden",
+      "no_ai": "No AI opponents joined this round.",
+      "player_line": "{emoji} **{name}** ({points})",
+      "bet_value": "Bet: {amount}",
+      "cards_line": "Cards: {cards}",
+      "status_line": "Status: {status}",
+      "action_label": "📢 Action",
+      "default_action": "🎮 Game on! Your move!",
+      "points_value": "{amount} pts",
+      "status": {
+        "folded": "❌ Folded",
+        "thinking": "🤔 Thinking...",
+        "all_in": "💎 All-in"
+      }
+    },
+    "phases": {
+      "preflop": "Pre-Flop",
+      "flop": "Flop",
+      "turn": "Turn",
+      "river": "River",
+      "showdown": "Showdown"
+    },
+    "hands": {
+      "royal_flush": "Royal Flush",
+      "straight_flush": "Straight Flush",
+      "four_of_a_kind": "Four of a Kind",
+      "full_house": "Full House",
+      "flush": "Flush",
+      "straight": "Straight",
+      "three_of_a_kind": "Three of a Kind",
+      "two_pair": "Two Pair",
+      "one_pair": "One Pair",
+      "high_card": "High Card"
+    },
+    "buttons": {
+      "fold": "Fold",
+      "check": "Check / Call",
+      "raise": "Raise",
+      "all_in": "All-In"
+    },
+    "results": {
+      "title": "🎮 Result",
+      "default_hand": "No revealed hand",
+      "win": "🎉 You won! Profit `{amount}` pts\nBest hand: {hand}",
+      "tie": "🤝 Split pot! Change `{amount}` pts\nBest hand: {hand}",
+      "timeout": "⏰ Timed out. Auto-fold applied.",
+      "fold": "❌ You folded. Remaining stack returned.",
+      "lose": "😢 You lost this round."
+    },
+    "messages": {
+      "not_your_game": "This isn't your table!",
+      "game_already_finished": "This game already ended.",
+      "cannot_raise": "❌ Not enough chips to raise.",
+      "raise_failed": "❌ Failed to raise. Please try again.",
+      "cannot_all_in": "❌ No chips left for all-in.",
+      "user_fetch_failed": "❌ Failed to load your profile. Please try again later.",
+      "invalid_bet": "❌ Invalid bet amount. Enter a positive number or `all`.",
+      "not_enough_points": "❌ Not enough points! You have `{current}` pts but need `{required}` pts.",
+      "deduct_failed": "❌ Failed to place bet. Please try again."
+    },
+    "stats": {
+      "title": "📊 Texas Hold'em Stats",
+      "description": "**{user}**'s game records",
+      "basic_stats": "🎮 Basics",
+      "total_games": "**Total Games:** {count}",
+      "wins": "**Wins:** {count} ({rate:.1f}%)",
+      "losses": "**Losses:** {count} ({rate:.1f}%)",
+      "ties": "**Ties:** {count} ({rate:.1f}%)",
+      "points_stats": "💰 Points",
+      "total_profit": "**Total Profit:** {emoji} {amount} pts",
+      "max_win": "**Max Win:** {amount} pts",
+      "max_loss": "**Max Loss:** {amount} pts",
+      "avg_start": "**Avg Start Stack:** {amount} pts",
+      "avg_final": "**Avg Final Stack:** {amount} pts",
+      "footer": "Good luck at the tables!",
+      "no_user_found": "❌ No user info found. Please play a game first.",
+      "no_games": "❌ You haven't played Texas Hold'em yet.",
+      "query_failed": "❌ Failed to load stats. Please try again."
     }
   }
 }
